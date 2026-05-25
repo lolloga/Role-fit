@@ -7,7 +7,7 @@ async function searchRole() {
   document.getElementById('diz-result').classList.add('hidden');
 
   try {
-    const response = await fetch('/.netlify/functions/claude', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
