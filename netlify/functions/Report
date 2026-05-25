@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoleFit — Il tuo report</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="report-page">
+  <div class="container">
+
+    <!-- Stato: generazione in corso -->
+    <div id="loading-state" style="min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;">
+      <div class="thinking">
+        <div class="thinking-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:0.9rem;">Stiamo costruendo il tuo report...</p>
+    </div>
+
+    <!-- Report generato -->
+    <div id="report-content" class="hidden">
+
+      <div class="report-header">
+        <div class="label" style="margin-bottom:12px;">Il tuo report RoleFit</div>
+        <h1>Ecco chi sei,<br><em style="font-style:italic;color:var(--terracotta);">professionalmente.</em></h1>
+      </div>
+
+      <!-- Blocco 1: Chi sei -->
+      <div class="report-section" id="section-chi-sei">
+        <div class="report-section-label">
+          <span class="label">Chi sei</span>
+        </div>
+        <div class="chi-sei-text" id="chi-sei-text"></div>
+      </div>
+
+      <!-- Blocco 2: I tuoi 3 ruoli -->
+      <div class="report-section" id="section-ruoli">
+        <div class="report-section-label">
+          <span class="label">I tuoi 3 ruoli</span>
+        </div>
+        <div id="ruoli-list"></div>
+      </div>
+
+      <!-- Blocco bonus -->
+      <div class="report-section" id="section-bonus">
+        <div class="report-section-label">
+          <span class="label">Il colpo di scena</span>
+        </div>
+        <div class="bonus-card" id="bonus-card"></div>
+      </div>
+
+      <!-- Azioni -->
+      <div class="report-actions">
+        <a href="dizionario.html" class="btn btn--primary">Approfondisci i ruoli</a>
+        <button class="btn btn--secondary" onclick="shareReport()">Condividi il report</button>
+        <a href="test.html" class="btn btn--secondary">Rifai il test</a>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script src="js/report.js"></script>
+</body>
+</html>
