@@ -188,13 +188,13 @@ Rispondi con un oggetto JSON valido:
 Rispondi SEMPRE e SOLO con JSON valido — nessun testo fuori dal JSON.
 `;
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    const { messages, fase } = JSON.parse(event.body);
+    const { messages, fase } = req.body;
 
     const systemPrompts = {
       test: PROMPT_DECISIONE,
@@ -220,17 +220,9 @@ exports.handler = async (event) => {
     });
 
     const data = await response.json();
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    };
+    return res.status(200).json(data);
 
   } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
+    return res.status(500).json({ error: error.message });
   }
-};
+}
