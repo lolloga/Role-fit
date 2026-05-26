@@ -147,7 +147,7 @@ const ACTIVITY_AFTER_FIXED = {
 
 // ─── CHIAMATA API ─────────────────────────────────────────────
 async function callClaude(fase = 'test') {
-  const response = await fetch('/.netlify/functions/claude', {
+  const response = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
