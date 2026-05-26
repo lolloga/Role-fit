@@ -22,7 +22,7 @@ async function generateReport() {
 
   const data = await response.json();
   const text = data.content[0].text;
-
+console.log('RISPOSTA CLAUDE:', text);
   // Estrai il JSON in modo robusto
   try {
     return JSON.parse(text);
