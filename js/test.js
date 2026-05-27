@@ -159,7 +159,7 @@ async function callClaude(fase = 'test') {
   const data = await response.json();
   const text = data.content[0].text;
 
-  try {
+try {
     return JSON.parse(text);
   } catch {
     // fallback se il JSON non è pulito
