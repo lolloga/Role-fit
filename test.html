@@ -8,6 +8,25 @@
 </head>
 <body>
 
+<!-- Blobs ambient -->
+<div class="blob-container">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<!-- Progress bar -->
+<div class="progress-bar-wrap">
+  <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+</div>
+
+<!-- Nav home -->
+<a href="index.html" class="nav-home">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Home
+</a>
+
 <div class="test-page">
   <div class="container">
 
@@ -26,23 +45,31 @@
     <!-- Area domanda -->
     <div class="question-area" id="question-area">
 
-      <!-- Stato: thinking -->
-      <div class="thinking hidden" id="thinking-state">
-        <div class="thinking-dots">
-          <span></span><span></span><span></span>
+      <!-- AI Thinking -->
+      <div class="ai-thinking hidden" id="thinking-state">
+        <div class="ai-orb">
+          <div class="ai-orb-ring2"></div>
+          <div class="ai-orb-ring"></div>
+          <div class="ai-orb-core"></div>
+          <div class="ai-orb-particles">
+            <div class="ai-particle"></div>
+            <div class="ai-particle"></div>
+            <div class="ai-particle"></div>
+          </div>
         </div>
-        <span>Un momento...</span>
+        <div class="ai-thinking-phrases" id="thinking-phrase">Sto elaborando...</div>
       </div>
 
       <!-- Domanda attiva -->
       <div id="active-question" class="hidden">
         <div class="question-text" id="question-text"></div>
+        <div class="question-context" id="question-context"></div>
         <div id="question-input"></div>
         <button class="back-btn" id="back-btn" onclick="goBack()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Torna indietro
+          Cambia risposta
         </button>
       </div>
 
