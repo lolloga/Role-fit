@@ -355,9 +355,12 @@ function renderMultipleChoice(container, questionData) {
   container.appendChild(grid);
 
   // Link per risposta aperta
-  const openLink = document.createElement('button');
-  openLink.className = 'open-toggle';
-  openLink.textContent = 'Preferisci rispondere con parole tue →';
+// Link risposta aperta — solo se non abbiamo già 2 risposte aperte
+  const openAnswers = state.answers.filter(a => a.isOpen).length;
+  if (openAnswers < 2) {
+    const openLink = document.createElement('button');
+    openLink.className = 'open-toggle';
+    openLink.textContent = 'Preferisci rispondere con parole tue →';
   openLink.addEventListener('click', () => {
     container.innerHTML = '';
     renderOpenInput(container, questionData);
@@ -394,7 +397,10 @@ function renderOpenInput(container, questionData) {
   btn.textContent = 'Continua';
   btn.addEventListener('click', () => {
     const val = textarea.value.trim();
-    if (val) submitAnswer(val, questionData);
+  if (val) {
+  questionData._isOpen = true;
+  submitAnswer(val, questionData);
+}
   });
 
   textarea.addEventListener('keydown', (e) => {
@@ -445,7 +451,7 @@ if (questionData.id === 'lavoro') {
     content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
 
-  state.answers.push({ id: questionData.id, question: questionData.text, answer: value, time: responseTime });
+state.answers.push({ id: questionData.id, question: questionData.text, answer: value, time: responseTime, isOpen: !!questionData._isOpen });
   state.questionCount++;
 
   if (state.fixedCount < STANDARD_QUESTIONS.length) {
