@@ -1,7 +1,9 @@
+// ─── GENERA REPORT ───────────────────────────────────────────
 async function generateReport() {
   const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
   const activities = JSON.parse(sessionStorage.getItem('rf_activities') || '{}');
 
+  // Aggiungi riepilogo attività alla richiesta
   const activitiesSummary = Object.entries(activities)
     .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
     .join('\n');
@@ -22,28 +24,15 @@ async function generateReport() {
 
   const data = await response.json();
   const text = data.content[0].text;
-console.log('RISPOSTA CLAUDE:', text);
-  // Estrai il JSON in modo robusto
+
   try {
     return JSON.parse(text);
   } catch {
-    // Prova a estrarre il primo blocco JSON valido
     const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        // Prova a pulire il testo da caratteri problematici
-        const cleaned = match[0]
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
-          .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']');
-        return JSON.parse(cleaned);
-      }
-    }
-    throw new Error('JSON non valido');
+    return match ? JSON.parse(match[0]) : null;
   }
 }
+
 // ─── RENDER REPORT ───────────────────────────────────────────
 function renderReport(data) {
   const report = data.report;
