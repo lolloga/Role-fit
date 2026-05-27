@@ -228,7 +228,19 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    return res.status(200).json(data);
+
+// Forza il testo a essere JSON puro prima di restituirlo
+if (data.content && data.content[0]?.text) {
+  let text = data.content[0].text.trim();
+  // Rimuove eventuali backtick markdown
+  text = text.replace(/```json|```/g, '').trim();
+  // Estrae solo il JSON se c'è testo attorno
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match) text = match[0];
+  data.content[0].text = text;
+}
+
+return res.status(200).json(data);
 
   } catch (error) {
     return res.status(500).json({ error: error.message });
