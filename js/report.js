@@ -47,7 +47,6 @@ async function generateReport() {
 function renderReport(data) {
   const report = data.report;
 
-  // Chi sei
   const chiSeiEl = document.getElementById('chi-sei-text');
   ['come_funzioni', 'cosa_ti_alimenta', 'di_cosa_hai_bisogno'].forEach(key => {
     if (report.chi_sei[key]) {
@@ -57,9 +56,8 @@ function renderReport(data) {
     }
   });
 
-  // Ruoli
   const ruoliEl = document.getElementById('ruoli-list');
-  report.ruoli.forEach((ruolo, i) => {
+  report.ruoli.forEach((ruolo) => {
     const card = document.createElement('div');
     card.className = 'ruolo-card';
     card.innerHTML = `
@@ -90,7 +88,6 @@ function renderReport(data) {
     ruoliEl.appendChild(card);
   });
 
-  // Bonus
   const bonusEl = document.getElementById('bonus-card');
   bonusEl.innerHTML = `
     <div class="bonus-eyebrow">Il ruolo che non ti aspetti</div>
@@ -98,7 +95,6 @@ function renderReport(data) {
     <div class="bonus-testo">${report.bonus.testo}</div>
   `;
 
-  // Ruoli mismatch
   if (report.ruoli_mismatch && report.ruoli_mismatch.length > 0) {
     const mismatchSection = document.getElementById('section-mismatch');
     if (mismatchSection) {
@@ -107,7 +103,6 @@ function renderReport(data) {
       report.ruoli_mismatch.forEach(ruolo => {
         const card = document.createElement('div');
         card.className = 'ruolo-card';
-        card.style.cssText = '--card-accent: var(--rose);';
         card.innerHTML = `
           <div class="ruolo-header">
             <div class="ruolo-nome">${ruolo.nome}</div>
@@ -121,18 +116,13 @@ function renderReport(data) {
             <div class="ruolo-detail-text">${ruolo.perche_no}</div>
           </div>
         `;
-        card.querySelector('::before');
-        card.style.setProperty('--before-bg', 'var(--rose)');
         mismatchList.appendChild(card);
       });
     }
   }
 
-  // Mostra tutto
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('report-content').classList.remove('hidden');
-
-  // Salva per condivisione
   sessionStorage.setItem('rf_report', JSON.stringify(report));
 }
 
@@ -141,7 +131,7 @@ function shareReport() {
   const report = JSON.parse(sessionStorage.getItem('rf_report') || '{}');
   if (!report.ruoli) return;
 
-  const text = `Ho fatto il test RoleFit 🎯\n\nI miei 3 ruoli:\n${report.ruoli.map(r => `• ${r.nome} (${r.match}%)`).join('\n')}\n\nRuolo bonus: ${report.bonus?.nome}\n\nScopri il tuo → rolefit.netlify.app`;
+  const text = `Ho fatto il test RoleFit 🎯\n\nI miei 3 ruoli:\n${report.ruoli.map(r => `• ${r.nome} (${r.match}%)`).join('\n')}\n\nRuolo bonus: ${report.bonus?.nome}\n\nScopri il tuo → role-fit-beta.vercel.app`;
 
   if (navigator.share) {
     navigator.share({ text });
@@ -152,9 +142,17 @@ function shareReport() {
   }
 }
 
+// ─── RESTART ─────────────────────────────────────────────────
+function restartTest() {
+  localStorage.removeItem('rf_state');
+  sessionStorage.removeItem('rf_history');
+  sessionStorage.removeItem('rf_activities');
+  sessionStorage.removeItem('rf_report');
+  window.location.href = 'test.html';
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Se non c'è history, torna al test
   const history = sessionStorage.getItem('rf_history');
   if (!history) {
     window.location.href = 'test.html';
