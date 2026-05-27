@@ -872,7 +872,33 @@ function init() {
   // Prova a ripristinare sessione salvata
   const restored = loadState();
 
-  if (restored && state.currentQuestion && state.questionCount > 0) {
+  if (restored && state.currentQuestion && state.fixedCount >= 1 && state.fixedCount <= 5) {
+    // Sessione valida solo se siamo nelle domande standard
+    // e la domanda corrente è effettivamente una delle 5 standard
+    const isStandardQuestion = STANDARD_QUESTIONS.some(q => q.id === state.currentQuestion.id);
+    const isWorkQuestion = state.currentQuestion.id === 'ruolo_attuale';
+
+    if (!isStandardQuestion && !isWorkQuestion) {
+      // Sessione in stato inconsistente — riparte da zero
+      clearState();
+      state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
+      renderQuestion(STANDARD_QUESTIONS[0]);
+      return;
+    }
+
+    updatePhase(state.currentPhase);
+    updateProgress();
+
+    const notice = document.createElement('div');
+    notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
+    notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
+
+    document.getElementById('active-question').classList.remove('hidden');
+    document.getElementById('active-question').prepend(notice);
+
+    renderQuestion(state.currentQuestion);
+    return;
+  } {
     // Ripristina fase
     updatePhase(state.currentPhase);
     updateProgress();
