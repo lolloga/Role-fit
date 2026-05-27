@@ -119,7 +119,8 @@ Per ogni ruolo:
 
 Blocco Bonus — IL RUOLO CHE NON TI ASPETTI
 Un ruolo sorprendente con lo stesso DNA psicologico ma settore lontanissimo. Deve far sorridere e avere una logica cristallina.
-
+Blocco 3 — I 3 RUOLI CHE NON FANNO PER TE
+Presenta 3 ruoli con bassa compatibilità. Per ognuno: nome, percentuale match (sotto il 35%), e una spiegazione onesta e specifica del perché questo profilo e quel ruolo non si allineano. Non deve essere una critica alla persona — deve suonare liberatorio, non negativo. "Non è per te perché..." deve aiutare a capire, non scoraggiare.
 REGOLE DI SCRITTURA
 
 - Usa "tu" sempre
@@ -149,10 +150,17 @@ Rispondi con un oggetto JSON valido:
         "sorpresa": "cosa non ti aspetti"
       }
     ],
-    "bonus": {
+   "bonus": {
       "nome": "Nome Ruolo Bonus",
       "testo": "spiegazione sorprendente con logica cristallina"
-    }
+    },
+    "ruoli_mismatch": [
+      {
+        "nome": "Nome Ruolo",
+        "match": 28,
+        "perche_no": "spiegazione onesta del mismatch"
+      }
+    ]
   }
 }
 
