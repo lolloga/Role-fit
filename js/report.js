@@ -3,7 +3,6 @@ async function generateReport() {
   const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
   const activities = JSON.parse(sessionStorage.getItem('rf_activities') || '{}');
 
-  // Aggiungi riepilogo attività alla richiesta
   const activitiesSummary = Object.entries(activities)
     .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
     .join('\n');
@@ -29,7 +28,18 @@ async function generateReport() {
     return JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
-    return match ? JSON.parse(match[0]) : null;
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        const cleaned = match[0]
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']');
+        return JSON.parse(cleaned);
+      }
+    }
+    throw new Error('JSON non valido');
   }
 }
 
@@ -87,6 +97,36 @@ function renderReport(data) {
     <div class="bonus-nome">${report.bonus.nome}</div>
     <div class="bonus-testo">${report.bonus.testo}</div>
   `;
+
+  // Ruoli mismatch
+  if (report.ruoli_mismatch && report.ruoli_mismatch.length > 0) {
+    const mismatchSection = document.getElementById('section-mismatch');
+    if (mismatchSection) {
+      mismatchSection.classList.remove('hidden');
+      const mismatchList = document.getElementById('mismatch-list');
+      report.ruoli_mismatch.forEach(ruolo => {
+        const card = document.createElement('div');
+        card.className = 'ruolo-card';
+        card.style.cssText = '--card-accent: var(--rose);';
+        card.innerHTML = `
+          <div class="ruolo-header">
+            <div class="ruolo-nome">${ruolo.nome}</div>
+            <div class="ruolo-match">
+              <span class="ruolo-match-number" style="color:var(--text-muted);">${ruolo.match}%</span>
+              <span class="ruolo-match-label">compatibilità</span>
+            </div>
+          </div>
+          <div class="ruolo-detail">
+            <div class="ruolo-detail-label" style="color:var(--rose);opacity:1;">Perché non fa per te</div>
+            <div class="ruolo-detail-text">${ruolo.perche_no}</div>
+          </div>
+        `;
+        card.querySelector('::before');
+        card.style.setProperty('--before-bg', 'var(--rose)');
+        mismatchList.appendChild(card);
+      });
+    }
+  }
 
   // Mostra tutto
   document.getElementById('loading-state').classList.add('hidden');
