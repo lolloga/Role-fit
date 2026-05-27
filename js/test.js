@@ -436,13 +436,8 @@ async function submitAnswer(value, questionData) {
   });
 
   // Controlla se lavora (per domanda sul ruolo)
-  if (questionData.id === 'lavoro') {
-    const worksOptions = [
-      'Sì, ho fatto qualcosa ma non è la mia strada',
-      'Sì, e mi piace ma voglio capire dove può portarmi',
-      'Sì, ma voglio cambiare completamente direzione'
-    ];
-    state.worksCurrently = worksOptions.some(o => value.startsWith(o.substring(0, 15)));
+if (questionData.id === 'lavoro') {
+    state.worksCurrently = value.startsWith('Sì');
   }
 
   state.conversationHistory.push({
