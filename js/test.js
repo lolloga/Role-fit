@@ -692,10 +692,11 @@ function renderDilemma(container, pairs) {
     optB.textContent = pair.b;
 
     const select = (chosen, other, value) => {
+      const wasSelected = chosen.classList.contains('selected');
       chosen.classList.add('selected');
       other.classList.remove('selected');
+      if (!results[i]) completed++;
       results[i] = { a: pair.a, b: pair.b, scelta: value };
-      completed++;
       if (completed === pairs.length) {
         setTimeout(() => completeActivity('dilemma', results), 500);
       }
@@ -1040,6 +1041,14 @@ Cosa cerchiamo:
       else if (bg.includes('255,100,150')) result.rosso.push(row.textContent);
       else if (bg.includes('255,200,50')) result.giallo.push(row.textContent);
     });
+    // Almeno 3 righe valutate prima di procedere
+    const total = result.verde.length + result.rosso.length + result.giallo.length;
+    if (total < 3) {
+      btn.textContent = 'Valuta almeno 3 righe per continuare';
+      btn.style.opacity = '0.6';
+      setTimeout(() => { btn.textContent = 'Conferma e continua'; btn.style.opacity = '1'; }, 2000);
+      return;
+    }
     completeActivity('smonta', result);
   });
 
