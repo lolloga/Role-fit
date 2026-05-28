@@ -486,12 +486,6 @@ async function submitAnswer(value, questionData) {
 
   saveState();
 
-  // Dopo domanda lavoro, chiedi ruolo se lavora
-  if (questionData.id === 'lavoro' && state.worksCurrently && !state.answers.find(a => a.id === 'ruolo_attuale')) {
-    renderQuestion(WORK_ROLE_QUESTION);
-    return;
-  }
-
   // Attività dopo domanda 3
   if (state.fixedCount === 3 && !state.activityResults['riunione']) {
     showActivity('riunione');
