@@ -110,9 +110,9 @@ REGOLE ASSOLUTE
 4. Mai fermarsi sotto 7 domande adattive
 5. Mai superare 15 domande adattive
 6. Le contraddizioni non si ignorano — si esplorano
-7. Massimo 2 domande aperte in tutto il test adattivo
-8. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
-9. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
+7. Massimo 2 domande aperte in tutto il test adattivo — CONTALE. Se hai già fatto 2 domande aperte, usa SOLO multiple_choice per tutte le successive
+8. Le domande aperte devono richiedere risposte brevissime (1-2 righe max) — mai domande che richiedono riflessioni elaborate. Esempio giusto: "Pensa all'ultimo lavoro che hai fatto. Come si chiamava il tuo ruolo?" Esempio sbagliato: "Quando pensi alle altre strade, cosa le rende attraenti? Cosa hanno in comune?"
+9. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
 `;
 
 const PROMPT_REPORT = `
