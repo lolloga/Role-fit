@@ -113,6 +113,7 @@ REGOLE ASSOLUTE
 7. Massimo 2 domande aperte in tutto il test adattivo — CONTALE. Se hai già fatto 2 domande aperte, usa SOLO multiple_choice per tutte le successive
 8. Le domande aperte devono richiedere risposte brevissime (1-2 righe max) — mai domande che richiedono riflessioni elaborate. Esempio giusto: "Pensa all'ultimo lavoro che hai fatto. Come si chiamava il tuo ruolo?" Esempio sbagliato: "Quando pensi alle altre strade, cosa le rende attraenti? Cosa hanno in comune?"
 9. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
+10. Scrivi in italiano corretto e naturale — controlla sempre la grammatica prima di restituire il JSON. Mai costruzioni innaturali come "l'ho convincente" invece di "l'ho convinto"
 `;
 
 const PROMPT_REPORT = `
