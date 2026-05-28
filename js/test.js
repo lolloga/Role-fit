@@ -182,32 +182,53 @@ const ACTIVITY_VARIANTS = {
       ]
     }
   ],
-  termometro: [
-    [
+  termometro: (() => {
+    const pool = [
       'Analizzi dati da zero per trovare un pattern nascosto',
       'Presenti una proposta a un cliente che non conosci',
       'Aiuti un collega a sbloccarsi su un problema difficile',
-      'Gestisci un progetto con deadline strette',
-      'Esplori un territorio nuovo senza direzione precisa',
-      'Scrivi un documento che definirà la strategia del prossimo anno'
-    ],
-    [
-      'Devi convincere qualcuno di un\'idea in cui credi',
-      'Lavori da solo per ore su qualcosa di tecnico',
-      'Organizzi un evento con molte variabili',
-      'Ricevi un feedback negativo su un lavoro fatto bene',
+      'Gestisci un progetto con deadline strette e molte dipendenze',
+      'Esplori un territorio nuovo senza una direzione precisa',
+      'Scrivi un documento che definirà la strategia del prossimo anno',
+      "Devi convincere qualcuno di un'idea in cui credi profondamente",
+      'Lavori da solo per ore su qualcosa di tecnico e complesso',
+      'Organizzi un evento con molte variabili da gestire',
+      'Ricevi un feedback negativo su un lavoro che pensavi fatto bene',
       'Ti viene chiesto di improvvisare davanti a un gruppo',
-      'Risolvi un problema urgente sotto pressione'
-    ],
-    [
-      'Crei qualcosa di visivo da zero',
-      'Fai una riunione dopo l\'altra per tutto il giorno',
-      'Scrivi un testo lungo e complesso',
-      'Negozi qualcosa di importante',
-      'Impari qualcosa di completamente nuovo',
-      'Ti occupi di qualcosa di routinario ma necessario'
-    ]
-  ],
+      'Risolvi un bug o un problema urgente sotto pressione',
+      'Crei qualcosa di visivo o narrativo da zero',
+      "Fai una riunione dopo l'altra per tutto il giorno",
+      'Scrivi un testo lungo e complesso che richiede rigore',
+      'Negozi qualcosa di importante con qualcuno che non vuole cedere',
+      'Impari qualcosa di completamente nuovo in poco tempo',
+      'Ti occupi di attività routinarie ma necessarie per il team',
+      'Coordini persone con caratteri e priorità molto diverse',
+      'Analizzi un problema che nessuno è riuscito a risolvere prima',
+      'Fai una presentazione davanti al management',
+      'Supporti qualcuno che sta attraversando un momento difficile',
+      'Pianifichi qualcosa di complesso con molte variabili',
+      'Esegui compiti ripetitivi ma precisi per ore',
+      'Costruisci una relazione con qualcuno di diffidente',
+      'Prendi una decisione importante con poche informazioni',
+      'Insegni qualcosa a qualcuno che parte da zero',
+      'Gestisci un conflitto tra due persone del tuo team',
+      'Lavori su un progetto creativo senza vincoli precisi',
+      'Monitori numeri e indicatori per settimane senza risultati visibili',
+      'Scrivi codice o lavori su qualcosa di altamente tecnico',
+      "Conduci un colloquio o un'intervista con qualcuno",
+      "Gestisci l'imprevisto che manda all'aria un piano ben fatto",
+      'Rappresenti la tua azienda in un evento esterno',
+      'Lavori su qualcosa che ha un impatto diretto sulla vita delle persone',
+      'Ti vengono assegnate responsabilità nuove senza una guida chiara',
+      'Collabori con persone di culture o background molto diversi dal tuo',
+      'Lavori su un progetto che sai che non andrà da nessuna parte',
+      'Ricevi un riconoscimento pubblico per un lavoro fatto bene',
+      'Devi spiegare qualcosa di complesso a chi non capisce il settore'
+    ];
+    const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+    const shuffled = shuffle(pool);
+    return [shuffled.slice(0, 6), shuffled.slice(6, 12), shuffled.slice(12, 18)];
+  })(),,
   dilemma: [
     [
       { a: 'Lavoro ad alto impatto ma poca libertà', b: 'Lavoro autonomo ma impatto incerto' },
@@ -630,10 +651,11 @@ function renderTermometro(container, scenarios) {
       btn.className = 'reaction-btn';
       btn.textContent = emoji;
       btn.addEventListener('click', () => {
+        const wasSelected = reactionBtns.querySelector('.reaction-btn.selected');
         reactionBtns.querySelectorAll('.reaction-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         results[i] = { scenario, reaction: emoji, value: r };
-        completed++;
+        if (!wasSelected) completed++;
         if (completed === scenarios.length) {
           setTimeout(() => completeActivity('termometro', results), 500);
         }
