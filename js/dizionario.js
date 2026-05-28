@@ -17,26 +17,37 @@ async function searchRole() {
 
     const data = await response.json();
     const text = data.content[0].text;
-console.log('risposta grezza:', text);
-   let result;
-try { result = JSON.parse(text); }
-catch {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) {
-    try { result = JSON.parse(match[0]); }
-    catch {
-      const cleaned = match[0]
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*]/g, ']')
-        .replace(/\n/g, ' ')
-        .replace(/\r/g, ' ');
-      try { result = JSON.parse(cleaned); }
-      catch { result = null; }
+
+    let result = null;
+
+    try {
+      result = JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          result = JSON.parse(match[0]);
+        } catch {
+          const cleaned = match[0]
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+            .replace(/,\s*}/g, '}')
+            .replace(/,\s*]/g, ']')
+            .replace(/\n/g, ' ')
+            .replace(/\r/g, ' ');
+          try {
+            result = JSON.parse(cleaned);
+          } catch {
+            result = null;
+          }
+        }
+      }
     }
-  }
-}
-    else throw new Error('Nessun risultato');
+
+    if (result && result.ruolo) {
+      renderResult(result.ruolo);
+    } else {
+      throw new Error('Nessun risultato');
+    }
 
   } catch (err) {
     console.error(err);
@@ -52,8 +63,8 @@ function renderResult(ruolo) {
   const el = document.getElementById('diz-result');
   el.innerHTML = '';
 
-  const trendClass = ruolo.trend?.includes('crescita') ? 'crescita' :
-                     ruolo.trend?.includes('declino')  ? 'declino'  : 'stabile';
+  const trendClass = ruolo.trend && ruolo.trend.includes('crescita') ? 'crescita' :
+                     ruolo.trend && ruolo.trend.includes('declino') ? 'declino' : 'stabile';
   const trendEmoji = trendClass === 'crescita' ? '↑' :
                      trendClass === 'declino'  ? '↓' : '→';
 
