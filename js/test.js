@@ -1054,7 +1054,6 @@ Cosa cerchiamo:
     }
     completeActivity('smonta', result);
   });
-  });
 
   content.appendChild(intro);
   content.appendChild(annuncio);
