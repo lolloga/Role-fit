@@ -18,7 +18,6 @@ function startThinking() {
   const el = document.getElementById('thinking-phrase');
   let i = Math.floor(Math.random() * THINKING_PHRASES.length);
   el.textContent = THINKING_PHRASES[i];
-
   thinkingInterval = setInterval(() => {
     el.style.animation = 'none';
     el.offsetHeight;
@@ -147,11 +146,11 @@ const STANDARD_QUESTIONS = [
   }
 ];
 
-// Domanda sul ruolo lavorativo (se lavora)
+// Domanda sul ruolo lavorativo (solo se lavora)
 const WORK_ROLE_QUESTION = {
   id: 'ruolo_attuale',
-  text: 'Descrivimi il tuo lavoro attuale.',
-  context: 'Scrivi il tuo ruolo, il tipo di attività che fai e il settore. Ci aiuterà a capire se il report rispecchia davvero la tua situazione.',
+  text: 'Descrivimi brevemente il tuo lavoro attuale.',
+  context: 'In 1-2 righe: ruolo, tipo di attività, settore.',
   type: 'open'
 };
 
@@ -168,7 +167,7 @@ const ACTIVITY_VARIANTS = {
     },
     {
       items: [
-        { time: '09:30', title: 'Brainstorming con il team su un problema aperto' },
+        { time: '09:30', title: 'Brainstorming su un problema aperto' },
         { time: '11:00', title: 'Presentazione risultati al management' },
         { time: '14:30', title: 'Formazione su un nuovo strumento' },
         { time: '16:30', title: 'Call con un cliente importante' }
@@ -179,7 +178,7 @@ const ACTIVITY_VARIANTS = {
         { time: '08:30', title: 'Pianificazione settimanale con il team' },
         { time: '10:00', title: 'Deep dive su un progetto complesso' },
         { time: '15:00', title: 'Sessione di feedback con un junior' },
-        { time: '17:00', title: 'Esplorazione di nuove opportunità di mercato' }
+        { time: '17:00', title: 'Esplorazione di nuove opportunità' }
       ]
     }
   ],
@@ -188,8 +187,8 @@ const ACTIVITY_VARIANTS = {
       'Analizzi dati da zero per trovare un pattern nascosto',
       'Presenti una proposta a un cliente che non conosci',
       'Aiuti un collega a sbloccarsi su un problema difficile',
-      'Gestisci un progetto con deadline strette e molte dipendenze',
-      'Esplori un territorio nuovo senza una direzione precisa',
+      'Gestisci un progetto con deadline strette',
+      'Esplori un territorio nuovo senza direzione precisa',
       'Scrivi un documento che definirà la strategia del prossimo anno'
     ],
     [
@@ -198,14 +197,14 @@ const ACTIVITY_VARIANTS = {
       'Organizzi un evento con molte variabili',
       'Ricevi un feedback negativo su un lavoro fatto bene',
       'Ti viene chiesto di improvvisare davanti a un gruppo',
-      'Risolvi un bug o un problema urgente sotto pressione'
+      'Risolvi un problema urgente sotto pressione'
     ],
     [
       'Crei qualcosa di visivo da zero',
       'Fai una riunione dopo l\'altra per tutto il giorno',
       'Scrivi un testo lungo e complesso',
       'Negozi qualcosa di importante',
-      'Impari qualcosa che non sapevi nulla il giorno prima',
+      'Impari qualcosa di completamente nuovo',
       'Ti occupi di qualcosa di routinario ma necessario'
     ]
   ],
@@ -214,19 +213,19 @@ const ACTIVITY_VARIANTS = {
       { a: 'Lavoro ad alto impatto ma poca libertà', b: 'Lavoro autonomo ma impatto incerto' },
       { a: 'Crescita rapida in un contesto caotico', b: 'Crescita lenta in un contesto solido' },
       { a: 'Essere riconosciuto pubblicamente', b: 'Sapere di aver fatto la cosa giusta' },
-      { a: 'Specializzarsi profondamente in un campo', b: 'Spaziare su molti ambiti diversi' }
+      { a: 'Specializzarsi profondamente', b: 'Spaziare su molti ambiti diversi' }
     ],
     [
-      { a: 'Lavorare con persone brillanti in un settore che non ti appassiona', b: 'Lavorare da solo in qualcosa che ami' },
-      { a: 'Stipendio alto con poco tempo libero', b: 'Stipendio medio con molta flessibilità' },
-      { a: 'Ruolo con responsabilità chiare e processi definiti', b: 'Ruolo ambiguo dove costruisci tutto da zero' },
+      { a: 'Persone brillanti, settore che non ti appassiona', b: 'Lavoro da solo in qualcosa che ami' },
+      { a: 'Stipendio alto, poco tempo libero', b: 'Stipendio medio, molta flessibilità' },
+      { a: 'Ruolo con responsabilità chiare', b: 'Ruolo ambiguo dove costruisci tutto' },
       { a: 'Fare bene una cosa', b: 'Fare molte cose abbastanza bene' }
     ],
     [
       { a: 'Rischio alto, ricompensa alta', b: 'Stabilità, crescita graduale' },
       { a: 'Cambiare settore ogni 3 anni', b: 'Diventare il migliore in un settore' },
       { a: 'Sapere sempre cosa ti aspetta', b: 'Essere sorpreso da dove ti porta il lavoro' },
-      { a: 'Lavorare per la missione, non per i soldi', b: 'Lavorare per i soldi e usarli per la missione' }
+      { a: 'Lavorare per la missione', b: 'Lavorare per i soldi e usarli per la missione' }
     ]
   ]
 };
@@ -271,7 +270,7 @@ async function callClaude(fase = 'test') {
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────
 function updateProgress() {
-  const total = 22; // stima domande totali
+  const total = 22;
   const done = state.questionCount;
   const pct = Math.min(95, Math.round((done / total) * 100));
   document.getElementById('progress-bar').style.width = pct + '%';
@@ -294,8 +293,7 @@ function updatePhase(phase) {
     const dot = document.getElementById(`dot-${i + 1}`);
     if (!dot) return;
     dot.className = 'phase-dot';
-    if (active) dot.classList.add(i < p.dots.indexOf(1, p.dots.lastIndexOf(1)) ? 'done' : 'active');
-    if (i === p.dots.lastIndexOf(1)) dot.classList.add('active');
+    if (active) dot.classList.add('active');
   });
 }
 
@@ -310,14 +308,12 @@ function renderQuestion(questionData) {
   document.getElementById('activity-area').classList.add('hidden');
   document.getElementById('active-question').classList.remove('hidden');
 
-  // Animazione testo
   const textEl = document.getElementById('question-text');
   textEl.style.animation = 'none';
   textEl.offsetHeight;
   textEl.style.animation = '';
   textEl.textContent = questionData.text;
 
-  // Contesto
   const ctxEl = document.getElementById('question-context');
   if (questionData.context) {
     ctxEl.textContent = questionData.context;
@@ -326,7 +322,6 @@ function renderQuestion(questionData) {
     ctxEl.classList.add('hidden');
   }
 
-  // Input
   const inputEl = document.getElementById('question-input');
   inputEl.innerHTML = '';
 
@@ -354,18 +349,18 @@ function renderMultipleChoice(container, questionData) {
 
   container.appendChild(grid);
 
-  // Link per risposta aperta
-// Link risposta aperta — solo se non abbiamo già 2 risposte aperte
+  // Mostra link risposta aperta solo se non abbiamo già 2 risposte aperte
   const openAnswers = state.answers.filter(a => a.isOpen).length;
   if (openAnswers < 2) {
     const openLink = document.createElement('button');
     openLink.className = 'open-toggle';
     openLink.textContent = 'Preferisci rispondere con parole tue →';
-  openLink.addEventListener('click', () => {
-    container.innerHTML = '';
-    renderOpenInput(container, questionData);
-  });
-  container.appendChild(openLink);
+    openLink.addEventListener('click', () => {
+      container.innerHTML = '';
+      renderOpenInput(container, questionData);
+    });
+    container.appendChild(openLink);
+  }
 }
 
 function renderOpenInput(container, questionData) {
@@ -379,7 +374,6 @@ function renderOpenInput(container, questionData) {
   const actions = document.createElement('div');
   actions.className = 'open-input-actions';
 
-  // Torna alle opzioni (se disponibili)
   if (questionData.options) {
     const backLink = document.createElement('button');
     backLink.className = 'open-toggle';
@@ -397,17 +391,20 @@ function renderOpenInput(container, questionData) {
   btn.textContent = 'Continua';
   btn.addEventListener('click', () => {
     const val = textarea.value.trim();
-  if (val) {
-  questionData._isOpen = true;
-  submitAnswer(val, questionData);
-}
+    if (val) {
+      questionData._isOpen = true;
+      submitAnswer(val, questionData);
+    }
   });
 
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const val = textarea.value.trim();
-      if (val) submitAnswer(val, questionData);
+      if (val) {
+        questionData._isOpen = true;
+        submitAnswer(val, questionData);
+      }
     }
   });
 
@@ -431,7 +428,6 @@ function selectOption(btn, value, questionData) {
 async function submitAnswer(value, questionData) {
   const responseTime = Date.now() - state.lastQuestionTime;
 
-  // Salva nello stack
   state.history.push({
     type: 'question',
     questionData,
@@ -441,8 +437,8 @@ async function submitAnswer(value, questionData) {
     adaptiveCount: state.adaptiveCount
   });
 
-  // Controlla se lavora (per domanda sul ruolo)
-if (questionData.id === 'lavoro') {
+  // Controlla se lavora
+  if (questionData.id === 'lavoro') {
     state.worksCurrently = value.startsWith('Sì');
   }
 
@@ -451,7 +447,14 @@ if (questionData.id === 'lavoro') {
     content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
 
-state.answers.push({ id: questionData.id, question: questionData.text, answer: value, time: responseTime, isOpen: !!questionData._isOpen });
+  state.answers.push({
+    id: questionData.id,
+    question: questionData.text,
+    answer: value,
+    time: responseTime,
+    isOpen: !!questionData._isOpen
+  });
+
   state.questionCount++;
 
   if (state.fixedCount < STANDARD_QUESTIONS.length) {
@@ -462,8 +465,8 @@ state.answers.push({ id: questionData.id, question: questionData.text, answer: v
 
   saveState();
 
-  // Dopo la 5a domanda standard, chiedi il ruolo se lavora
-  if (state.fixedCount === 5 && state.worksCurrently && !state.answers.find(a => a.id === 'ruolo_attuale')) {
+  // Dopo domanda lavoro, chiedi ruolo se lavora
+  if (questionData.id === 'lavoro' && state.worksCurrently && !state.answers.find(a => a.id === 'ruolo_attuale')) {
     renderQuestion(WORK_ROLE_QUESTION);
     return;
   }
@@ -474,7 +477,7 @@ state.answers.push({ id: questionData.id, question: questionData.text, answer: v
     return;
   }
 
-  // Attività dopo domanda 5 (o dopo ruolo_attuale)
+  // Attività dopo domanda 5 o dopo ruolo_attuale
   if ((state.fixedCount === 5 || questionData.id === 'ruolo_attuale') && !state.activityResults['termometro']) {
     showActivity('termometro');
     return;
@@ -487,8 +490,9 @@ state.answers.push({ id: questionData.id, question: questionData.text, answer: v
 async function getNextStep() {
   showThinking();
 
-  // Dopo le 5 standard inizia Claude
+  // Ancora nelle domande standard
   if (state.fixedCount < STANDARD_QUESTIONS.length) {
+    stopThinking();
     renderQuestion(STANDARD_QUESTIONS[state.fixedCount]);
     return;
   }
@@ -553,7 +557,7 @@ function showActivity(activityId) {
     riunione: {
       eyebrow: 'Attività 1 di 4',
       title: 'Riunione o No',
-      subtitle: 'È lunedì mattina. Apri il calendario — quale di queste riunioni apriresti con più piacere?',
+      subtitle: 'È lunedì mattina. Quale di queste riunioni apriresti con più piacere?',
       render: (c) => renderRiunione(c, getRandomVariant('riunione'))
     },
     termometro: {
@@ -587,7 +591,6 @@ function showActivity(activityId) {
   act.render(document.getElementById('activity-content'));
 }
 
-// Riunione
 function renderRiunione(container, variant) {
   const grid = document.createElement('div');
   grid.className = 'riunione-grid';
@@ -607,7 +610,6 @@ function renderRiunione(container, variant) {
   container.appendChild(grid);
 }
 
-// Termometro
 function renderTermometro(container, scenarios) {
   const reactions = ['😩', '😐', '😍'];
   const results = {};
@@ -647,7 +649,6 @@ function renderTermometro(container, scenarios) {
   container.appendChild(grid);
 }
 
-// Dilemma
 function renderDilemma(container, pairs) {
   const results = {};
   let completed = 0;
@@ -688,7 +689,6 @@ function renderDilemma(container, pairs) {
   });
 }
 
-// Costruisci la settimana
 function renderCostruisci(container) {
   const maxSelect = 5;
   const selected = new Set();
@@ -751,7 +751,6 @@ async function completeActivity(activityId, result) {
   state.questionCount++;
   saveState();
 
-  // Smonta l'annuncio come ultima attività
   if (activityId === 'costruisci' && !state.activityResults['smonta']) {
     showSmonta();
     return;
@@ -760,7 +759,6 @@ async function completeActivity(activityId, result) {
   await getNextStep();
 }
 
-// Smonta l'annuncio
 function showSmonta() {
   stopThinking();
   const area = document.getElementById('activity-area');
@@ -795,6 +793,7 @@ Cosa cerchiamo:
 • Disponibilità a trasferte nella zona assegnata`;
 
   const result = { verde: [], rosso: [], giallo: [] };
+
   const intro = document.createElement('p');
   intro.style.cssText = 'font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;';
   intro.textContent = 'Tocca una riga per ciclarla: verde → rosso → giallo → nessuno.';
@@ -831,9 +830,9 @@ Cosa cerchiamo:
   btn.addEventListener('click', () => {
     annuncio.querySelectorAll('div').forEach(row => {
       const bg = row.style.background;
-      if (bg.includes('1D9E75') || bg.includes('29,158,117')) result.verde.push(row.textContent);
-      else if (bg.includes('FF6496') || bg.includes('255,100,150')) result.rosso.push(row.textContent);
-      else if (bg.includes('FFD060') || bg.includes('255,200,50')) result.giallo.push(row.textContent);
+      if (bg.includes('29,158,117')) result.verde.push(row.textContent);
+      else if (bg.includes('255,100,150')) result.rosso.push(row.textContent);
+      else if (bg.includes('255,200,50')) result.giallo.push(row.textContent);
     });
     completeActivity('smonta', result);
   });
@@ -875,17 +874,13 @@ function goToReport() {
 
 // ─── INIT ─────────────────────────────────────────────────────
 function init() {
-  // Prova a ripristinare sessione salvata
   const restored = loadState();
 
-  if (restored && state.currentQuestion && state.fixedCount >= 1 && state.fixedCount <= 5) {
-    // Sessione valida solo se siamo nelle domande standard
-    // e la domanda corrente è effettivamente una delle 5 standard
+  if (restored && state.currentQuestion && state.questionCount > 0) {
     const isStandardQuestion = STANDARD_QUESTIONS.some(q => q.id === state.currentQuestion.id);
     const isWorkQuestion = state.currentQuestion.id === 'ruolo_attuale';
 
     if (!isStandardQuestion && !isWorkQuestion) {
-      // Sessione in stato inconsistente — riparte da zero
       clearState();
       state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
       renderQuestion(STANDARD_QUESTIONS[0]);
@@ -904,31 +899,10 @@ function init() {
 
     renderQuestion(state.currentQuestion);
     return;
-  } {
-    // Ripristina fase
-    updatePhase(state.currentPhase);
-    updateProgress();
-
-    // Mostra messaggio di ripristino
-    const area = document.getElementById('question-area');
-    const notice = document.createElement('div');
-    notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
-    notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
-
-    document.getElementById('active-question').classList.remove('hidden');
-    document.getElementById('active-question').prepend(notice);
-
-    renderQuestion(state.currentQuestion);
-    return;
   }
 
-  // Inizia da zero
   clearState();
-  state.conversationHistory.push({
-    role: 'user',
-    content: 'Inizia il test. Sono pronto.'
-  });
-
+  state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
   renderQuestion(STANDARD_QUESTIONS[0]);
 }
 
