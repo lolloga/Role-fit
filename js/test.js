@@ -228,7 +228,7 @@ const ACTIVITY_VARIANTS = {
     const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
     const shuffled = shuffle(pool);
     return [shuffled.slice(0, 6), shuffled.slice(6, 12), shuffled.slice(12, 18)];
-  })(),,
+  })(),
   dilemma: [
     [
       { a: 'Lavoro ad alto impatto ma poca libertà', b: 'Lavoro autonomo ma impatto incerto' },
