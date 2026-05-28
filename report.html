@@ -55,6 +55,30 @@
         <div class="chi-sei-text" id="chi-sei-text"></div>
       </div>
 
+      <!-- Sezione ruolo attuale — visibile solo se lavora -->
+      <div class="report-section hidden" id="section-ruolo-attuale">
+        <div class="report-section-label">
+          <span class="label" style="color:var(--emerald-light);">E il lavoro che fai adesso?</span>
+        </div>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;">Scrivi il ruolo che ricopri adesso. Ti diciamo quanto è compatibile con il tuo profilo — e cosa significa.</p>
+
+        <div id="ruolo-attuale-form" class="card" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Es. Account Manager, UX Designer, Avvocato...</div>
+            <input
+              type="text"
+              id="ruolo-attuale-input"
+              placeholder="Il tuo ruolo attuale"
+              style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;"
+              onkeydown="if(event.key==='Enter') submitRuoloAttuale()"
+            />
+          </div>
+          <button id="ruolo-attuale-btn" class="btn btn--primary" onclick="submitRuoloAttuale()">Analizza →</button>
+        </div>
+
+        <div id="ruolo-attuale-risultato" class="card hidden" style="margin-top:12px;"></div>
+      </div>
+
       <div class="report-section" id="section-ruoli">
         <div class="report-section-label">
           <span class="label">I tuoi 3 ruoli</span>
@@ -75,30 +99,6 @@
         </div>
         <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;">Non è una critica — è una mappa. Sapere cosa evitare è liberatorio quanto sapere dove andare.</p>
         <div id="mismatch-list"></div>
-      </div>
-
-      <!-- Sezione ruolo attuale — visibile solo se lavora -->
-      <div class="report-section hidden" id="section-ruolo-attuale">
-        <div class="report-section-label">
-          <span class="label" style="color:var(--emerald-light);">Il tuo ruolo attuale</span>
-        </div>
-        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;">Scrivi il ruolo che ricopri adesso. Ti diciamo quanto è compatibile con il tuo profilo — e cosa significa.</p>
-
-        <div id="ruolo-attuale-form" class="card" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-          <div style="flex:1;min-width:200px;">
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Es. Account Manager, UX Designer, Avvocato...</div>
-            <input
-              type="text"
-              id="ruolo-attuale-input"
-              placeholder="Il tuo ruolo attuale"
-              style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;"
-              onkeydown="if(event.key==='Enter') submitRuoloAttuale()"
-            />
-          </div>
-          <button id="ruolo-attuale-btn" class="btn btn--primary" onclick="submitRuoloAttuale()">Analizza →</button>
-        </div>
-
-        <div id="ruolo-attuale-risultato" class="card hidden" style="margin-top:12px;"></div>
       </div>
 
       <div class="report-actions">
