@@ -43,10 +43,50 @@ async function generateReport() {
   }
 }
 
+// ─── VALUTA RUOLO ATTUALE ─────────────────────────────────────
+async function valutaRuoloAttuale(ruoloInput) {
+  const report = JSON.parse(sessionStorage.getItem('rf_report') || '{}');
+  const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
+
+  const messages = [
+    ...history,
+    {
+      role: 'user',
+      content: `L'utente lavora attualmente come: "${ruoloInput}".
+
+Basandoti sul profilo emerso dal test e sui 3 ruoli suggeriti nel report (${report.ruoli?.map(r => r.nome).join(', ')}), valuta la compatibilità tra il ruolo attuale e il profilo dell'utente.
+
+Rispondi SOLO con JSON valido:
+{
+  "match": 72,
+  "titolo": "frase breve di sintesi (es. 'Un buon punto di partenza' o 'Distante dal tuo profilo')",
+  "descrizione": "2-3 frasi oneste e specifiche: cosa funziona in questo ruolo rispetto al profilo, cosa manca o logora, e in che direzione potrebbe evolvere"
+}`
+    }
+  ];
+
+  const response = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, fase: 'compatibilita' })
+  });
+
+  const data = await response.json();
+  const text = data.content[0].text;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : null;
+  }
+}
+
 // ─── RENDER REPORT ───────────────────────────────────────────
 function renderReport(data) {
   const report = data.report;
 
+  // Chi sei
   const chiSeiEl = document.getElementById('chi-sei-text');
   ['come_funzioni', 'cosa_ti_alimenta', 'di_cosa_hai_bisogno'].forEach(key => {
     if (report.chi_sei[key]) {
@@ -56,6 +96,7 @@ function renderReport(data) {
     }
   });
 
+  // Ruoli
   const ruoliEl = document.getElementById('ruoli-list');
   report.ruoli.forEach((ruolo) => {
     const card = document.createElement('div');
@@ -88,6 +129,7 @@ function renderReport(data) {
     ruoliEl.appendChild(card);
   });
 
+  // Bonus
   const bonusEl = document.getElementById('bonus-card');
   bonusEl.innerHTML = `
     <div class="bonus-eyebrow">Il ruolo che non ti aspetti</div>
@@ -95,6 +137,7 @@ function renderReport(data) {
     <div class="bonus-testo">${report.bonus.testo}</div>
   `;
 
+  // Ruoli mismatch
   if (report.ruoli_mismatch && report.ruoli_mismatch.length > 0) {
     const mismatchSection = document.getElementById('section-mismatch');
     if (mismatchSection) {
@@ -121,9 +164,74 @@ function renderReport(data) {
     }
   }
 
+  // Box ruolo attuale — solo se l'utente ha detto che lavora
+  const worksCurrently = checkWorksCurrently();
+  if (worksCurrently) {
+    const section = document.getElementById('section-ruolo-attuale');
+    if (section) section.classList.remove('hidden');
+  }
+
+  // Mostra tutto
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('report-content').classList.remove('hidden');
+
+  // Salva per condivisione
   sessionStorage.setItem('rf_report', JSON.stringify(report));
+}
+
+// ─── CONTROLLA SE LAVORA ──────────────────────────────────────
+function checkWorksCurrently() {
+  const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
+  return history.some(msg =>
+    msg.role === 'user' &&
+    typeof msg.content === 'string' &&
+    msg.content.includes('Risposta:') &&
+    msg.content.includes('Sì')
+  );
+}
+
+// ─── SUBMIT RUOLO ATTUALE ─────────────────────────────────────
+async function submitRuoloAttuale() {
+  const input = document.getElementById('ruolo-attuale-input');
+  const val = input?.value.trim();
+  if (!val) return;
+
+  const btn = document.getElementById('ruolo-attuale-btn');
+  const risultato = document.getElementById('ruolo-attuale-risultato');
+
+  btn.textContent = 'Analizzo...';
+  btn.disabled = true;
+
+  try {
+    const data = await valutaRuoloAttuale(val);
+    if (!data) throw new Error('Nessun risultato');
+
+    const matchColor = data.match >= 70 ? 'var(--emerald-light)' :
+                       data.match >= 45 ? '#FFD060' : 'var(--rose)';
+
+    risultato.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Il tuo ruolo attuale</div>
+          <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${val}</div>
+          <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${data.titolo}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${data.match}%</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">compatibilità</div>
+        </div>
+      </div>
+      <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${data.descrizione}</div>
+    `;
+    risultato.classList.remove('hidden');
+
+    // Nascondi il form
+    document.getElementById('ruolo-attuale-form').classList.add('hidden');
+
+  } catch (err) {
+    btn.textContent = 'Riprova';
+    btn.disabled = false;
+  }
 }
 
 // ─── CONDIVIDI ────────────────────────────────────────────────
