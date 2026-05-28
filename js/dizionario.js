@@ -18,6 +18,7 @@ async function searchRole() {
     const data = await response.json();
   const raw = data.content[0].text;
 const text = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    console.log('TEXT:', JSON.stringify(text.substring(0, 300)));
     let result = null;
 
     try {
