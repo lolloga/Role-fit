@@ -260,7 +260,7 @@ Rispondi SOLO con JSON valido — zero testo fuori:
     };
 
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
-   const maxTokens = fase === 'report' ? 4000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 600;
+   const maxTokens = fase === 'report' ? 4000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 800;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
