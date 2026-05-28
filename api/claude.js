@@ -281,11 +281,13 @@ const data = await response.json();
 
 // Rimuovi backtick markdown dalla risposta di Claude
 if (data.content && data.content[0] && data.content[0].text) {
-  data.content[0].text = data.content[0].text
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
+  let t = data.content[0].text;
+  // Rimuovi backtick markdown
+  t = t.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  // Estrai solo il blocco JSON se c'è testo extra prima o dopo
+  const match = t.match(/\{[\s\S]*\}/);
+  if (match) t = match[0];
+  data.content[0].text = t;
 }
 
 return res.status(200).json(data);
