@@ -11,9 +11,9 @@ const THINKING_PHRASES = [
   "Qualcosa sta emergendo...",
   "Le cose si fanno chiare..."
 ];
- 
+
 let thinkingInterval = null;
- 
+
 function startThinking() {
   const el = document.getElementById('thinking-phrase');
   let i = Math.floor(Math.random() * THINKING_PHRASES.length);
@@ -26,14 +26,14 @@ function startThinking() {
     el.textContent = THINKING_PHRASES[i];
   }, 2500);
 }
- 
+
 function stopThinking() {
   if (thinkingInterval) {
     clearInterval(thinkingInterval);
     thinkingInterval = null;
   }
 }
- 
+
 // ─── STATO GLOBALE ───────────────────────────────────────────
 const state = {
   conversationHistory: [],
@@ -48,7 +48,7 @@ const state = {
   currentQuestion: null,
   worksCurrently: false,
 };
- 
+
 // ─── PERSISTENZA ─────────────────────────────────────────────
 function saveState() {
   const toSave = {
@@ -65,7 +65,7 @@ function saveState() {
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
- 
+
 function loadState() {
   const saved = localStorage.getItem('rf_state');
   if (!saved) return false;
@@ -77,11 +77,11 @@ function loadState() {
     return false;
   }
 }
- 
+
 function clearState() {
   localStorage.removeItem('rf_state');
 }
- 
+
 // ─── 5 DOMANDE STANDARD (no AI) ──────────────────────────────
 const STANDARD_QUESTIONS = [
   {
@@ -145,15 +145,7 @@ const STANDARD_QUESTIONS = [
     ]
   }
 ];
- 
-// Domanda sul ruolo lavorativo (solo se lavora)
-const WORK_ROLE_QUESTION = {
-  id: 'ruolo_attuale',
-  text: 'Descrivimi brevemente il tuo lavoro attuale.',
-  context: 'In 1-2 righe: ruolo, tipo di attività, settore.',
-  type: 'open'
-};
- 
+
 // ─── VARIANTI ATTIVITÀ ────────────────────────────────────────
 const ACTIVITY_VARIANTS = {
   riunione: [
@@ -250,12 +242,12 @@ const ACTIVITY_VARIANTS = {
     ]
   ]
 };
- 
+
 function getRandomVariant(key) {
   const variants = ACTIVITY_VARIANTS[key];
   return variants[Math.floor(Math.random() * variants.length)];
 }
- 
+
 // ─── CHIAMATA API ─────────────────────────────────────────────
 async function callClaude(fase = 'test') {
   const response = await fetch('/api/claude', {
@@ -266,10 +258,10 @@ async function callClaude(fase = 'test') {
       fase
     })
   });
- 
+
   const data = await response.json();
   const text = data.content[0].text;
- 
+
   try {
     return JSON.parse(text);
   } catch {
@@ -293,7 +285,7 @@ async function callClaude(fase = 'test') {
     return null;
   }
 }
- 
+
 // ─── PROGRESS BAR ─────────────────────────────────────────────
 function updateProgress() {
   const total = 22;
@@ -301,7 +293,7 @@ function updateProgress() {
   const pct = Math.min(95, Math.round((done / total) * 100));
   document.getElementById('progress-bar').style.width = pct + '%';
 }
- 
+
 // ─── FASE ─────────────────────────────────────────────────────
 function updatePhase(phase) {
   state.currentPhase = phase;
@@ -311,10 +303,10 @@ function updatePhase(phase) {
     almost:    { label: 'Quasi fatto',                       dots: [1, 1, 1, 0] },
     done:      { label: 'Abbiamo quello che ci serve',       dots: [1, 1, 1, 1] }
   };
- 
+
   const p = phases[phase] || phases.building;
   document.getElementById('phase-label').textContent = p.label;
- 
+
   p.dots.forEach((active, i) => {
     const dot = document.getElementById(`dot-${i + 1}`);
     if (!dot) return;
@@ -322,24 +314,24 @@ function updatePhase(phase) {
     if (active) dot.classList.add('active');
   });
 }
- 
+
 // ─── RENDER DOMANDA ───────────────────────────────────────────
 function renderQuestion(questionData) {
   state.lastQuestionTime = Date.now();
   state.currentQuestion = questionData;
   saveState();
- 
+
   stopThinking();
   document.getElementById('thinking-state').classList.add('hidden');
   document.getElementById('activity-area').classList.add('hidden');
   document.getElementById('active-question').classList.remove('hidden');
- 
+
   const textEl = document.getElementById('question-text');
   textEl.style.animation = 'none';
   textEl.offsetHeight;
   textEl.style.animation = '';
   textEl.textContent = questionData.text;
- 
+
   const ctxEl = document.getElementById('question-context');
   if (questionData.context) {
     ctxEl.textContent = questionData.context;
@@ -347,23 +339,23 @@ function renderQuestion(questionData) {
   } else {
     ctxEl.classList.add('hidden');
   }
- 
+
   const inputEl = document.getElementById('question-input');
   inputEl.innerHTML = '';
- 
+
   if (questionData.type === 'multiple_choice') {
     renderMultipleChoice(inputEl, questionData);
   } else {
     renderOpenInput(inputEl, questionData);
   }
- 
+
   updateProgress();
 }
- 
+
 function renderMultipleChoice(container, questionData) {
   const grid = document.createElement('div');
   grid.className = 'options-grid';
- 
+
   const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
   questionData.options.forEach((opt, i) => {
     const btn = document.createElement('button');
@@ -372,9 +364,9 @@ function renderMultipleChoice(container, questionData) {
     btn.addEventListener('click', () => selectOption(btn, opt, questionData));
     grid.appendChild(btn);
   });
- 
+
   container.appendChild(grid);
- 
+
   // Mostra link risposta aperta solo se non abbiamo già 2 risposte aperte
   const openAnswers = state.answers.filter(a => a.isOpen).length;
   if (openAnswers < 2) {
@@ -388,18 +380,18 @@ function renderMultipleChoice(container, questionData) {
     container.appendChild(openLink);
   }
 }
- 
+
 function renderOpenInput(container, questionData) {
   const area = document.createElement('div');
   area.className = 'open-input-area';
- 
+
   const textarea = document.createElement('textarea');
   textarea.className = 'open-input';
   textarea.placeholder = 'Scrivi qui la tua risposta...';
- 
+
   const actions = document.createElement('div');
   actions.className = 'open-input-actions';
- 
+
   if (questionData.options) {
     const backLink = document.createElement('button');
     backLink.className = 'open-toggle';
@@ -411,7 +403,7 @@ function renderOpenInput(container, questionData) {
     });
     actions.appendChild(backLink);
   }
- 
+
   const btn = document.createElement('button');
   btn.className = 'btn btn--primary';
   btn.textContent = 'Continua';
@@ -422,7 +414,7 @@ function renderOpenInput(container, questionData) {
       submitAnswer(val, questionData);
     }
   });
- 
+
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -433,15 +425,15 @@ function renderOpenInput(container, questionData) {
       }
     }
   });
- 
+
   actions.appendChild(btn);
   area.appendChild(textarea);
   area.appendChild(actions);
   container.appendChild(area);
- 
+
   setTimeout(() => textarea.focus(), 100);
 }
- 
+
 // ─── SELEZIONE OPZIONE ────────────────────────────────────────
 function selectOption(btn, value, questionData) {
   btn.closest('.options-grid').querySelectorAll('.option-btn')
@@ -449,11 +441,11 @@ function selectOption(btn, value, questionData) {
   btn.classList.add('selected');
   setTimeout(() => submitAnswer(value, questionData), 280);
 }
- 
+
 // ─── SUBMIT ───────────────────────────────────────────────────
 async function submitAnswer(value, questionData) {
   const responseTime = Date.now() - state.lastQuestionTime;
- 
+
   state.history.push({
     type: 'question',
     questionData,
@@ -462,17 +454,17 @@ async function submitAnswer(value, questionData) {
     fixedCount: state.fixedCount,
     adaptiveCount: state.adaptiveCount
   });
- 
+
   // Controlla se lavora
   if (questionData.id === 'lavoro') {
     state.worksCurrently = value.startsWith('Sì');
   }
- 
+
   state.conversationHistory.push({
     role: 'user',
     content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
- 
+
   state.answers.push({
     id: questionData.id,
     question: questionData.text,
@@ -480,66 +472,60 @@ async function submitAnswer(value, questionData) {
     time: responseTime,
     isOpen: !!questionData._isOpen
   });
- 
+
   state.questionCount++;
- 
+
   if (state.fixedCount < STANDARD_QUESTIONS.length) {
     state.fixedCount++;
   } else {
     state.adaptiveCount++;
   }
- 
+
   saveState();
- 
-  // Dopo domanda lavoro, chiedi ruolo se lavora
-  if (questionData.id === 'lavoro' && state.worksCurrently && !state.answers.find(a => a.id === 'ruolo_attuale')) {
-    renderQuestion(WORK_ROLE_QUESTION);
-    return;
-  }
- 
+
   // Attività dopo domanda 3
   if (state.fixedCount === 3 && !state.activityResults['riunione']) {
     showActivity('riunione');
     return;
   }
- 
-  // Attività dopo domanda 5 o dopo ruolo_attuale
-  if ((state.fixedCount === 5 || questionData.id === 'ruolo_attuale') && !state.activityResults['termometro']) {
+
+  // Attività dopo domanda 5
+  if (state.fixedCount === 5 && !state.activityResults['termometro']) {
     showActivity('termometro');
     return;
   }
- 
+
   await getNextStep();
 }
- 
+
 // ─── PROSSIMO STEP ────────────────────────────────────────────
 async function getNextStep() {
   showThinking();
- 
+
   // Ancora nelle domande standard
   if (state.fixedCount < STANDARD_QUESTIONS.length) {
     stopThinking();
     renderQuestion(STANDARD_QUESTIONS[state.fixedCount]);
     return;
   }
- 
+
   const result = await callClaude('test');
- 
+
   if (!result) {
     console.error('Risposta Claude non valida');
     stopThinking();
     return;
   }
- 
+
   if (result.phase) updatePhase(result.phase);
- 
+
   state.conversationHistory.push({
     role: 'assistant',
     content: JSON.stringify(result)
   });
- 
+
   saveState();
- 
+
   if (result.action === 'report') {
     goToReport();
   } else if (result.action === 'ask' && result.question) {
@@ -557,7 +543,7 @@ async function getNextStep() {
     renderQuestion(result.question);
   }
 }
- 
+
 // ─── THINKING ─────────────────────────────────────────────────
 function showThinking() {
   document.getElementById('active-question').classList.add('hidden');
@@ -565,20 +551,20 @@ function showThinking() {
   document.getElementById('thinking-state').classList.remove('hidden');
   startThinking();
 }
- 
+
 // ─── ATTIVITÀ ─────────────────────────────────────────────────
 function showActivity(activityId) {
   stopThinking();
   document.getElementById('active-question').classList.add('hidden');
   document.getElementById('thinking-state').classList.add('hidden');
- 
+
   const area = document.getElementById('activity-area');
   area.classList.remove('hidden');
   area.innerHTML = '';
- 
+
   const card = document.createElement('div');
   card.className = 'activity-card';
- 
+
   const activities = {
     riunione: {
       eyebrow: 'Attività 1 di 4',
@@ -605,7 +591,7 @@ function showActivity(activityId) {
       render: (c) => renderCostruisci(c)
     }
   };
- 
+
   const act = activities[activityId];
   card.innerHTML = `
     <div class="activity-eyebrow">${act.eyebrow}</div>
@@ -616,11 +602,11 @@ function showActivity(activityId) {
   area.appendChild(card);
   act.render(document.getElementById('activity-content'));
 }
- 
+
 function renderRiunione(container, variant) {
   const grid = document.createElement('div');
   grid.className = 'riunione-grid';
- 
+
   variant.items.forEach((item, i) => {
     const card = document.createElement('button');
     card.className = 'riunione-card';
@@ -632,25 +618,25 @@ function renderRiunione(container, variant) {
     });
     grid.appendChild(card);
   });
- 
+
   container.appendChild(grid);
 }
- 
+
 function renderTermometro(container, scenarios) {
   const reactions = ['😩', '😐', '😍'];
   const results = {};
   let completed = 0;
- 
+
   const grid = document.createElement('div');
   grid.className = 'termometro-grid';
- 
+
   scenarios.forEach((scenario, i) => {
     const row = document.createElement('div');
     row.className = 'termometro-row';
- 
+
     const reactionBtns = document.createElement('div');
     reactionBtns.className = 'termometro-reactions';
- 
+
     reactions.forEach((emoji, r) => {
       const btn = document.createElement('button');
       btn.className = 'reaction-btn';
@@ -667,35 +653,35 @@ function renderTermometro(container, scenarios) {
       });
       reactionBtns.appendChild(btn);
     });
- 
+
     row.innerHTML = `<span class="termometro-scenario">${scenario}</span>`;
     row.appendChild(reactionBtns);
     grid.appendChild(row);
   });
- 
+
   container.appendChild(grid);
 }
- 
+
 function renderDilemma(container, pairs) {
   const results = {};
   let completed = 0;
- 
+
   pairs.forEach((pair, i) => {
     const pairEl = document.createElement('div');
     pairEl.className = 'dilemma-pair';
- 
+
     const optA = document.createElement('button');
     optA.className = 'dilemma-option';
     optA.textContent = pair.a;
- 
+
     const vs = document.createElement('span');
     vs.className = 'dilemma-vs';
     vs.textContent = 'o';
- 
+
     const optB = document.createElement('button');
     optB.className = 'dilemma-option';
     optB.textContent = pair.b;
- 
+
     const select = (chosen, other, value) => {
       const wasSelected = chosen.classList.contains('selected');
       chosen.classList.add('selected');
@@ -706,17 +692,17 @@ function renderDilemma(container, pairs) {
         setTimeout(() => completeActivity('dilemma', results), 500);
       }
     };
- 
+
     optA.addEventListener('click', () => select(optA, optB, 'a'));
     optB.addEventListener('click', () => select(optB, optA, 'b'));
- 
+
     pairEl.appendChild(optA);
     pairEl.appendChild(vs);
     pairEl.appendChild(optB);
     container.appendChild(pairEl);
   });
 }
- 
+
 function renderCostruisci(container) {
   const maxSelect = 5;
   const selected = new Set();
@@ -732,19 +718,19 @@ function renderCostruisci(container) {
     'Fare presentazioni o pitching',
     'Tempo libero non strutturato per esplorare'
   ];
- 
+
   const counter = document.createElement('div');
   counter.style.cssText = 'font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;';
   counter.textContent = `0 / ${maxSelect} selezionate`;
- 
+
   const grid = document.createElement('div');
   grid.className = 'options-grid';
- 
+
   items.forEach((item, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
     btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${item}</span>`;
- 
+
     btn.addEventListener('click', () => {
       if (selected.has(i)) {
         selected.delete(i);
@@ -753,22 +739,22 @@ function renderCostruisci(container) {
         selected.add(i);
         btn.classList.add('selected');
       }
- 
+
       counter.textContent = `${selected.size} / ${maxSelect} selezionate`;
- 
+
       if (selected.size === maxSelect) {
         const result = [...selected].map(idx => items[idx]);
         setTimeout(() => completeActivity('costruisci', { scelte: result }), 400);
       }
     });
- 
+
     grid.appendChild(btn);
   });
- 
+
   container.appendChild(counter);
   container.appendChild(grid);
 }
- 
+
 // ─── COMPLETA ATTIVITÀ ────────────────────────────────────────
 async function completeActivity(activityId, result) {
   state.activityResults[activityId] = result;
@@ -778,21 +764,21 @@ async function completeActivity(activityId, result) {
   });
   state.questionCount++;
   saveState();
- 
+
   if (activityId === 'costruisci' && !state.activityResults['smonta']) {
     showSmonta();
     return;
   }
- 
+
   await getNextStep();
 }
- 
+
 function showSmonta() {
   stopThinking();
   const area = document.getElementById('activity-area');
   area.classList.remove('hidden');
   area.innerHTML = '';
- 
+
   const card = document.createElement('div');
   card.className = 'activity-card';
   card.innerHTML = `
@@ -802,9 +788,9 @@ function showSmonta() {
     <div id="activity-content"></div>
   `;
   area.appendChild(card);
- 
+
   const content = document.getElementById('activity-content');
- 
+
   const annunci = [
     `Account Manager — Zona Roma
 Siamo una realtà in forte crescita nel settore dei servizi digitali B2B. Cerchiamo una persona che costruisca relazioni durature con i clienti.
@@ -818,7 +804,7 @@ Cosa cerchiamo:
 • Ottima capacità di ascolto e orientamento alla relazione
 • Autonomia e spirito d'iniziativa
 • Disponibilità a trasferte nella zona assegnata`,
- 
+
     `UX Designer — Milano (Ibrido)
 Studio di design cerca un designer che metta le persone al centro di ogni progetto. Lavorerai su prodotti digitali usati da milioni di persone.
 Cosa farai:
@@ -831,7 +817,7 @@ Cosa cerchiamo:
 • Padronanza di Figma
 • Curiosità genuina per il comportamento umano
 • Capacità di argomentare le tue scelte di design`,
- 
+
     `Policy Officer — Roma
 Ente istituzionale cerca un profilo analitico per supportare lo sviluppo di politiche pubbliche su temi di innovazione e digitale.
 Cosa farai:
@@ -844,7 +830,7 @@ Cosa cerchiamo:
 • Capacità di sintesi e scrittura chiara
 • Interesse per il funzionamento delle istituzioni
 • Inglese professionale`,
- 
+
     `Content Strategist — Remote
 Startup cerca qualcuno che sappia raccontare storie complesse in modo semplice e costruire una presenza editoriale distintiva.
 Cosa farai:
@@ -857,7 +843,7 @@ Cosa cerchiamo:
 • Ossessione per la chiarezza e la precisione
 • Autonomia nella gestione delle priorità
 • Capacità di lavorare su più progetti in parallelo`,
- 
+
     `Data Analyst — Milano
 Azienda retail cerca un profilo che trasformi i dati in decisioni concrete.
 Cosa farai:
@@ -870,7 +856,7 @@ Cosa cerchiamo:
 • Esperienza con strumenti di BI (Power BI, Tableau)
 • Mentalità analitica e attenzione al dettaglio
 • Capacità di comunicare insight a un pubblico non tecnico`,
- 
+
     `HR Business Partner — Torino
 Azienda manifatturiera cerca un HRBP che affianchi i manager nei momenti che contano davvero.
 Cosa farai:
@@ -883,7 +869,7 @@ Cosa cerchiamo:
 • Capacità di ascolto profondo e gestione dei conflitti
 • Orientamento alle persone senza perdere di vista il business
 • Laurea in psicologia, scienze della formazione o economia`,
- 
+
     `Product Manager — Milano
 Scale-up B2B cerca un PM che bilanci visione di prodotto e pragmatismo operativo.
 Cosa farai:
@@ -896,7 +882,7 @@ Cosa cerchiamo:
 • Capacità di prendere decisioni con dati incompleti
 • Comunicazione chiara con profili tecnici e non tecnici
 • Ossessione per il problema dell'utente, non per la soluzione`,
- 
+
     `Sustainability Specialist — Roma
 Gruppo assicurativo cerca un profilo che trasformi la sostenibilità da obbligo normativo a leva competitiva.
 Cosa farai:
@@ -909,7 +895,7 @@ Cosa cerchiamo:
 • Capacità di lavorare in modo trasversale con tutti i reparti
 • Passione genuina per i temi ambientali e sociali
 • Laurea in economia, ingegneria o scienze ambientali`,
- 
+
     `Software Engineer Backend — Full Remote
 Fintech cerca uno sviluppatore che costruisca infrastrutture che reggano milioni di transazioni.
 Cosa farai:
@@ -922,7 +908,7 @@ Cosa cerchiamo:
 • Familiarità con architetture a microservizi e cloud (AWS/GCP)
 • Mentalità orientata alla qualità e alla manutenibilità
 • Capacità di lavorare in autonomia in un contesto distribuito`,
- 
+
     `Talent Acquisition Specialist — Milano
 Agenzia di headhunting cerca un recruiter che ami le persone quanto i numeri.
 Cosa farai:
@@ -935,7 +921,7 @@ Cosa cerchiamo:
 • Capacità di leggere le persone oltre il CV
 • Energia, proattività e resistenza allo stress
 • Orientamento ai risultati con un tocco umano`,
- 
+
     `Giornalista Digitale — Roma
 Testata online cerca un giornalista curioso e veloce, capace di raccontare temi complessi a un pubblico largo.
 Cosa farai:
@@ -948,7 +934,7 @@ Cosa cerchiamo:
 • Velocità di scrittura senza sacrificare la qualità
 • Fiuto per le notizie e capacità di verificare le fonti
 • Conoscenza dei principali CMS editoriali`,
- 
+
     `NGO Program Officer — Roma
 ONG internazionale cerca un profilo operativo per gestire programmi di cooperazione in Africa subsahariana.
 Cosa farai:
@@ -961,7 +947,7 @@ Cosa cerchiamo:
 • Conoscenza dei framework di rendicontazione UE o AICS
 • Inglese e francese fluenti
 • Disponibilità a missioni sul campo`,
- 
+
     `Compliance Specialist — Milano
 Banca digitale cerca un profilo che garantisca il rispetto delle normative in un contesto in rapida evoluzione.
 Cosa farai:
@@ -974,7 +960,7 @@ Cosa cerchiamo:
 • Capacità di tradurre la complessità normativa in processi pratici
 • Rigore metodologico e attenzione ai dettagli
 • Laurea in giurisprudenza o economia`,
- 
+
     `Graphic Designer — Studio Creativo
 Studio cerca un designer con una voce visiva riconoscibile, capace di lavorare su brand identity e comunicazione integrata.
 Cosa farai:
@@ -987,7 +973,7 @@ Cosa cerchiamo:
 • Padronanza della Adobe Suite
 • Capacità di rispettare i brief senza perdere la creatività
 • Attitudine alla collaborazione e alla contaminazione`,
- 
+
     `Psicologo Clinico — Studio Privato Roma
 Studio di psicoterapia cerca uno psicologo per presa in carico di pazienti adulti con disturbi d'ansia e dell'umore.
 Cosa farai:
@@ -1001,30 +987,30 @@ Cosa cerchiamo:
 • Capacità di costruire alleanza terapeutica solida
 • Orientamento alla crescita professionale continua`
   ];
- 
+
   const testo = annunci[Math.floor(Math.random() * annunci.length)];
- 
+
   const result = { verde: [], rosso: [], giallo: [] };
- 
+
   const intro = document.createElement('p');
   intro.style.cssText = 'font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;';
   intro.textContent = 'Tocca una riga per ciclarla: verde → rosso → giallo → nessuno.';
- 
+
   const annuncio = document.createElement('div');
   annuncio.style.cssText = 'background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:18px;';
- 
+
     testo.split('\n').filter(r => r.trim()).forEach(riga => {
     const row = document.createElement('div');
     row.style.cssText = 'padding:6px 8px;border-radius:6px;cursor:pointer;font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:4px;transition:background 0.15s,color 0.15s;';
     row.textContent = riga;
     row.dataset.stato = '';
- 
+
     row.addEventListener('click', () => {
       if (row.dataset.stato === '') row.dataset.stato = 'verde';
       else if (row.dataset.stato === 'verde') row.dataset.stato = 'rosso';
       else if (row.dataset.stato === 'rosso') row.dataset.stato = 'giallo';
       else row.dataset.stato = '';
- 
+
       const s = row.dataset.stato;
       row.style.background = s === 'verde' ? 'rgba(29,158,117,0.15)' :
                               s === 'rosso' ? 'rgba(255,100,150,0.15)' :
@@ -1033,10 +1019,10 @@ Cosa cerchiamo:
                         s === 'rosso' ? 'var(--rose-light)' :
                         s === 'giallo' ? '#FFD060' : 'var(--text-secondary)';
     });
- 
+
     annuncio.appendChild(row);
   });
- 
+
   const btn = document.createElement('button');
   btn.className = 'btn btn--primary mt-16';
   btn.textContent = 'Conferma e continua';
@@ -1059,75 +1045,74 @@ Cosa cerchiamo:
     }
     completeActivity('smonta', result);
   });
- 
+
   content.appendChild(intro);
   content.appendChild(annuncio);
   content.appendChild(btn);
 }
- 
+
 // ─── TORNA INDIETRO ───────────────────────────────────────────
 function goBack() {
   if (state.history.length === 0) return;
   const prev = state.history.pop();
- 
+
   state.conversationHistory = state.conversationHistory.slice(0, prev.conversationLength);
   state.questionCount = prev.questionCount;
   state.fixedCount = prev.fixedCount;
   state.adaptiveCount = prev.adaptiveCount;
- 
+
   saveState();
   renderQuestion(prev.questionData);
 }
- 
+
 // ─── VAI AL REPORT ────────────────────────────────────────────
 function goToReport() {
   stopThinking();
   updatePhase('done');
   document.getElementById('progress-bar').style.width = '100%';
- 
+
   sessionStorage.setItem('rf_history', JSON.stringify(state.conversationHistory));
   sessionStorage.setItem('rf_activities', JSON.stringify(state.activityResults));
- 
+
   clearState();
- 
+
   setTimeout(() => {
     window.location.href = 'report.html';
   }, 600);
 }
- 
+
 // ─── INIT ─────────────────────────────────────────────────────
 function init() {
   const restored = loadState();
- 
+
   if (restored && state.currentQuestion && state.questionCount > 0) {
     const isStandardQuestion = STANDARD_QUESTIONS.some(q => q.id === state.currentQuestion.id);
     const isWorkQuestion = state.currentQuestion.id === 'ruolo_attuale';
- 
+
     if (!isStandardQuestion && !isWorkQuestion) {
       clearState();
       state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
       renderQuestion(STANDARD_QUESTIONS[0]);
       return;
     }
- 
+
     updatePhase(state.currentPhase);
     updateProgress();
- 
+
     const notice = document.createElement('div');
     notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
     notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
- 
+
     document.getElementById('active-question').classList.remove('hidden');
     document.getElementById('active-question').prepend(notice);
- 
+
     renderQuestion(state.currentQuestion);
     return;
   }
- 
+
   clearState();
   state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
   renderQuestion(STANDARD_QUESTIONS[0]);
 }
- 
+
 document.addEventListener('DOMContentLoaded', init);
- 
