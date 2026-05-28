@@ -1008,24 +1008,25 @@ Cosa cerchiamo:
   const annuncio = document.createElement('div');
   annuncio.style.cssText = 'background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:18px;';
 
-  testo.split('\n').filter(r => r.trim()).forEach(riga => {
+    testo.split('\n').filter(r => r.trim()).forEach(riga => {
     const row = document.createElement('div');
     row.style.cssText = 'padding:6px 8px;border-radius:6px;cursor:pointer;font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:4px;transition:background 0.15s,color 0.15s;';
     row.textContent = riga;
-    let stato = null;
+    row.dataset.stato = '';
 
     row.addEventListener('click', () => {
-      if (stato === null) stato = 'verde';
-      else if (stato === 'verde') stato = 'rosso';
-      else if (stato === 'rosso') stato = 'giallo';
-      else stato = null;
+      if (row.dataset.stato === '') row.dataset.stato = 'verde';
+      else if (row.dataset.stato === 'verde') row.dataset.stato = 'rosso';
+      else if (row.dataset.stato === 'rosso') row.dataset.stato = 'giallo';
+      else row.dataset.stato = '';
 
-      row.style.background = stato === 'verde' ? 'rgba(29,158,117,0.15)' :
-                              stato === 'rosso' ? 'rgba(255,100,150,0.15)' :
-                              stato === 'giallo' ? 'rgba(255,200,50,0.1)' : 'transparent';
-      row.style.color = stato === 'verde' ? 'var(--emerald-light)' :
-                        stato === 'rosso' ? 'var(--rose-light)' :
-                        stato === 'giallo' ? '#FFD060' : 'var(--text-secondary)';
+      const s = row.dataset.stato;
+      row.style.background = s === 'verde' ? 'rgba(29,158,117,0.15)' :
+                              s === 'rosso' ? 'rgba(255,100,150,0.15)' :
+                              s === 'giallo' ? 'rgba(255,200,50,0.1)' : 'transparent';
+      row.style.color = s === 'verde' ? 'var(--emerald-light)' :
+                        s === 'rosso' ? 'var(--rose-light)' :
+                        s === 'giallo' ? '#FFD060' : 'var(--text-secondary)';
     });
 
     annuncio.appendChild(row);
@@ -1035,13 +1036,15 @@ Cosa cerchiamo:
   btn.className = 'btn btn--primary mt-16';
   btn.textContent = 'Conferma e continua';
   btn.addEventListener('click', () => {
-    annuncio.querySelectorAll('div').forEach(row => {
-      const bg = row.style.background;
-      if (bg.includes('29,158,117')) result.verde.push(row.textContent);
-      else if (bg.includes('255,100,150')) result.rosso.push(row.textContent);
-      else if (bg.includes('255,200,50')) result.giallo.push(row.textContent);
+    result.verde = [];
+    result.rosso = [];
+    result.giallo = [];
+    annuncio.querySelectorAll('div[data-stato]').forEach(row => {
+      const s = row.dataset.stato;
+      if (s === 'verde') result.verde.push(row.textContent);
+      else if (s === 'rosso') result.rosso.push(row.textContent);
+      else if (s === 'giallo') result.giallo.push(row.textContent);
     });
-    // Almeno 3 righe valutate prima di procedere
     const total = result.verde.length + result.rosso.length + result.giallo.length;
     if (total < 3) {
       btn.textContent = 'Valuta almeno 3 righe per continuare';
@@ -1050,6 +1053,7 @@ Cosa cerchiamo:
       return;
     }
     completeActivity('smonta', result);
+  });
   });
 
   content.appendChild(intro);
