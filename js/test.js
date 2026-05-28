@@ -776,21 +776,205 @@ function showSmonta() {
   area.appendChild(card);
 
   const content = document.getElementById('activity-content');
-  const testo = `Account Manager — Zona Roma
 
-Siamo una realtà in forte crescita nel settore dei servizi digitali B2B. Cerchiamo una persona che voglia costruire relazioni durature con i clienti e contribuire allo sviluppo commerciale.
-
+  const annunci = [
+    `Account Manager — Zona Roma
+Siamo una realtà in forte crescita nel settore dei servizi digitali B2B. Cerchiamo una persona che costruisca relazioni durature con i clienti.
 Cosa farai:
 • Gestire e sviluppare un portafoglio clienti esistente
 • Identificare nuove opportunità di crescita
 • Lavorare con il team marketing e prodotto
 • Partecipare a fiere ed eventi di settore
-
 Cosa cerchiamo:
 • 2-4 anni di esperienza in ruoli commerciali
 • Ottima capacità di ascolto e orientamento alla relazione
 • Autonomia e spirito d'iniziativa
-• Disponibilità a trasferte nella zona assegnata`;
+• Disponibilità a trasferte nella zona assegnata`,
+
+    `UX Designer — Milano (Ibrido)
+Studio di design cerca un designer che metta le persone al centro di ogni progetto. Lavorerai su prodotti digitali usati da milioni di persone.
+Cosa farai:
+• Condurre ricerche utenti e trasformarle in insight
+• Progettare wireframe, prototipi e interfacce
+• Collaborare con sviluppatori e product manager
+• Presentare il tuo lavoro a stakeholder interni
+Cosa cerchiamo:
+• Portfolio con almeno 3 case study completi
+• Padronanza di Figma
+• Curiosità genuina per il comportamento umano
+• Capacità di argomentare le tue scelte di design`,
+
+    `Policy Officer — Roma
+Ente istituzionale cerca un profilo analitico per supportare lo sviluppo di politiche pubbliche su temi di innovazione e digitale.
+Cosa farai:
+• Analizzare normative e scenari di policy
+• Redigere documenti di posizione e briefing
+• Partecipare a tavoli di lavoro istituzionali
+• Monitorare l'evoluzione del quadro regolatorio europeo
+Cosa cerchiamo:
+• Laurea in scienze politiche, giurisprudenza o economia
+• Capacità di sintesi e scrittura chiara
+• Interesse per il funzionamento delle istituzioni
+• Inglese professionale`,
+
+    `Content Strategist — Remote
+Startup cerca qualcuno che sappia raccontare storie complesse in modo semplice e costruire una presenza editoriale distintiva.
+Cosa farai:
+• Definire la strategia editoriale e il tono di voce
+• Produrre contenuti per blog, newsletter e social
+• Analizzare le performance e ottimizzare i formati
+• Coordinare freelance e collaboratori esterni
+Cosa cerchiamo:
+• Esperienza in content marketing o giornalismo digitale
+• Ossessione per la chiarezza e la precisione
+• Autonomia nella gestione delle priorità
+• Capacità di lavorare su più progetti in parallelo`,
+
+    `Data Analyst — Milano
+Azienda retail cerca un profilo che trasformi i dati in decisioni concrete.
+Cosa farai:
+• Estrarre e analizzare dati da fonti multiple
+• Costruire dashboard e report per il management
+• Identificare trend e opportunità nascoste nei dati
+• Supportare decisioni strategiche con analisi ad hoc
+Cosa cerchiamo:
+• Padronanza di SQL e Excel avanzato
+• Esperienza con strumenti di BI (Power BI, Tableau)
+• Mentalità analitica e attenzione al dettaglio
+• Capacità di comunicare insight a un pubblico non tecnico`,
+
+    `HR Business Partner — Torino
+Azienda manifatturiera cerca un HRBP che affianchi i manager nei momenti che contano davvero.
+Cosa farai:
+• Supportare i manager su performance, sviluppo e conflitti
+• Gestire i processi di valutazione e feedback
+• Contribuire alla costruzione di una cultura aziendale sana
+• Collaborare con il team HR su progetti trasversali
+Cosa cerchiamo:
+• Esperienza in ruoli HR generalisti o come HRBP
+• Capacità di ascolto profondo e gestione dei conflitti
+• Orientamento alle persone senza perdere di vista il business
+• Laurea in psicologia, scienze della formazione o economia`,
+
+    `Product Manager — Milano
+Scale-up B2B cerca un PM che bilanci visione di prodotto e pragmatismo operativo.
+Cosa farai:
+• Definire la roadmap e prioritizzare le funzionalità
+• Intervistare utenti e trasformare i feedback in requisiti
+• Allineare engineering, design e business sulle priorità
+• Misurare l'impatto delle release e iterare
+Cosa cerchiamo:
+• 2+ anni di esperienza in product management
+• Capacità di prendere decisioni con dati incompleti
+• Comunicazione chiara con profili tecnici e non tecnici
+• Ossessione per il problema dell'utente, non per la soluzione`,
+
+    `Sustainability Specialist — Roma
+Gruppo assicurativo cerca un profilo che trasformi la sostenibilità da obbligo normativo a leva competitiva.
+Cosa farai:
+• Sviluppare e implementare la strategia ESG
+• Redigere il bilancio di sostenibilità
+• Formare i colleghi su temi ESG
+• Relazionarti con investitori e stakeholder esterni
+Cosa cerchiamo:
+• Conoscenza del framework GRI e delle normative ESG
+• Capacità di lavorare in modo trasversale con tutti i reparti
+• Passione genuina per i temi ambientali e sociali
+• Laurea in economia, ingegneria o scienze ambientali`,
+
+    `Software Engineer Backend — Full Remote
+Fintech cerca uno sviluppatore che costruisca infrastrutture che reggano milioni di transazioni.
+Cosa farai:
+• Progettare e sviluppare API e microservizi
+• Ottimizzare le performance e la scalabilità del sistema
+• Partecipare alle code review e migliorare la qualità del codice
+• Collaborare con il team prodotto su nuove funzionalità
+Cosa cerchiamo:
+• Solida esperienza in Python o Go
+• Familiarità con architetture a microservizi e cloud (AWS/GCP)
+• Mentalità orientata alla qualità e alla manutenibilità
+• Capacità di lavorare in autonomia in un contesto distribuito`,
+
+    `Talent Acquisition Specialist — Milano
+Agenzia di headhunting cerca un recruiter che ami le persone quanto i numeri.
+Cosa farai:
+• Gestire end-to-end i processi di selezione
+• Fare sourcing su LinkedIn e altri canali
+• Costruire relazioni durature con candidati e hiring manager
+• Contribuire all'employer branding dell'agenzia
+Cosa cerchiamo:
+• Esperienza in selezione del personale (agenzia o in-house)
+• Capacità di leggere le persone oltre il CV
+• Energia, proattività e resistenza allo stress
+• Orientamento ai risultati con un tocco umano`,
+
+    `Giornalista Digitale — Roma
+Testata online cerca un giornalista curioso e veloce, capace di raccontare temi complessi a un pubblico largo.
+Cosa farai:
+• Scrivere articoli di approfondimento e breaking news
+• Intervistare fonti istituzionali e non convenzionali
+• Gestire i canali social della testata
+• Collaborare con la redazione su inchieste e speciali
+Cosa cerchiamo:
+• Iscrizione all'Ordine dei Giornalisti o praticantato in corso
+• Velocità di scrittura senza sacrificare la qualità
+• Fiuto per le notizie e capacità di verificare le fonti
+• Conoscenza dei principali CMS editoriali`,
+
+    `NGO Program Officer — Roma
+ONG internazionale cerca un profilo operativo per gestire programmi di cooperazione in Africa subsahariana.
+Cosa farai:
+• Gestire il ciclo di progetto dalla proposta al rendiconto
+• Coordinare i partner locali nei paesi di intervento
+• Redigere report per i donatori istituzionali
+• Supportare lo sviluppo di nuove proposte progettuali
+Cosa cerchiamo:
+• Esperienza in gestione di progetti di cooperazione internazionale
+• Conoscenza dei framework di rendicontazione UE o AICS
+• Inglese e francese fluenti
+• Disponibilità a missioni sul campo`,
+
+    `Compliance Specialist — Milano
+Banca digitale cerca un profilo che garantisca il rispetto delle normative in un contesto in rapida evoluzione.
+Cosa farai:
+• Monitorare l'evoluzione normativa e aggiornare le procedure
+• Condurre audit interni e gestire le ispezioni
+• Formare i colleghi sulle policy di compliance
+• Collaborare con il team legale su temi regolatori
+Cosa cerchiamo:
+• Conoscenza della normativa bancaria e finanziaria italiana ed europea
+• Capacità di tradurre la complessità normativa in processi pratici
+• Rigore metodologico e attenzione ai dettagli
+• Laurea in giurisprudenza o economia`,
+
+    `Graphic Designer — Studio Creativo
+Studio cerca un designer con una voce visiva riconoscibile, capace di lavorare su brand identity e comunicazione integrata.
+Cosa farai:
+• Progettare identità visive per brand in settori diversi
+• Sviluppare materiali di comunicazione print e digital
+• Collaborare con copywriter e strategist per campagne integrate
+• Presentare i concept ai clienti e gestire i feedback
+Cosa cerchiamo:
+• Portfolio che dimostri versatilità e punto di vista estetico preciso
+• Padronanza della Adobe Suite
+• Capacità di rispettare i brief senza perdere la creatività
+• Attitudine alla collaborazione e alla contaminazione`,
+
+    `Psicologo Clinico — Studio Privato Roma
+Studio di psicoterapia cerca uno psicologo per presa in carico di pazienti adulti con disturbi d'ansia e dell'umore.
+Cosa farai:
+• Condurre colloqui di valutazione e presa in carico
+• Seguire pazienti in percorsi individuali di psicoterapia
+• Partecipare alle supervisioni di gruppo settimanali
+• Contribuire alle attività di ricerca dello studio
+Cosa cerchiamo:
+• Laurea in psicologia e abilitazione all'esercizio della professione
+• Specializzazione in psicoterapia (cognitivo-comportamentale o sistemica)
+• Capacità di costruire alleanza terapeutica solida
+• Orientamento alla crescita professionale continua`
+  ];
+
+  const testo = annunci[Math.floor(Math.random() * annunci.length)];
 
   const result = { verde: [], rosso: [], giallo: [] };
 
