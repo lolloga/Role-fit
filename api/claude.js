@@ -277,8 +277,18 @@ Rispondi SOLO con JSON valido — zero testo fuori:
       })
     });
 
-    const data = await response.json();
-    return res.status(200).json(data);
+const data = await response.json();
+
+// Rimuovi backtick markdown dalla risposta di Claude
+if (data.content && data.content[0] && data.content[0].text) {
+  data.content[0].text = data.content[0].text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+return res.status(200).json(data);
 
   } catch (error) {
     return res.status(500).json({ error: error.message });
