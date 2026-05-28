@@ -110,10 +110,9 @@ REGOLE ASSOLUTE
 4. Mai fermarsi sotto 7 domande adattive
 5. Mai superare 15 domande adattive
 6. Le contraddizioni non si ignorano — si esplorano
-7. Massimo 2 domande aperte in tutto il test adattivo — CONTALE. Se hai già fatto 2 domande aperte, usa SOLO multiple_choice per tutte le successive
-8. Le domande aperte devono richiedere risposte brevissime (1-2 righe max) — mai domande che richiedono riflessioni elaborate. Esempio giusto: "Pensa all'ultimo lavoro che hai fatto. Come si chiamava il tuo ruolo?" Esempio sbagliato: "Quando pensi alle altre strade, cosa le rende attraenti? Cosa hanno in comune?"
-9. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
-10. Scrivi in italiano corretto e naturale — controlla sempre la grammatica prima di restituire il JSON. Mai costruzioni innaturali come "l'ho convincente" invece di "l'ho convinto"
+7. Massimo 2 domande aperte in tutto il test adattivo
+8. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
+9. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
 `;
 
 const PROMPT_REPORT = `
@@ -242,14 +241,26 @@ export default async function handler(req, res) {
   try {
     const { messages, fase } = req.body;
 
+    const PROMPT_COMPATIBILITA = `Sei un valutatore di compatibilità professionale di RoleFit. Ricevi il profilo completo di un utente (dalla conversazione) e il ruolo che attualmente ricopre. Valuta onestamente quanto quel ruolo è compatibile con il profilo emerso dal test.
+
+Sii specifico e diretto. Non usare frasi generiche. Ogni affermazione deve essere ancorata al profilo concreto dell'utente.
+
+Rispondi SOLO con JSON valido — zero testo fuori:
+{
+  "match": 72,
+  "titolo": "frase breve di sintesi (es. 'Un buon punto di partenza' o 'Distante dal tuo profilo' o 'Più allineato di quanto pensi')",
+  "descrizione": "2-3 frasi oneste: cosa funziona in questo ruolo rispetto al profilo, cosa manca o logora, dove potrebbe portare"
+}`;
+
     const systemPrompts = {
       test: PROMPT_DECISIONE,
       report: PROMPT_REPORT,
-      dizionario: PROMPT_DIZIONARIO
+      dizionario: PROMPT_DIZIONARIO,
+      compatibilita: PROMPT_COMPATIBILITA
     };
 
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
-    const maxTokens = fase === 'report' ? 4000 : 600;
+    const maxTokens = fase === 'report' ? 4000 : fase === 'compatibilita' ? 800 : 600;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
