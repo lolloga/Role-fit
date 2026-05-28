@@ -275,14 +275,24 @@ async function callClaude(fase = 'test') {
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
+     try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
       try {
-        return JSON.parse(match[0]);
+        return JSON.parse(text.substring(start, end + 1));
       } catch {
-        const cleaned = match[0]
+        const cleaned = text.substring(start, end + 1)
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
           .replace(/,\s*}/g, '}')
           .replace(/,\s*]/g, ']');
-        return JSON.parse(cleaned);
+        try {
+          return JSON.parse(cleaned);
+        } catch {
+          return null;
+        }
       }
     }
     return null;
