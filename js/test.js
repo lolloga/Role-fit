@@ -148,32 +148,36 @@ const STANDARD_QUESTIONS = [
 
 // ─── VARIANTI ATTIVITÀ ────────────────────────────────────────
 const ACTIVITY_VARIANTS = {
-  riunione: [
-    {
-      items: [
-        { time: '09:00', title: 'Workshop creativo — nuovi concept' },
-        { time: '10:30', title: 'Review dati Q1 con il team analytics' },
-        { time: '14:00', title: '1:1 con un collega in difficoltà' },
-        { time: '16:00', title: 'Strategia go-to-market nuovo prodotto' }
-      ]
-    },
-    {
-      items: [
-        { time: '09:30', title: 'Brainstorming su un problema aperto' },
-        { time: '11:00', title: 'Presentazione risultati al management' },
-        { time: '14:30', title: 'Formazione su un nuovo strumento' },
-        { time: '16:30', title: 'Call con un cliente importante' }
-      ]
-    },
-    {
-      items: [
-        { time: '08:30', title: 'Pianificazione settimanale con il team' },
-        { time: '10:00', title: 'Deep dive su un progetto complesso' },
-        { time: '15:00', title: 'Sessione di feedback con un junior' },
-        { time: '17:00', title: 'Esplorazione di nuove opportunità' }
-      ]
-    }
-  ],
+  riunione: (() => {
+    const pool = [
+      'Workshop creativo per generare nuovi concept',
+      'Review dei dati e degli indicatori con il team',
+      '1:1 con un collega in difficoltà',
+      'Strategia go-to-market di un nuovo prodotto',
+      'Brainstorming su un problema ancora aperto',
+      'Presentazione dei risultati al management',
+      'Formazione su un nuovo strumento o metodo',
+      'Call con un cliente importante',
+      'Pianificazione settimanale con il team',
+      'Deep dive tecnico su un progetto complesso',
+      'Sessione di feedback con una persona junior',
+      'Esplorazione di nuove opportunità di mercato',
+      'Riunione per risolvere un conflitto interno',
+      'Allineamento con un altro reparto',
+      'Sessione di pianificazione del budget',
+      'Intervista a un candidato per il team',
+      'Retrospettiva su un progetto appena concluso',
+      'Negoziazione con un fornitore o partner'
+    ];
+    const orari = ['08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '14:00', '14:30', '15:00', '16:00', '16:30', '17:00'];
+    const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+    const pickItems = () => {
+      const titles = shuffle(pool).slice(0, 4);
+      const times = shuffle(orari).slice(0, 4).sort();
+      return { items: titles.map((t, i) => ({ time: times[i], title: t })) };
+    };
+    return [pickItems(), pickItems(), pickItems()];
+  })(),
   termometro: (() => {
     const pool = [
       'Analizzi dati da zero per trovare un pattern nascosto',
@@ -221,26 +225,29 @@ const ACTIVITY_VARIANTS = {
     const shuffled = shuffle(pool);
     return [shuffled.slice(0, 6), shuffled.slice(6, 12), shuffled.slice(12, 18)];
   })(),
-  dilemma: [
-    [
+  dilemma: (() => {
+    const pool = [
       { a: 'Lavoro ad alto impatto ma poca libertà', b: 'Lavoro autonomo ma impatto incerto' },
       { a: 'Crescita rapida in un contesto caotico', b: 'Crescita lenta in un contesto solido' },
       { a: 'Essere riconosciuto pubblicamente', b: 'Sapere di aver fatto la cosa giusta' },
-      { a: 'Specializzarsi profondamente', b: 'Spaziare su molti ambiti diversi' }
-    ],
-    [
+      { a: 'Specializzarsi profondamente', b: 'Spaziare su molti ambiti diversi' },
       { a: 'Persone brillanti, settore che non ti appassiona', b: 'Lavoro da solo in qualcosa che ami' },
       { a: 'Stipendio alto, poco tempo libero', b: 'Stipendio medio, molta flessibilità' },
       { a: 'Ruolo con responsabilità chiare', b: 'Ruolo ambiguo dove costruisci tutto' },
-      { a: 'Fare bene una cosa', b: 'Fare molte cose abbastanza bene' }
-    ],
-    [
-      { a: 'Rischio alto, ricompensa alta', b: 'Stabilità, crescita graduale' },
-      { a: 'Cambiare settore ogni 3 anni', b: 'Diventare il migliore in un settore' },
+      { a: 'Fare bene una cosa sola', b: 'Fare molte cose abbastanza bene' },
+      { a: 'Rischio alto, ricompensa alta', b: 'Stabilità e crescita graduale' },
+      { a: 'Cambiare settore ogni pochi anni', b: 'Diventare il migliore in un settore' },
       { a: 'Sapere sempre cosa ti aspetta', b: 'Essere sorpreso da dove ti porta il lavoro' },
-      { a: 'Lavorare per la missione', b: 'Lavorare per i soldi e usarli per la missione' }
-    ]
-  ]
+      { a: 'Lavorare per la missione', b: 'Lavorare per i soldi e usarli per la missione' },
+      { a: 'Un capo che ti sfida sempre', b: 'Un capo che ti lascia in pace' },
+      { a: 'Lavorare con i dati', b: 'Lavorare con le persone' },
+      { a: 'Costruire qualcosa di nuovo', b: 'Migliorare qualcosa che esiste' },
+      { a: 'Tante regole chiare', b: 'Massima libertà di interpretazione' }
+    ];
+    const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+    const pick = () => shuffle(pool).slice(0, 4);
+    return [pick(), pick(), pick()];
+  })()
 };
 
 function getRandomVariant(key) {
@@ -710,7 +717,7 @@ function renderDilemma(container, pairs) {
 function renderCostruisci(container) {
   const maxSelect = 5;
   const selected = new Set();
-  const items = [
+  const pool = [
     'Analizzare dati e trovare pattern',
     'Incontrare clienti o partner nuovi',
     'Scrivere un documento strategico',
@@ -720,8 +727,17 @@ function renderCostruisci(container) {
     'Creare qualcosa da zero',
     'Risolvere un problema urgente e complesso',
     'Fare presentazioni o pitching',
-    'Tempo libero non strutturato per esplorare'
+    'Tempo libero non strutturato per esplorare',
+    'Dare feedback e far crescere qualcuno',
+    'Organizzare e mettere ordine in un progetto',
+    'Negoziare un accordo importante',
+    'Approfondire un tema tecnico complesso',
+    'Costruire relazioni con nuove persone',
+    'Migliorare un processo che non funziona',
+    'Lavorare a contatto con il pubblico',
+    'Riflettere e definire una strategia di lungo periodo'
   ];
+  const items = [...pool].sort(() => Math.random() - 0.5).slice(0, 10);
 
   const counter = document.createElement('div');
   counter.style.cssText = 'font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;';
