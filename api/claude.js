@@ -110,7 +110,7 @@ REGOLE ASSOLUTE
 4. Mai fermarsi sotto 7 domande adattive
 5. Mai superare 15 domande adattive
 6. Le contraddizioni non si ignorano — si esplorano
-7. Massimo 2 domande aperte in tutto il test adattivo
+7. Genera SEMPRE e SOLO domande di tipo "multiple_choice" — MAI "open". Questo è assoluto e non ha eccezioni. Ogni domanda deve avere esattamente 4 opzioni concrete e specifiche, coerenti con il testo della domanda. Le opzioni non possono mai essere "Sì, decisamente / In parte / Non proprio / No, per niente" — devono descrivere azioni, comportamenti o situazioni specifiche.
 8. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
 9. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
 `;
