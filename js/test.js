@@ -367,18 +367,15 @@ function renderMultipleChoice(container, questionData) {
 
   container.appendChild(grid);
 
-  // Mostra link risposta aperta solo se non abbiamo già 2 risposte aperte
-  const openAnswers = state.answers.filter(a => a.isOpen).length;
-  if (openAnswers < 2) {
-    const openLink = document.createElement('button');
-    openLink.className = 'open-toggle';
-    openLink.textContent = 'Preferisci rispondere con parole tue →';
-    openLink.addEventListener('click', () => {
-      container.innerHTML = '';
-      renderOpenInput(container, questionData);
-    });
-    container.appendChild(openLink);
-  }
+  // Link per risposta libera
+  const openLink = document.createElement('button');
+  openLink.className = 'open-toggle';
+  openLink.textContent = 'Preferisci rispondere con parole tue →';
+  openLink.addEventListener('click', () => {
+    container.innerHTML = '';
+    renderOpenInput(container, questionData);
+  });
+  container.appendChild(openLink);
 }
 
 function renderOpenInput(container, questionData) {
@@ -470,7 +467,7 @@ async function submitAnswer(value, questionData) {
     question: questionData.text,
     answer: value,
     time: responseTime,
-    isOpen: !!questionData._isOpen
+    isOpen: false
   });
 
   state.questionCount++;
@@ -538,6 +535,13 @@ async function getNextStep() {
     if (state.adaptiveCount >= 4 && !state.activityResults['costruisci']) {
       showActivity('costruisci');
       return;
+    }
+    // Forza sempre multiple_choice — mai domande aperte nel test
+    if (result.question.type === 'open') {
+      result.question.type = 'multiple_choice';
+      if (!result.question.options || result.question.options.length === 0) {
+        result.question.options = ['Sì, decisamente', 'In parte', 'Non proprio', 'No, per niente'];
+      }
     }
     stopThinking();
     renderQuestion(result.question);
