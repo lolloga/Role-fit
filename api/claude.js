@@ -1,4 +1,4 @@
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
