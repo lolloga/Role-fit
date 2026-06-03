@@ -27,21 +27,24 @@ async function generateReport() {
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      let block = text.substring(start, end + 1);
       try {
-        return JSON.parse(match[0]);
+        return JSON.parse(block);
       } catch {
-        const cleaned = match[0]
+        block = block
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
           .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']');
-        return JSON.parse(cleaned);
+          .replace(/,\s*]/g, ']')
+          .replace(/}\s*{/g, '},{')
+          .replace(/"\s*\n\s*"/g, '", "');
+        return JSON.parse(block);
       }
     }
     throw new Error('JSON non valido');
   }
-}
 
 // ─── VALUTA RUOLO ATTUALE ─────────────────────────────────────
 async function valutaRuoloAttuale(ruoloInput) {
