@@ -514,6 +514,7 @@ async function getNextStep() {
   }
 
   const result = await callClaude('test');
+console.log('RISULTATO CLAUDE:', result);
 
   if (!result) {
     console.error('Risposta Claude non valida');
