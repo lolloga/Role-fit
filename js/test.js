@@ -266,9 +266,8 @@ async function callClaude(fase = 'test') {
     })
   });
 
-const data = await response.json();
-const text = data.content[0].text;
-console.log('RAW LENGTH:', text.length, 'FINISH:', data.stop_reason);
+  const data = await response.json();
+  const text = data.content[0].text;
 
   try {
     return JSON.parse(text);
@@ -515,7 +514,6 @@ async function getNextStep() {
   }
 
   const result = await callClaude('test');
-console.log('RISULTATO CLAUDE:', result);
 
   if (!result) {
     console.error('Risposta Claude non valida');
