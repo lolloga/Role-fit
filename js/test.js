@@ -266,8 +266,9 @@ async function callClaude(fase = 'test') {
     })
   });
 
-  const data = await response.json();
-  const text = data.content[0].text;
+const data = await response.json();
+const text = data.content[0].text;
+console.log('RAW LENGTH:', text.length, 'FINISH:', data.stop_reason);
 
   try {
     return JSON.parse(text);
