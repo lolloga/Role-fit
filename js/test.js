@@ -47,6 +47,7 @@ const state = {
   history: [],
   currentQuestion: null,
   worksCurrently: false,
+  _retryCount: 0,
 };
 
 // ─── PERSISTENZA ─────────────────────────────────────────────
@@ -543,15 +544,35 @@ async function getNextStep() {
       showActivity('costruisci');
       return;
     }
-    // Forza sempre multiple_choice — mai domande aperte nel test
-    if (result.question.type === 'open') {
-      result.question.type = 'multiple_choice';
-      if (!result.question.options || result.question.options.length === 0) {
-        result.question.options = ['Sì, decisamente', 'In parte', 'Non proprio', 'No, per niente'];
-      }
+
+    // VALIDAZIONE DOMANDA — una domanda valida deve avere 4 opzioni concrete
+    const q = result.question;
+    const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
+    const haOpzioniValide = q.options &&
+      q.options.length >= 3 &&
+      !q.options.every((o, i) => opzioniGeneriche.includes((o || '').toLowerCase().trim()));
+
+    if (!haOpzioniValide && state._retryCount < 2) {
+      // Domanda malfatta: chiediamo a Claude di rigenerarla
+      state._retryCount = (state._retryCount || 0) + 1;
+      state.conversationHistory.push({
+        role: 'user',
+        content: 'La domanda precedente non aveva 4 opzioni concrete e specifiche. Rigenera SUBITO una domanda a scelta multipla con esattamente 4 opzioni che descrivono azioni o situazioni concrete, mai opzioni generiche tipo Sì/In parte/No.'
+      });
+      await getNextStep();
+      return;
     }
+
+    state._retryCount = 0;
+
+    // Se ancora non valida dopo i retry, usiamo opzioni di emergenza coerenti
+    if (!haOpzioniValide) {
+      q.options = ['Mi rappresenta molto', 'Mi rappresenta in parte', 'Non mi rappresenta', 'Non saprei dire'];
+    }
+
+    q.type = 'multiple_choice';
     stopThinking();
-    renderQuestion(result.question);
+    renderQuestion(q);
   }
 }
 
