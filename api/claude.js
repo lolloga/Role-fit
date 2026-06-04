@@ -1,4 +1,4 @@
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
@@ -79,8 +79,8 @@ Se continui:
   "question": {
     "text": "testo della domanda",
     "context": "micro-contesto di 1 riga",
-    "type": "multiple_choice" | "open",
-    "options": ["opzione 1", "opzione 2", "opzione 3", "opzione 4"]
+    "type": "multiple_choice",
+    "options": ["opzione concreta 1", "opzione concreta 2", "opzione concreta 3", "opzione concreta 4"]
   },
   "internal": {
     "dim1": "CHIARO|PROBABILE|AMBIGUO|MANCANTE",
@@ -110,9 +110,13 @@ REGOLE ASSOLUTE
 4. Mai fermarsi sotto 7 domande adattive
 5. Mai superare 15 domande adattive
 6. Le contraddizioni non si ignorano — si esplorano
-7. Massimo 2 domande aperte in tutto il test adattivo
-8. Ogni domanda a scelta multipla deve avere 4 opzioni, tutte credibili
-9. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
+7. TUTTE le domande sono di tipo "multiple_choice". MAI tipo "open". Senza eccezioni.
+8. Ogni domanda DEVE avere ESATTAMENTE 4 opzioni concrete e specifiche.
+9. VIETATO usare opzioni generiche tipo "Sì decisamente / In parte / Non proprio / No per niente". Le opzioni devono SEMPRE descrivere azioni, scelte, situazioni o comportamenti concreti e diversi tra loro.
+10. VIETATO porre domande che chiedono "perché" o una spiegazione. Una domanda multiple_choice non può chiedere di spiegare: deve far scegliere tra 4 alternative concrete.
+   ESEMPIO VIETATO: "Quale ti attrae di più e perché?" con opzioni Sì/No.
+   ESEMPIO CORRETTO: "Quale di queste due strade ti attrae di più?" con opzioni: "La sicurezza di un percorso strutturato" / "La libertà di costruire da zero" / "Un mix dei due, con prevalenza di struttura" / "Un mix dei due, con prevalenza di libertà".
+11. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
 `;
 
 const PROMPT_REPORT = `
