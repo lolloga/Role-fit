@@ -1,4 +1,4 @@
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
@@ -262,6 +262,9 @@ Rispondi SOLO con JSON valido — zero testo fuori:
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
     const maxTokens = fase === 'report' ? 6000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 800;
 
+    // Prefill: forziamo Claude a iniziare la risposta con la parentesi graffa
+    const messagesWithPrefill = [...messages, { role: 'assistant', content: '{' }];
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -272,35 +275,37 @@ Rispondi SOLO con JSON valido — zero testo fuori:
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: maxTokens,
+        temperature: 0.3,
         system,
-        messages
+        messages: messagesWithPrefill
       })
     });
 
     const data = await response.json();
 
-    // Pulizia robusta del JSON lato server — gestisce tutti i casi
     if (data.content && data.content[0] && data.content[0].text) {
-      let text = data.content[0].text;
+      // Riaggiungiamo la parentesi del prefill che Claude non ripete
+      let text = '{' + data.content[0].text;
 
-      // 1. Rimuovi backtick markdown
-      text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-
-      // 2. Estrai solo il blocco JSON principale
-      const start = text.indexOf('{');
-      const end = text.lastIndexOf('}');
-      if (start !== -1 && end !== -1 && end > start) {
-        text = text.substring(start, end + 1);
+      const startIdx = text.indexOf('{');
+      const endIdx = text.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        text = text.substring(startIdx, endIdx + 1);
       }
 
-      // 3. Verifica che sia JSON valido, altrimenti prova a ripararlo
       try {
         JSON.parse(text);
       } catch {
-        text = text
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+        const repaired = text
+          .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
           .replace(/,\s*}/g, '}')
           .replace(/,\s*]/g, ']');
+        try {
+          JSON.parse(repaired);
+          text = repaired;
+        } catch {
+          // fallback gestito dal frontend
+        }
       }
 
       data.content[0].text = text;
