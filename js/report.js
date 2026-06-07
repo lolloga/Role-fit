@@ -22,6 +22,11 @@ async function generateReport() {
   });
 
   const data = await response.json();
+
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    throw new Error('Risposta API vuota o non valida');
+  }
+
   const text = data.content[0].text;
 
   try {
@@ -30,21 +35,23 @@ async function generateReport() {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
     if (start !== -1 && end !== -1 && end > start) {
-      let block = text.substring(start, end + 1);
       try {
-        return JSON.parse(block);
+        return JSON.parse(text.substring(start, end + 1));
       } catch {
-        block = block
+        const cleaned = text.substring(start, end + 1)
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
           .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']')
-          .replace(/}\s*{/g, '},{')
-          .replace(/"\s*\n\s*"/g, '", "');
-        return JSON.parse(block);
+          .replace(/,\s*]/g, ']');
+        try {
+          return JSON.parse(cleaned);
+        } catch {
+          return null;
+        }
       }
     }
-    throw new Error('JSON non valido');
+    return null;
   }
+}
 
 // ─── VALUTA RUOLO ATTUALE ─────────────────────────────────────
 async function valutaRuoloAttuale(ruoloInput) {
