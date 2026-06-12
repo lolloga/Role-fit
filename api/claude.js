@@ -186,6 +186,11 @@ L'utente ha indicato 1 o 2 "mondi" che lo incuriosiscono (una delle domande stan
 - Traduci i mondi in SETTORI CONCRETI e nominabili (es. "creatività e comunicazione" → advertising, editoria digitale, eventi; "impatto e sostenibilità" → ESG aziendale, terzo settore, energia rinnovabile). Mai restituire il nome generico del mondo come settore.
 - Se l'utente ha scelto 2 mondi, i settori dei 3 ruoli devono attingere da ENTRAMBI — e dove possibile dalla loro intersezione (es. business e numeri + creatività → marketing analytics, media buying).
 - Per ogni settore, 1-2 frasi su COME quel ruolo si declina lì: cosa cambia nel quotidiano, nel ritmo, nel tipo di relazioni. Lo stesso ruolo vive in modo diverso in settori diversi — fai vedere questa differenza.
+- Per ogni settore, indica anche 3 AZIENDE come esempi orientativi. REGOLE FERREE sulle aziende:
+  * Devono essere aziende REALI, NOTE e CONSOLIDATE, con presenza in Italia. Mai inventare nomi. Nel dubbio, scegli la realtà più grande e riconoscibile del settore invece di una di nicchia.
+  * Sono esempi del TIPO di realtà dove quel ruolo ha senso, NON garanzie di posizioni aperte né raccomandazioni di candidatura.
+  * Privilegia aziende che un italiano riconoscerebbe (es. banking → Intesa Sanpaolo, UniCredit, Mediobanca; advertising → Publicis, WPP, Armando Testa). Evita startup oscure o nomi di cui non sei certo.
+  * Se per un settore non sei sicuro di 3 aziende reali e note, indicane meno (anche solo 1 o 2) piuttosto che inventare.
 - Anche qui specificità radicale: collega la scelta del settore a un segnale preciso del test, non a frasi che varrebbero per chiunque.
 
 SE L'UTENTE HA DESCRITTO IL SUO RUOLO ATTUALE:
@@ -228,7 +233,8 @@ FORMATO OUTPUT — JSON valido, zero testo fuori:
         "settori": [
           {
             "nome": "Nome settore concreto",
-            "declinazione": "1-2 frasi su come questo ruolo si declina in questo settore per questa persona"
+            "declinazione": "1-2 frasi su come questo ruolo si declina in questo settore per questa persona",
+            "aziende": ["Azienda reale 1", "Azienda reale 2", "Azienda reale 3"]
           }
         ]
       }
@@ -302,6 +308,17 @@ Rispondi SOLO con JSON valido — zero testo fuori:
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
     const maxTokens = fase === 'report' ? 8000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 800;
 
+    // Modello scelto per fase. Per ora tutte le fasi usano Sonnet 4.6.
+    // In futuro si possono spostare le fasi frequenti (test) su Haiku per ridurre i costi:
+    // es. test: 'claude-haiku-4-5-20251001', report: 'claude-sonnet-4-6'.
+    const models = {
+      test: 'claude-sonnet-4-6',
+      report: 'claude-sonnet-4-6',
+      dizionario: 'claude-sonnet-4-6',
+      compatibilita: 'claude-sonnet-4-6'
+    };
+    const model = models[fase] || 'claude-sonnet-4-6';
+
     // Prefill: forziamo Claude a iniziare la risposta con la parentesi graffa
     const messagesWithPrefill = [...messages, { role: 'assistant', content: '{' }];
 
@@ -313,7 +330,7 @@ Rispondi SOLO con JSON valido — zero testo fuori:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model,
         max_tokens: maxTokens,
         temperature: 0.3,
         system,
