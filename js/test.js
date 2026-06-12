@@ -83,7 +83,7 @@ function clearState() {
   localStorage.removeItem('rf_state');
 }
 
-// ─── 5 DOMANDE STANDARD (no AI) ──────────────────────────────
+// ─── 6 DOMANDE STANDARD (no AI) ──────────────────────────────
 const STANDARD_QUESTIONS = [
   {
     id: 'eta',
@@ -143,6 +143,21 @@ const STANDARD_QUESTIONS = [
       'Sto organizzando e portando ordine nel caos',
       'Sto aiutando qualcuno a stare meglio o a crescere',
       'Sto esplorando qualcosa che non conosco ancora'
+    ]
+  },
+  {
+    id: 'mondi',
+    text: 'In quale di questi mondi ti incuriosirebbe di più passare le tue giornate?',
+    context: 'Scegline uno o due.',
+    type: 'multi_select',
+    maxSelect: 2,
+    options: [
+      'Mondi tecnici e digitali',
+      'Persone e relazioni',
+      'Business e numeri',
+      'Creatività e comunicazione',
+      'Cose concrete e produzione',
+      'Impatto e sostenibilità'
     ]
   }
 ];
@@ -296,7 +311,7 @@ async function callClaude(fase = 'test') {
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────
 function updateProgress() {
-  const total = 22;
+  const total = 23;
   const done = state.questionCount;
   const pct = Math.min(95, Math.round((done / total) * 100));
   document.getElementById('progress-bar').style.width = pct + '%';
@@ -353,6 +368,8 @@ function renderQuestion(questionData) {
 
   if (questionData.type === 'multiple_choice') {
     renderMultipleChoice(inputEl, questionData);
+  } else if (questionData.type === 'multi_select') {
+    renderMultiSelect(inputEl, questionData);
   } else {
     renderOpenInput(inputEl, questionData);
   }
@@ -439,7 +456,68 @@ function renderOpenInput(container, questionData) {
   setTimeout(() => textarea.focus(), 100);
 }
 
-// ─── SELEZIONE OPZIONE ────────────────────────────────────────
+// ─── MULTI-SELECT (max 2) ─────────────────────────────────────
+function renderMultiSelect(container, questionData) {
+  const maxSelect = questionData.maxSelect || 2;
+  const selected = new Set();
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+  const counter = document.createElement('div');
+  counter.style.cssText = 'font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;';
+  counter.textContent = `0 / ${maxSelect} — puoi sceglierne anche solo uno`;
+
+  const grid = document.createElement('div');
+  grid.className = 'options-grid';
+
+  const buttons = [];
+
+  const refresh = () => {
+    counter.textContent = selected.size === 0
+      ? `0 / ${maxSelect} — puoi sceglierne anche solo uno`
+      : `${selected.size} / ${maxSelect} selezionati`;
+    const full = selected.size >= maxSelect;
+    buttons.forEach((b, i) => {
+      const isSel = selected.has(i);
+      b.classList.toggle('selected', isSel);
+      b.disabled = full && !isSel;
+      b.style.opacity = (full && !isSel) ? '0.4' : '1';
+    });
+    confirmBtn.disabled = selected.size === 0;
+    confirmBtn.style.opacity = selected.size === 0 ? '0.5' : '1';
+  };
+
+  questionData.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+    btn.addEventListener('click', () => {
+      if (selected.has(i)) {
+        selected.delete(i);
+      } else if (selected.size < maxSelect) {
+        selected.add(i);
+      }
+      refresh();
+    });
+    buttons.push(btn);
+    grid.appendChild(btn);
+  });
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'btn btn--primary mt-16';
+  confirmBtn.textContent = 'Continua';
+  confirmBtn.addEventListener('click', () => {
+    if (selected.size === 0) return;
+    const values = [...selected].sort((a, b) => a - b).map(i => questionData.options[i]);
+    submitAnswer(values.join(' + '), questionData);
+  });
+
+  container.appendChild(counter);
+  container.appendChild(grid);
+  container.appendChild(confirmBtn);
+  refresh();
+}
+
+
 function selectOption(btn, value, questionData) {
   btn.closest('.options-grid').querySelectorAll('.option-btn')
     .forEach(b => b.classList.remove('selected'));
@@ -1035,13 +1113,27 @@ Cosa cerchiamo:
 
   const intro = document.createElement('p');
   intro.style.cssText = 'font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;';
-  intro.textContent = 'Tocca una riga per ciclarla: verde → rosso → giallo → nessuno.';
+  intro.textContent = 'Tocca le righe dell\'annuncio per ciclarle: verde → rosso → giallo → nessuno. Titolo e intestazioni non sono valutabili.';
 
   const annuncio = document.createElement('div');
   annuncio.style.cssText = 'background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:18px;';
 
-    testo.split('\n').filter(r => r.trim()).forEach(riga => {
+    testo.split('\n').filter(r => r.trim()).forEach((riga, idx) => {
+    const isTitolo = idx === 0;
+    const isIntestazione = riga.trim().endsWith(':');
+
     const row = document.createElement('div');
+
+    // Titolo e intestazioni di sezione: visibili ma NON selezionabili (non portano segnale)
+    if (isTitolo || isIntestazione) {
+      row.style.cssText = isTitolo
+        ? 'padding:6px 8px;font-size:0.95rem;font-weight:600;color:var(--text-primary);line-height:1.5;margin-bottom:8px;cursor:default;'
+        : 'padding:6px 8px;font-size:0.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;line-height:1.5;margin-top:10px;margin-bottom:4px;cursor:default;';
+      row.textContent = riga;
+      annuncio.appendChild(row);
+      return;
+    }
+
     row.style.cssText = 'padding:6px 8px;border-radius:6px;cursor:pointer;font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:4px;transition:background 0.15s,color 0.15s;';
     row.textContent = riga;
     row.dataset.stato = '';
