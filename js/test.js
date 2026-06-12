@@ -271,6 +271,14 @@ async function callClaude(fase = 'test') {
   });
 
   const data = await response.json();
+
+  // Se l'API ha risposto con un errore (modello non valido, rate limit, sovraccarico...),
+  // non c'è data.content — logghiamo l'errore vero invece di crashare su content[0].
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    console.error('Errore API Claude (fase ' + fase + '):', data.error || data);
+    return null;
+  }
+
   const text = data.content[0].text;
 
   try {
