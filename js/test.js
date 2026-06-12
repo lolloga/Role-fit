@@ -83,7 +83,7 @@ function clearState() {
   localStorage.removeItem('rf_state');
 }
 
-// ─── 6 DOMANDE STANDARD (no AI) ──────────────────────────────
+// ─── 5 DOMANDE STANDARD (no AI) ──────────────────────────────
 const STANDARD_QUESTIONS = [
   {
     id: 'eta',
@@ -101,7 +101,7 @@ const STANDARD_QUESTIONS = [
       'Ho appena finito gli studi e sto capendo cosa fare',
       'Ho iniziato a lavorare ma non sono sicuro che sia la strada giusta',
       'Lavoro da anni ma sento che qualcosa non torna',
-      'So già cosa voglio, cerco conferma'
+      'Sto facendo un lavoro che mi piace, ma cerco conferma'
     ]
   },
   {
@@ -117,18 +117,6 @@ const STANDARD_QUESTIONS = [
       'Artistico, creativo, design',
       'Sanitario, biologico, psicologico',
       'Nessun percorso formale specifico'
-    ]
-  },
-  {
-    id: 'lavoro',
-    text: 'Hai già esperienza lavorativa?',
-    context: null,
-    type: 'multiple_choice',
-    options: [
-      'No, sono ancora in formazione',
-      'Sì, ho fatto qualcosa ma non è la mia strada',
-      'Sì, e mi piace ma voglio capire dove può portarmi',
-      'Sì, ma voglio cambiare completamente direzione'
     ]
   },
   {
@@ -311,7 +299,7 @@ async function callClaude(fase = 'test') {
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────
 function updateProgress() {
-  const total = 23;
+  const total = 22;
   const done = state.questionCount;
   const pct = Math.min(95, Math.round((done / total) * 100));
   document.getElementById('progress-bar').style.width = pct + '%';
@@ -538,9 +526,10 @@ async function submitAnswer(value, questionData) {
     adaptiveCount: state.adaptiveCount
   });
 
-  // Controlla se lavora
-  if (questionData.id === 'lavoro') {
-    state.worksCurrently = value.startsWith('Sì');
+  // Rileva se l'utente sta lavorando — ora sulla domanda 'momento'.
+  // Tutte le opzioni indicano un lavoro in corso TRANNE "Ho appena finito gli studi...".
+  if (questionData.id === 'momento') {
+    state.worksCurrently = !value.startsWith('Ho appena finito gli studi');
   }
 
   state.conversationHistory.push({
