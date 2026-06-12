@@ -117,17 +117,32 @@ function renderReport(data) {
     if (Array.isArray(ruolo.settori) && ruolo.settori.length > 0) {
       const items = ruolo.settori
         .filter(s => s && s.nome)
-        .map(s => `
-          <div style="margin-bottom:10px;">
+        .map(s => {
+          // Aziende esempio (guard: solo se presenti)
+          let aziendeHtml = '';
+          if (Array.isArray(s.aziende) && s.aziende.length > 0) {
+            const tags = s.aziende
+              .filter(a => a && a.trim())
+              .map(a => `<span style="display:inline-block;font-size:0.74rem;color:var(--text-secondary);background:var(--deep);border:1px solid var(--card-border);border-radius:6px;padding:2px 9px;margin:3px 4px 0 0;">${a}</span>`)
+              .join('');
+            if (tags) {
+              aziendeHtml = `<div style="margin-top:6px;"><span style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Esempi di realtà</span><div style="margin-top:3px;">${tags}</div></div>`;
+            }
+          }
+          return `
+          <div style="margin-bottom:12px;">
             <span style="display:inline-block;font-size:0.78rem;font-weight:600;color:var(--emerald-light);background:rgba(29,158,117,0.12);border:1px solid rgba(29,158,117,0.3);border-radius:999px;padding:3px 12px;margin-bottom:6px;">${s.nome}</span>
             <div class="ruolo-detail-text" style="margin-top:2px;">${s.declinazione || ''}</div>
-          </div>`)
+            ${aziendeHtml}
+          </div>`;
+        })
         .join('');
       if (items) {
         settoriHtml = `
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Dove brilla per te</div>
         ${items}
+        <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic;margin-top:8px;">Esempi orientativi per darti un punto di partenza — verifica sempre le posizioni effettivamente aperte.</div>
       </div>`;
       }
     }
