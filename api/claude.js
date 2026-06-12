@@ -138,7 +138,7 @@ REGOLE ASSOLUTE
    ESEMPIO CORRETTO: "Quale di queste due strade ti attrae di più?" con opzioni: "La sicurezza di un percorso strutturato" / "La libertà di costruire da zero" / "Un mix dei due, con prevalenza di struttura" / "Un mix dei due, con prevalenza di libertà".
 11. VIETATO ASSOLUTAMENTE fare domande che richiedono informazioni già note dalle 5 domande standard, anche se riformulate. In particolare: MAI chiedere se l'utente sta lavorando o che lavoro fa (lo sai già dalla domanda sul momento professionale), che età ha, che studi ha fatto, o in che settore vorrebbe lavorare. Queste risposte le hai GIÀ. Prima di generare ogni domanda, verifica che non duplichi nulla di già chiesto nella conversazione.
 12. In ogni test, 2 o 3 domande adattive devono essere domande indirette su scenari di vita fuori dal lavoro (vedi sezione DOMANDE INDIRETTE). Mai più di 3, mai due consecutive.
-13. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
+13. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON. Il primo carattere della tua risposta DEVE essere { e l'ultimo }. Nessuna introduzione, nessun commento, nessun blocco markdown.
 `;
 
 const PROMPT_REPORT = `
@@ -213,7 +213,7 @@ REGOLE DI SCRITTURA
 - Lunghezza: 3-5 minuti di lettura
 - Tono: come un amico che ti conosce bene e lavora in un campo che capisce le persone
 
-FORMATO OUTPUT — JSON valido, zero testo fuori:
+FORMATO OUTPUT — JSON valido, zero testo fuori (il primo carattere deve essere { e l'ultimo }, nessuna introduzione né markdown):
 
 {
   "report": {
@@ -319,9 +319,9 @@ Rispondi SOLO con JSON valido — zero testo fuori:
     };
     const model = models[fase] || 'claude-sonnet-4-6';
 
-    // Prefill: forziamo Claude a iniziare la risposta con la parentesi graffa
-    const messagesWithPrefill = [...messages, { role: 'assistant', content: '{' }];
-
+    // NOTA: Sonnet 4.6 non supporta il prefill dei messaggi assistant.
+    // Per ottenere JSON pulito ci affidiamo all'istruzione "solo JSON" nei prompt
+    // e alla pulizia/riparazione qui sotto (prima { ... ultima }).
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -334,15 +334,17 @@ Rispondi SOLO con JSON valido — zero testo fuori:
         max_tokens: maxTokens,
         temperature: 0.3,
         system,
-        messages: messagesWithPrefill
+        messages
       })
     });
 
     const data = await response.json();
 
     if (data.content && data.content[0] && data.content[0].text) {
-      // Riaggiungiamo la parentesi del prefill che Claude non ripete
-      let text = '{' + data.content[0].text;
+      // Senza prefill, il testo contiene già la { iniziale.
+      // Isoliamo comunque il JSON tra la prima { e l'ultima } per scartare
+      // eventuale testo prima o dopo.
+      let text = data.content[0].text;
 
       const startIdx = text.indexOf('{');
       const endIdx = text.lastIndexOf('}');
