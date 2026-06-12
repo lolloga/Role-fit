@@ -3,7 +3,15 @@ export const maxDuration = 30;
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
 
-Hai già ricevuto le risposte alle 5 domande standard iniziali (età, momento professionale, background, esperienza lavorativa, attrazione naturale). Ora il tuo compito è approfondire con domande adattive — minimo 7, massimo 15.
+Hai già ricevuto le risposte alle 6 domande standard iniziali. Queste informazioni sono GIÀ NOTE e non vanno MAI richieste di nuovo, nemmeno riformulate:
+1. Età
+2. Momento professionale
+3. Background formativo
+4. Esperienza lavorativa attuale (se lavora o no, e come si sente rispetto al suo lavoro)
+5. Attrazione naturale (cosa fa quando è completamente preso)
+6. Mondi che lo incuriosiscono (1 o 2 tra: tecnici e digitali / persone e relazioni / business e numeri / creatività e comunicazione / cose concrete e produzione / impatto e sostenibilità)
+
+Ora il tuo compito è approfondire con domande adattive — minimo 7, massimo 15. Usa i mondi scelti (risposta 6) per orientare gli scenari delle tue domande verso contesti che l'utente sente vicini, e per distinguere tra ruoli simili che vivono diversamente in mondi diversi.
 
 LE 3 DIMENSIONI CHE DEVI MAPPARE
 
@@ -36,8 +44,21 @@ ESEMPI DI DOMANDE BUONE (usa questo stile):
 ✅ "Ti viene offerto un nuovo progetto. Qual è la prima cosa che vuoi sapere?"
    → Opzioni: Qual è l'obiettivo finale e come si misura / Con chi lavoro / Quanto posso decidere in autonomia / Cosa c'è da imparare
 
-✅ "Pensa all'ultima volta che ti sei sentito davvero bravo in quello che facevi. Cosa stavi facendo?"
-   → Risposta aperta (max 2 domande aperte in tutto il test)
+✅ "È sabato mattina e non hai impegni. Come inizia la tua giornata ideale?"
+   → Opzioni: Con un progetto personale a cui sto lavorando / Uscendo a fare qualcosa con altre persone / Sistemando e organizzando le mie cose / Esplorando qualcosa di nuovo senza un piano
+
+DOMANDE INDIRETTE — LO STRUMENTO PIÙ POTENTE
+In ogni test, 2 o 3 delle tue domande adattive (non di più) DEVONO essere domande indirette: scenari di vita FUORI dal lavoro che rivelano come la persona funziona davvero. Sono le domande che fanno percepire all'utente la profondità del test — e spesso danno i segnali più affidabili, perché abbassano le difese.
+
+ESEMPI DI DOMANDE INDIRETTE BUONE:
+✅ "Cosa ti piace fare dopo il lavoro per staccare davvero?"
+   → Opzioni: Qualcosa di fisico che mi svuota la testa / Vedere persone e parlare / Un hobby in cui mi perdo da solo / Imparare o guardare qualcosa che mi incuriosisce
+✅ "Stai organizzando un viaggio con amici. Che ruolo prendi naturalmente?"
+   → Opzioni: Costruisco l'itinerario nei dettagli / Trovo le esperienze che nessuno conosce / Tengo insieme il gruppo e gli umori / Mi adatto, l'importante è partire
+✅ "Un amico ti racconta un problema personale complicato. Cosa fai d'istinto?"
+   → Opzioni: Gli faccio domande per capire bene la situazione / Gli propongo subito una soluzione pratica / Lo ascolto e basta, senza giudicare / Gli racconto un'esperienza simile che ho vissuto
+
+Leggi queste risposte come segnali sulle 3 dimensioni, esattamente come le domande lavorative: chi stacca con un hobby solitario e immersivo funziona diversamente da chi ha bisogno di persone per ricaricarsi.
 
 AGGIUNTA CONTESTUALE
 Ogni domanda deve avere un micro-contesto di 1 riga che la rende più umana. Non spiega il perché della domanda — crea un'atmosfera.
@@ -116,7 +137,9 @@ REGOLE ASSOLUTE
 10. VIETATO porre domande che chiedono "perché" o una spiegazione. Una domanda multiple_choice non può chiedere di spiegare: deve far scegliere tra 4 alternative concrete.
    ESEMPIO VIETATO: "Quale ti attrae di più e perché?" con opzioni Sì/No.
    ESEMPIO CORRETTO: "Quale di queste due strade ti attrae di più?" con opzioni: "La sicurezza di un percorso strutturato" / "La libertà di costruire da zero" / "Un mix dei due, con prevalenza di struttura" / "Un mix dei due, con prevalenza di libertà".
-11. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
+11. VIETATO ASSOLUTAMENTE fare domande che richiedono informazioni già note dalle 6 domande standard, anche se riformulate. In particolare: MAI chiedere se l'utente sta lavorando, che lavoro fa, che età ha, che studi ha fatto, o in che settore vorrebbe lavorare. Queste risposte le hai GIÀ. Prima di generare ogni domanda, verifica che non duplichi nulla di già chiesto nella conversazione.
+12. In ogni test, 2 o 3 domande adattive devono essere domande indirette su scenari di vita fuori dal lavoro (vedi sezione DOMANDE INDIRETTE). Mai più di 3, mai due consecutive.
+13. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON
 `;
 
 const PROMPT_REPORT = `
@@ -157,12 +180,20 @@ Per ogni ruolo includi anche:
 - Cosa fa davvero (1-2 frasi, linguaggio umano, zero LinkedIn)
 - Come si entra (percorso concreto calibrato sull'età e momento dell'utente)
 - Una cosa che non ti aspetti (aspetto controintuitivo — deve essere vera e sorprendente)
+- DOVE BRILLA PER TE: 2-3 settori specifici in cui questo ruolo si sposa meglio col profilo dell'utente
+
+I SETTORI — REGOLE PRECISE:
+L'utente ha indicato 1 o 2 "mondi" che lo incuriosiscono (una delle 6 domande standard: tecnici e digitali / persone e relazioni / business e numeri / creatività e comunicazione / cose concrete e produzione / impatto e sostenibilità). Quei mondi sono il punto di partenza, MA non l'unico segnale: incrocia anche le reazioni del Termometro, le scelte del Dilemma e i verdi/rossi di Smonta l'Annuncio.
+- Traduci i mondi in SETTORI CONCRETI e nominabili (es. "creatività e comunicazione" → advertising, editoria digitale, eventi; "impatto e sostenibilità" → ESG aziendale, terzo settore, energia rinnovabile). Mai restituire il nome generico del mondo come settore.
+- Se l'utente ha scelto 2 mondi, i settori dei 3 ruoli devono attingere da ENTRAMBI — e dove possibile dalla loro intersezione (es. business e numeri + creatività → marketing analytics, media buying).
+- Per ogni settore, 1-2 frasi su COME quel ruolo si declina lì: cosa cambia nel quotidiano, nel ritmo, nel tipo di relazioni. Lo stesso ruolo vive in modo diverso in settori diversi — fai vedere questa differenza.
+- Anche qui specificità radicale: collega la scelta del settore a un segnale preciso del test, non a frasi che varrebbero per chiunque.
 
 SE L'UTENTE HA DESCRITTO IL SUO RUOLO ATTUALE:
 Aggiungi una riga nel "perché ti si addice" del ruolo più simile a quello attuale: confronta esplicitamente. Es. "Rispetto al tuo ruolo attuale in X, qui troveresti Y in più e perderesti Z — che però dal tuo profilo sembra qualcosa che non ti manca."
 
 SE L'UTENTE HA FATTO "SMONTA L'ANNUNCIO":
-Usa le righe che ha colorato di verde e rosso per personalizzare il percorso di ingresso. Es. se ha segnato in verde "lavorare con il team marketing", menzionalo nel ruolo più compatibile.
+Le righe che l'utente ha potuto valutare sono SOLO quelle con contenuto significativo (responsabilità, modalità di lavoro, requisiti) — titoli e intestazioni erano esclusi. Quindi ogni verde e ogni rosso è un segnale deliberato e affidabile: usalo con peso pieno. Usa le righe verdi e rosse per personalizzare il percorso di ingresso e la scelta dei settori. Es. se ha segnato in verde "lavorare con il team marketing", menzionalo nel ruolo più compatibile.
 
 Blocco 3 — I 3 RUOLI CHE NON FANNO PER TE
 3 ruoli con bassa compatibilità (sotto il 35%). Per ognuno: nome, match%, e una spiegazione che suoni liberatoria non critica. "Non è per te perché..." deve aiutare a capire chi sei, non scoraggiare.
@@ -194,7 +225,13 @@ FORMATO OUTPUT — JSON valido, zero testo fuori:
         "perche": "perché personalissimo ancorato al test",
         "cosa_fa": "cosa fa davvero in linguaggio umano",
         "come_si_entra": "percorso concreto per questa persona specifica",
-        "sorpresa": "aspetto controintuitivo vero e utile"
+        "sorpresa": "aspetto controintuitivo vero e utile",
+        "settori": [
+          {
+            "nome": "Nome settore concreto",
+            "declinazione": "1-2 frasi su come questo ruolo si declina in questo settore per questa persona"
+          }
+        ]
       }
     ],
     "bonus": {
@@ -264,7 +301,7 @@ Rispondi SOLO con JSON valido — zero testo fuori:
     };
 
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
-    const maxTokens = fase === 'report' ? 6000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 800;
+    const maxTokens = fase === 'report' ? 8000 : fase === 'dizionario' ? 2000 : fase === 'compatibilita' ? 800 : 800;
 
     // Prefill: forziamo Claude a iniziare la risposta con la parentesi graffa
     const messagesWithPrefill = [...messages, { role: 'assistant', content: '{' }];
