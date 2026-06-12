@@ -213,13 +213,19 @@ function renderReport(data) {
 // ─── CONTROLLA SE LAVORA ──────────────────────────────────────
 function checkWorksCurrently() {
   const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
-  // Le risposte sono loggate come: Risposta: "testo..." — la domanda 'lavoro'
-  // ha opzioni che iniziano con "Sì" solo se l'utente ha esperienza lavorativa.
-  // Controlliamo che la risposta INIZI con Sì, non che contenga Sì ovunque.
+  // Il segnale ora viene dalla domanda 'momento'. Tutte le sue opzioni indicano
+  // un lavoro in corso TRANNE "Ho appena finito gli studi...".
+  // Le risposte sono loggate come: Risposta: "testo..."
+  // Quindi: lavora se esiste una risposta-momento che NON inizia con "Ho appena finito gli studi".
+  const opzioniLavoro = [
+    'Ho iniziato a lavorare ma non sono sicuro che sia la strada giusta',
+    'Lavoro da anni ma sento che qualcosa non torna',
+    'Sto facendo un lavoro che mi piace, ma cerco conferma'
+  ];
   return history.some(msg =>
     msg.role === 'user' &&
     typeof msg.content === 'string' &&
-    msg.content.includes('Risposta: "Sì')
+    opzioniLavoro.some(opt => msg.content.includes(`Risposta: "${opt}`))
   );
 }
 
