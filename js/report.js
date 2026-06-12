@@ -111,6 +111,27 @@ function renderReport(data) {
   report.ruoli.forEach((ruolo) => {
     const card = document.createElement('div');
     card.className = 'ruolo-card';
+
+    // Settori — "Dove brilla per te" (guard: presente solo se l'API li ha restituiti)
+    let settoriHtml = '';
+    if (Array.isArray(ruolo.settori) && ruolo.settori.length > 0) {
+      const items = ruolo.settori
+        .filter(s => s && s.nome)
+        .map(s => `
+          <div style="margin-bottom:10px;">
+            <span style="display:inline-block;font-size:0.78rem;font-weight:600;color:var(--emerald-light);background:rgba(29,158,117,0.12);border:1px solid rgba(29,158,117,0.3);border-radius:999px;padding:3px 12px;margin-bottom:6px;">${s.nome}</span>
+            <div class="ruolo-detail-text" style="margin-top:2px;">${s.declinazione || ''}</div>
+          </div>`)
+        .join('');
+      if (items) {
+        settoriHtml = `
+      <div class="ruolo-detail">
+        <div class="ruolo-detail-label">Dove brilla per te</div>
+        ${items}
+      </div>`;
+      }
+    }
+
     card.innerHTML = `
       <div class="ruolo-header">
         <div class="ruolo-nome">${ruolo.nome}</div>
@@ -126,7 +147,7 @@ function renderReport(data) {
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Cosa fa davvero</div>
         <div class="ruolo-detail-text">${ruolo.cosa_fa}</div>
-      </div>
+      </div>${settoriHtml}
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Come si entra</div>
         <div class="ruolo-detail-text">${ruolo.come_si_entra}</div>
@@ -192,11 +213,13 @@ function renderReport(data) {
 // ─── CONTROLLA SE LAVORA ──────────────────────────────────────
 function checkWorksCurrently() {
   const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
+  // Le risposte sono loggate come: Risposta: "testo..." — la domanda 'lavoro'
+  // ha opzioni che iniziano con "Sì" solo se l'utente ha esperienza lavorativa.
+  // Controlliamo che la risposta INIZI con Sì, non che contenga Sì ovunque.
   return history.some(msg =>
     msg.role === 'user' &&
     typeof msg.content === 'string' &&
-    msg.content.includes('Risposta:') &&
-    msg.content.includes('Sì')
+    msg.content.includes('Risposta: "Sì')
   );
 }
 
