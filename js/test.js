@@ -139,17 +139,23 @@ const STANDARD_QUESTIONS = [
   },
   {
     id: 'mondi',
-    text: 'In quale di questi mondi ti incuriosirebbe di più passare le tue giornate?',
-    context: 'Scegline uno o due.',
+    text: 'In quale settore ti incuriosirebbe di più lavorare?',
+    context: 'Scegline uno o due. Non serve esserci già dentro — basta che ti attiri.',
     type: 'multi_select',
     maxSelect: 2,
     options: [
-      'Mondi tecnici e digitali',
-      'Persone e relazioni',
-      'Business e numeri',
-      'Creatività e comunicazione',
-      'Cose concrete e produzione',
-      'Impatto e sostenibilità'
+      'Tecnologia e digitale',
+      'Finanza, banche e assicurazioni',
+      'Sanità e farmaceutico',
+      'Industria, energia e ambiente',
+      'Moda, lusso e design',
+      'Commercio, retail e largo consumo',
+      'Media, comunicazione e marketing',
+      'Arte, cultura e intrattenimento',
+      'Turismo, ristorazione e ospitalità',
+      'Istruzione, formazione e ricerca',
+      'Pubblica amministrazione e non profit',
+      'Edilizia, immobiliare e infrastrutture'
     ]
   }
 ];
@@ -632,15 +638,16 @@ async function getNextStep() {
 
     // VALIDAZIONE DOMANDA — una domanda valida deve avere 4 opzioni concrete
     const q = result.question;
-const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
+    const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
 
-    // Controlla typo evidenti: consonanti triplicate o sequenze impossibili in italiano
-    const haTypo = (testo) => /([bcdfghjklmnpqrstvwxyz])\1\1/i.test(testo);
+    // Controlla typo evidenti: 3+ consonanti uguali consecutive (es. "Abbzzo" → "bb"+"zz"
+    // o sequenze tipo "sss"), che in italiano non esistono e tradiscono un errore di generazione.
+    const haTypo = (testo) => /([bcdfghjklmnpqrstvwxyz])\1\1/i.test(testo || '');
 
     const haOpzioniValide = q.options &&
       q.options.length >= 3 &&
-      !q.options.every((o) => opzioniGeneriche.includes((o || '').toLowerCase().trim())) &&
-      !q.options.some((o) => haTypo(o || ''));
+      !q.options.every((o, i) => opzioniGeneriche.includes((o || '').toLowerCase().trim())) &&
+      !q.options.some((o) => haTypo(o));
 
     if (!haOpzioniValide && state._retryCount < 2) {
       // Domanda malfatta: chiediamo a Claude di rigenerarla
