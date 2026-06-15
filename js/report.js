@@ -151,10 +151,11 @@ Ricorda: è un SOGNO/ASPIRAZIONE della persona. Non sminuirlo mai. Se il match �
 
 // ─── RENDER BLOCCO RUOLO ASPIRATO ─────────────────────────────
 // Inserisce il risultato della compatibilità del ruolo aspirato nel report,
-// subito dopo la lista dei 3 ruoli. Enfasi sulla precisione se match >= 80.
+// dentro il contenitore #ruolo-aspirato-container (sotto il ruolo attuale).
+// Enfasi sulla precisione se match >= 80.
 function renderRuoloAspirato(ruoloInput, data) {
-  const ruoliEl = document.getElementById('ruoli-list');
-  if (!ruoliEl || !data) return;
+  const container = document.getElementById('ruolo-aspirato-container');
+  if (!container || !data) return;
 
   const altaPrecisione = data.alta_precisione === true || data.match >= 80;
 
@@ -163,8 +164,8 @@ function renderRuoloAspirato(ruoloInput, data) {
                      data.match >= 35 ? '#FFD060' : 'var(--rose)';
 
   const wrapper = document.createElement('div');
-  wrapper.className = 'ruolo-card';
-  wrapper.style.marginTop = '20px';
+  wrapper.className = 'card';
+  wrapper.style.marginTop = '12px';
 
   // Quando la precisione è alta, la card si distingue con bordo e sfondo smeraldo
   if (altaPrecisione) {
@@ -194,7 +195,7 @@ function renderRuoloAspirato(ruoloInput, data) {
     ${altaPrecisione ? `<div style="font-size:0.82rem;color:var(--emerald-light);line-height:1.6;margin-top:14px;font-style:italic;">Avevi già in mente la direzione giusta: il profilo emerso dal test e il ruolo a cui aspiri combaciano in modo netto. È la conferma che ti conosci bene.</div>` : ''}
   `;
 
-  ruoliEl.appendChild(wrapper);
+  container.appendChild(wrapper);
 }
 
 // ─── RENDER REPORT ───────────────────────────────────────────
@@ -315,13 +316,6 @@ function renderReport(data) {
     }
   }
 
-  // Box ruolo attuale — solo se l'utente ha detto che lavora
-  const worksCurrently = checkWorksCurrently();
-  if (worksCurrently) {
-    const section = document.getElementById('section-ruolo-attuale');
-    if (section) section.classList.remove('hidden');
-  }
-
   // Mostra tutto
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('report-content').classList.remove('hidden');
@@ -329,10 +323,36 @@ function renderReport(data) {
   // Salva per condivisione
   sessionStorage.setItem('rf_report', JSON.stringify(report));
 
-  // Ruolo aspirato — se l'utente ne ha scritto uno nell'ultima domanda del test.
-  // Parte DOPO aver mostrato il report (il salvataggio di rf_report sopra è il
-  // prerequisito perché valutaRuoloAspirato legga i 3 ruoli). Non blocca il render.
+  // ─── SEZIONE RUOLO ATTUALE + ASPIRATO ───────────────────────
+  // La sezione è unica e contiene entrambi i box. La rendiamo visibile se:
+  //  - l'utente lavora (mostra il form ruolo attuale), OPPURE
+  //  - l'utente ha dichiarato un'aspirazione (mostra solo il box aspirato).
+  const worksCurrently = checkWorksCurrently();
   const aspirato = (sessionStorage.getItem('rf_aspiration') || '').trim();
+
+  const section = document.getElementById('section-ruolo-attuale');
+  const formWrapper = document.getElementById('ruolo-attuale-wrapper');
+  const titolo = document.getElementById('ruolo-attuale-titolo');
+  const intro = document.getElementById('ruolo-attuale-intro');
+
+  if (section) {
+    if (worksCurrently || aspirato) {
+      section.classList.remove('hidden');
+
+      if (worksCurrently) {
+        // Mostra il form del ruolo attuale (comportamento normale)
+        if (formWrapper) formWrapper.classList.remove('hidden');
+      } else {
+        // Non lavora: nascondiamo il form attuale e adattiamo il titolo all'aspirazione
+        if (formWrapper) formWrapper.classList.add('hidden');
+        if (titolo) titolo.textContent = 'Il ruolo a cui aspiri';
+        if (intro) intro.textContent = 'Hai indicato un ruolo a cui aspiri. Ecco quanto è compatibile con il profilo emerso dal test.';
+      }
+    }
+  }
+
+  // Avvia il calcolo della compatibilità del ruolo aspirato (se presente).
+  // Non blocca il render: il report è già a schermo.
   if (aspirato) {
     mostraRuoloAspirato(aspirato);
   }
@@ -340,20 +360,20 @@ function renderReport(data) {
 
 // ─── ORCHESTRA IL BLOCCO ASPIRATO (async, non blocca il report) ──
 async function mostraRuoloAspirato(ruoloInput) {
-  // Placeholder di caricamento nel flusso dei ruoli
-  const ruoliEl = document.getElementById('ruoli-list');
-  if (!ruoliEl) return;
+  const container = document.getElementById('ruolo-aspirato-container');
+  if (!container) return;
 
+  // Placeholder di caricamento
   const loader = document.createElement('div');
-  loader.className = 'ruolo-card';
-  loader.style.marginTop = '20px';
+  loader.className = 'card';
+  loader.style.marginTop = '12px';
   loader.id = 'aspirato-loader';
   loader.innerHTML = `
     <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Il ruolo a cui aspiri</div>
     <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${ruoloInput}</div>
     <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:10px;font-style:italic;">Sto confrontando questo ruolo con il tuo profilo...</div>
   `;
-  ruoliEl.appendChild(loader);
+  container.appendChild(loader);
 
   try {
     const data = await valutaRuoloAspirato(ruoloInput);
@@ -362,7 +382,6 @@ async function mostraRuoloAspirato(ruoloInput) {
       renderRuoloAspirato(ruoloInput, data);
     }
   } catch (err) {
-    // In caso di errore non mostriamo nulla di tecnico: rimuoviamo il loader e basta
     const l = document.getElementById('aspirato-loader');
     if (l) l.remove();
   }
