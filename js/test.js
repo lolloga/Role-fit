@@ -632,10 +632,15 @@ async function getNextStep() {
 
     // VALIDAZIONE DOMANDA — una domanda valida deve avere 4 opzioni concrete
     const q = result.question;
-    const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
+const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
+
+    // Controlla typo evidenti: consonanti triplicate o sequenze impossibili in italiano
+    const haTypo = (testo) => /([bcdfghjklmnpqrstvwxyz])\1\1/i.test(testo);
+
     const haOpzioniValide = q.options &&
       q.options.length >= 3 &&
-      !q.options.every((o, i) => opzioniGeneriche.includes((o || '').toLowerCase().trim()));
+      !q.options.every((o) => opzioniGeneriche.includes((o || '').toLowerCase().trim())) &&
+      !q.options.some((o) => haTypo(o || ''));
 
     if (!haOpzioniValide && state._retryCount < 2) {
       // Domanda malfatta: chiediamo a Claude di rigenerarla
