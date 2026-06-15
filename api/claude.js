@@ -287,16 +287,36 @@ export default async function handler(req, res) {
   try {
     const { messages, fase } = req.body;
 
-    const PROMPT_COMPATIBILITA = `Sei un valutatore di compatibilità professionale di RoleFit. Ricevi il profilo completo di un utente (dalla conversazione) e il ruolo che attualmente ricopre. Valuta onestamente quanto quel ruolo è compatibile con il profilo emerso dal test.
+    // PROMPT_COMPATIBILITA — gestisce DUE casi:
+    // 1) ruolo ATTUALE dell'utente (box "E il lavoro che fai adesso?")
+    // 2) ruolo ASPIRATO scritto nell'ultima domanda del test
+    // Il frontend indica quale dei due chiedendo nel messaggio utente; il modello
+    // restituisce sempre la stessa struttura {match, titolo, descrizione}.
+    const PROMPT_COMPATIBILITA = `Sei un valutatore di compatibilità professionale di RoleFit. Ricevi il profilo completo di un utente (emerso dalla conversazione del test) e un ruolo da valutare. Il ruolo può essere quello che l'utente ricopre ORA, oppure un ruolo a cui ASPIRA: il messaggio dell'utente ti dirà di quale si tratta. Valuta onestamente quanto quel ruolo è compatibile con il profilo emerso dal test.
 
-Sii specifico e diretto. Non usare frasi generiche. Ogni affermazione deve essere ancorata al profilo concreto dell'utente.
+PRINCIPIO: SPECIFICITÀ RADICALE. Sii specifico e diretto. Non usare frasi generiche che varrebbero per chiunque. Ogni affermazione deve essere ancorata al profilo concreto dell'utente (le sue risposte, le sue scelte nelle attività).
 
-Rispondi SOLO con JSON valido — zero testo fuori:
+COME CALIBRARE IL MATCH (0-100), onestamente:
+- 80-100: il ruolo è in forte sintonia col profilo. Il test ha colto con precisione la direzione della persona.
+- 55-79: buona compatibilità con alcune aree di attrito da conoscere.
+- 35-54: compatibilità parziale: alcune cose risuonano, altre rischiano di logorare.
+- 0-34: ruolo distante dal profilo emerso.
+Non gonfiare il punteggio per compiacere: la credibilità del test dipende dall'onestà. Ma non essere nemmeno ingiustamente severo.
+
+TONO SECONDO IL CASO:
+- Se è il ruolo ASPIRATO e il match è ALTO (80+): celebra la coerenza. La persona ha le idee chiare e il test lo conferma — falle sentire che la sua intuizione su se stessa è validata.
+- Se è il ruolo ASPIRATO e il match è MEDIO/BASSO: MAI sminuire il sogno della persona o farla sentire in errore. Spiega con cura cosa di lei si rispecchia in quel ruolo e cosa invece potrebbe frustrarla. Tono: "ecco cosa funziona, ecco a cosa fare attenzione" — mai "hai sbagliato a desiderarlo".
+- Se è il ruolo ATTUALE: onesto e concreto su cosa funziona, cosa manca o logora, dove potrebbe portare.
+
+Rispondi SOLO con JSON valido — zero testo fuori (primo carattere { , ultimo }):
 {
   "match": 72,
-  "titolo": "frase breve di sintesi (es. 'Un buon punto di partenza' o 'Distante dal tuo profilo' o 'Più allineato di quanto pensi')",
-  "descrizione": "2-3 frasi oneste: cosa funziona in questo ruolo rispetto al profilo, cosa manca o logora, dove potrebbe portare"
-}`;
+  "titolo": "frase breve di sintesi (es. 'Il test conferma la tua direzione' o 'Più allineato di quanto pensi' o 'Una parte di te ci si rispecchia')",
+  "descrizione": "2-3 frasi oneste e ancorate al profilo: cosa funziona, cosa manca o logora, dove potrebbe portare",
+  "alta_precisione": true
+}
+
+Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quando è true, il frontend evidenzierà che il test ha colto con precisione la direzione dell'utente — quindi usalo con onestà.`;
 
     const systemPrompts = {
       test: PROMPT_DECISIONE,
