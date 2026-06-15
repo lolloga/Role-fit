@@ -62,16 +62,11 @@ async function valutaRuoloAttuale(ruoloInput) {
     ...history,
     {
       role: 'user',
-      content: `L'utente lavora attualmente come: "${ruoloInput}".
+      content: `Valuta un ruolo di tipo ATTUALE. L'utente lavora attualmente come: "${ruoloInput}".
 
 Basandoti sul profilo emerso dal test e sui 3 ruoli suggeriti nel report (${report.ruoli?.map(r => r.nome).join(', ')}), valuta la compatibilità tra il ruolo attuale e il profilo dell'utente.
 
-Rispondi SOLO con JSON valido:
-{
-  "match": 72,
-  "titolo": "frase breve di sintesi (es. 'Un buon punto di partenza' o 'Distante dal tuo profilo')",
-  "descrizione": "2-3 frasi oneste e specifiche: cosa funziona in questo ruolo rispetto al profilo, cosa manca o logora, e in che direzione potrebbe evolvere"
-}`
+Ricorda: è il ruolo che ricopre ORA. Sii onesto e concreto su cosa funziona, cosa manca o logora, dove potrebbe portare.`
     }
   ];
 
@@ -82,14 +77,124 @@ Rispondi SOLO con JSON valido:
   });
 
   const data = await response.json();
+
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    return null;
+  }
+
   const text = data.content[0].text;
 
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    return match ? JSON.parse(match[0]) : null;
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(text.substring(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
+}
+
+// ─── VALUTA RUOLO ASPIRATO ────────────────────────────────────
+// Chiamata solo se l'utente, nell'ultima domanda del test, ha scritto un ruolo
+// a cui aspira. Usa la stessa fase 'compatibilita' ma dichiara che è ASPIRATO.
+async function valutaRuoloAspirato(ruoloInput) {
+  const report = JSON.parse(sessionStorage.getItem('rf_report') || '{}');
+  const history = JSON.parse(sessionStorage.getItem('rf_history') || '[]');
+
+  const messages = [
+    ...history,
+    {
+      role: 'user',
+      content: `Valuta un ruolo di tipo ASPIRATO. L'utente, alla fine del test, ha dichiarato che con la sua esperienza aspira a questo ruolo: "${ruoloInput}".
+
+Basandoti sul profilo emerso dal test e sui 3 ruoli suggeriti nel report (${report.ruoli?.map(r => r.nome).join(', ')}), valuta quanto questo ruolo aspirato è compatibile con il profilo dell'utente.
+
+Ricorda: è un SOGNO/ASPIRAZIONE della persona. Non sminuirlo mai. Se il match è alto, conferma con entusiasmo che la sua intuizione su se stesso è validata dal test. Se è medio o basso, spiega con cura cosa di lui si rispecchia in quel ruolo e cosa invece potrebbe frustrarlo, senza mai farlo sentire in errore per averlo desiderato.`
+    }
+  ];
+
+  const response = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, fase: 'compatibilita' })
+  });
+
+  const data = await response.json();
+
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    return null;
+  }
+
+  const text = data.content[0].text;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(text.substring(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+// ─── RENDER BLOCCO RUOLO ASPIRATO ─────────────────────────────
+// Inserisce il risultato della compatibilità del ruolo aspirato nel report,
+// subito dopo la lista dei 3 ruoli. Enfasi sulla precisione se match >= 80.
+function renderRuoloAspirato(ruoloInput, data) {
+  const ruoliEl = document.getElementById('ruoli-list');
+  if (!ruoliEl || !data) return;
+
+  const altaPrecisione = data.alta_precisione === true || data.match >= 80;
+
+  const matchColor = data.match >= 80 ? 'var(--emerald-light)' :
+                     data.match >= 55 ? 'var(--emerald-light)' :
+                     data.match >= 35 ? '#FFD060' : 'var(--rose)';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ruolo-card';
+  wrapper.style.marginTop = '20px';
+
+  // Quando la precisione è alta, la card si distingue con bordo e sfondo smeraldo
+  if (altaPrecisione) {
+    wrapper.style.border = '1px solid rgba(29,158,117,0.5)';
+    wrapper.style.background = 'rgba(29,158,117,0.06)';
+  }
+
+  // Badge di precisione (solo se match >= 80)
+  const badgeHtml = altaPrecisione
+    ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--emerald-light);background:rgba(29,158,117,0.14);border:1px solid rgba(29,158,117,0.35);border-radius:999px;padding:4px 12px;margin-bottom:14px;">✓ Il test ha colto la tua direzione</div>`
+    : '';
+
+  wrapper.innerHTML = `
+    ${badgeHtml}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Il ruolo a cui aspiri</div>
+        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${ruoloInput}</div>
+        <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${data.titolo || ''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${data.match}%</div>
+        <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">compatibilità</div>
+      </div>
+    </div>
+    <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${data.descrizione || ''}</div>
+    ${altaPrecisione ? `<div style="font-size:0.82rem;color:var(--emerald-light);line-height:1.6;margin-top:14px;font-style:italic;">Avevi già in mente la direzione giusta: il profilo emerso dal test e il ruolo a cui aspiri combaciano in modo netto. È la conferma che ti conosci bene.</div>` : ''}
+  `;
+
+  ruoliEl.appendChild(wrapper);
 }
 
 // ─── RENDER REPORT ───────────────────────────────────────────
@@ -223,6 +328,44 @@ function renderReport(data) {
 
   // Salva per condivisione
   sessionStorage.setItem('rf_report', JSON.stringify(report));
+
+  // Ruolo aspirato — se l'utente ne ha scritto uno nell'ultima domanda del test.
+  // Parte DOPO aver mostrato il report (il salvataggio di rf_report sopra è il
+  // prerequisito perché valutaRuoloAspirato legga i 3 ruoli). Non blocca il render.
+  const aspirato = (sessionStorage.getItem('rf_aspiration') || '').trim();
+  if (aspirato) {
+    mostraRuoloAspirato(aspirato);
+  }
+}
+
+// ─── ORCHESTRA IL BLOCCO ASPIRATO (async, non blocca il report) ──
+async function mostraRuoloAspirato(ruoloInput) {
+  // Placeholder di caricamento nel flusso dei ruoli
+  const ruoliEl = document.getElementById('ruoli-list');
+  if (!ruoliEl) return;
+
+  const loader = document.createElement('div');
+  loader.className = 'ruolo-card';
+  loader.style.marginTop = '20px';
+  loader.id = 'aspirato-loader';
+  loader.innerHTML = `
+    <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Il ruolo a cui aspiri</div>
+    <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${ruoloInput}</div>
+    <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:10px;font-style:italic;">Sto confrontando questo ruolo con il tuo profilo...</div>
+  `;
+  ruoliEl.appendChild(loader);
+
+  try {
+    const data = await valutaRuoloAspirato(ruoloInput);
+    loader.remove();
+    if (data) {
+      renderRuoloAspirato(ruoloInput, data);
+    }
+  } catch (err) {
+    // In caso di errore non mostriamo nulla di tecnico: rimuoviamo il loader e basta
+    const l = document.getElementById('aspirato-loader');
+    if (l) l.remove();
+  }
 }
 
 // ─── CONTROLLA SE LAVORA ──────────────────────────────────────
@@ -310,6 +453,7 @@ function restartTest() {
   sessionStorage.removeItem('rf_history');
   sessionStorage.removeItem('rf_activities');
   sessionStorage.removeItem('rf_report');
+  sessionStorage.removeItem('rf_aspiration');
   window.location.href = 'test.html';
 }
 
@@ -324,6 +468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const data = await generateReport();
     if (data) renderReport(data);
+    else throw new Error('Report non valido');
   } catch (err) {
     console.error('Errore generazione report:', err);
     document.querySelector('#loading-state p').textContent = 'Qualcosa è andato storto. Riprova.';
