@@ -48,6 +48,8 @@ const state = {
   currentQuestion: null,
   worksCurrently: false,
   _retryCount: 0,
+  _aspirationAsked: false,
+  aspirationRole: null,
 };
 
 // ─── PERSISTENZA ─────────────────────────────────────────────
@@ -63,6 +65,8 @@ function saveState() {
     history: state.history,
     currentQuestion: state.currentQuestion,
     worksCurrently: state.worksCurrently,
+    _aspirationAsked: state._aspirationAsked,
+    aspirationRole: state.aspirationRole,
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
@@ -607,6 +611,12 @@ async function getNextStep() {
   saveState();
 
   if (result.action === 'report') {
+    // Prima del report: domanda finale sull'aspirazione (una sola volta)
+    if (!state._aspirationAsked) {
+      stopThinking();
+      showAspirationQuestion();
+      return;
+    }
     goToReport();
   } else if (result.action === 'ask' && result.question) {
     // Attività Dilemma dopo 7 domande totali
@@ -873,6 +883,9 @@ function renderCostruisci(container) {
 
 // ─── COMPLETA ATTIVITÀ ────────────────────────────────────────
 async function completeActivity(activityId, result) {
+  // Anti doppio-trigger: se l'attività è già stata completata, esci
+  if (state.activityResults[activityId]) return;
+
   state.activityResults[activityId] = result;
   state.conversationHistory.push({
     role: 'user',
@@ -1181,6 +1194,117 @@ Cosa cerchiamo:
   content.appendChild(btn);
 }
 
+// ─── DOMANDA FINALE: ASPIRAZIONE ──────────────────────────────
+// Ultima domanda per tutti, dopo che Claude ha deciso di chiudere il test.
+// "Sì" apre un campo libero dove l'utente scrive il ruolo a cui aspira.
+// "No" va dritto al report. L'aspirazione viene passata a report.js.
+function showAspirationQuestion() {
+  state._aspirationAsked = true;
+  saveState();
+
+  updatePhase('done');
+
+  document.getElementById('thinking-state').classList.add('hidden');
+  document.getElementById('activity-area').classList.add('hidden');
+  const qArea = document.getElementById('active-question');
+  qArea.classList.remove('hidden');
+
+  // Rimuove eventuali avvisi di ripristino residui
+  qArea.querySelectorAll('.restore-notice').forEach(n => n.remove());
+
+  document.getElementById('question-text').textContent =
+    'Hai un ruolo a cui aspiri con la tua esperienza?';
+
+  const ctxEl = document.getElementById('question-context');
+  ctxEl.textContent = 'Ultima domanda. Se ce l\'hai, lo confronteremo col tuo profilo.';
+  ctxEl.classList.remove('hidden');
+
+  const inputEl = document.getElementById('question-input');
+  inputEl.innerHTML = '';
+
+  // Due scelte iniziali: Sì (apre il campo) / No (va al report)
+  const grid = document.createElement('div');
+  grid.className = 'options-grid';
+
+  const siBtn = document.createElement('button');
+  siBtn.className = 'option-btn';
+  siBtn.innerHTML = '<span class="option-letter">A</span><span>Sì, c\'è un ruolo a cui aspiro</span>';
+  siBtn.addEventListener('click', () => {
+    grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+    siBtn.classList.add('selected');
+    setTimeout(renderAspirationInput, 220);
+  });
+
+  const noBtn = document.createElement('button');
+  noBtn.className = 'option-btn';
+  noBtn.innerHTML = '<span class="option-letter">B</span><span>No, non in particolare</span>';
+  noBtn.addEventListener('click', () => {
+    grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+    noBtn.classList.add('selected');
+    state.aspirationRole = null;
+    saveState();
+    setTimeout(goToReport, 300);
+  });
+
+  grid.appendChild(siBtn);
+  grid.appendChild(noBtn);
+  inputEl.appendChild(grid);
+}
+
+function renderAspirationInput() {
+  const ctxEl = document.getElementById('question-context');
+  ctxEl.textContent = 'Scrivilo come lo diresti tu — anche solo il titolo del ruolo.';
+
+  const inputEl = document.getElementById('question-input');
+  inputEl.innerHTML = '';
+
+  const area = document.createElement('div');
+  area.className = 'open-input-area';
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'open-input';
+  textarea.placeholder = 'Es. Product Manager, Direttore creativo, Consulente ambientale...';
+
+  const actions = document.createElement('div');
+  actions.className = 'open-input-actions';
+
+  // Link per tornare alle due scelte Sì/No
+  const backLink = document.createElement('button');
+  backLink.className = 'open-toggle';
+  backLink.textContent = '← Indietro';
+  backLink.style.marginRight = 'auto';
+  backLink.addEventListener('click', showAspirationQuestion);
+  actions.appendChild(backLink);
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--primary';
+  btn.textContent = 'Vedi il mio report';
+
+  let submitting = false;
+  const submit = () => {
+    if (submitting) return; // anti doppio-click
+    const val = textarea.value.trim();
+    if (!val) return;
+    submitting = true;
+    btn.style.opacity = '0.6';
+    state.aspirationRole = val;
+    saveState();
+    goToReport();
+  };
+
+  btn.addEventListener('click', submit);
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
+
+  actions.appendChild(btn);
+  area.appendChild(textarea);
+  area.appendChild(actions);
+  inputEl.appendChild(area);
+
+  setTimeout(() => textarea.focus(), 100);
+}
+
 // ─── TORNA INDIETRO ───────────────────────────────────────────
 function goBack() {
   if (state.history.length === 0) return;
@@ -1203,6 +1327,7 @@ function goToReport() {
 
   sessionStorage.setItem('rf_history', JSON.stringify(state.conversationHistory));
   sessionStorage.setItem('rf_activities', JSON.stringify(state.activityResults));
+  sessionStorage.setItem('rf_aspiration', state.aspirationRole || '');
 
   clearState();
 
@@ -1230,6 +1355,7 @@ function init() {
     updateProgress();
 
     const notice = document.createElement('div');
+    notice.className = 'restore-notice';
     notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
     notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
 
