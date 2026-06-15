@@ -55,28 +55,35 @@
         <div class="chi-sei-text" id="chi-sei-text"></div>
       </div>
 
-      <!-- Sezione ruolo attuale — visibile solo se lavora -->
+      <!-- Sezione ruolo attuale + aspirato -->
+      <!-- Diventa visibile se l'utente lavora OPPURE se ha dichiarato un'aspirazione -->
       <div class="report-section hidden" id="section-ruolo-attuale">
         <div class="report-section-label">
-          <span class="label" style="color:var(--emerald-light);">E il lavoro che fai adesso?</span>
+          <span class="label" style="color:var(--emerald-light);" id="ruolo-attuale-titolo">E il lavoro che fai adesso?</span>
         </div>
-        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;">Scrivi il ruolo che ricopri adesso. Ti diciamo quanto è compatibile con il tuo profilo — e cosa significa.</p>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;" id="ruolo-attuale-intro">Scrivi il ruolo che ricopri adesso. Ti diciamo quanto è compatibile con il tuo profilo — e cosa significa.</p>
 
-        <div id="ruolo-attuale-form" class="card" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-          <div style="flex:1;min-width:200px;">
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Es. Account Manager, UX Designer, Avvocato...</div>
-            <input
-              type="text"
-              id="ruolo-attuale-input"
-              placeholder="Il tuo ruolo attuale"
-              style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;"
-              onkeydown="if(event.key==='Enter') submitRuoloAttuale()"
-            />
+        <!-- Form ruolo attuale — nascosto se l'utente non lavora -->
+        <div id="ruolo-attuale-wrapper">
+          <div id="ruolo-attuale-form" class="card" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Es. Account Manager, UX Designer, Avvocato...</div>
+              <input
+                type="text"
+                id="ruolo-attuale-input"
+                placeholder="Il tuo ruolo attuale"
+                style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;"
+                onkeydown="if(event.key==='Enter') submitRuoloAttuale()"
+              />
+            </div>
+            <button id="ruolo-attuale-btn" class="btn btn--primary" onclick="submitRuoloAttuale()">Analizza →</button>
           </div>
-          <button id="ruolo-attuale-btn" class="btn btn--primary" onclick="submitRuoloAttuale()">Analizza →</button>
+
+          <div id="ruolo-attuale-risultato" class="card hidden" style="margin-top:12px;"></div>
         </div>
 
-        <div id="ruolo-attuale-risultato" class="card hidden" style="margin-top:12px;"></div>
+        <!-- Box ruolo aspirato — iniettato qui da report.js, subito sotto il ruolo attuale -->
+        <div id="ruolo-aspirato-container"></div>
       </div>
 
       <div class="report-section" id="section-ruoli">
