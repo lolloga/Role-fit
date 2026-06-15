@@ -387,11 +387,12 @@ function renderMultipleChoice(container, questionData) {
   const grid = document.createElement('div');
   grid.className = 'options-grid';
 
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   questionData.options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
-    btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+    const lettera = letters[i] || String(i + 1);
+    btn.innerHTML = `<span class="option-letter">${lettera}</span><span>${opt}</span>`;
     btn.addEventListener('click', () => selectOption(btn, opt, questionData));
     grid.appendChild(btn);
   });
@@ -466,7 +467,7 @@ function renderOpenInput(container, questionData) {
 function renderMultiSelect(container, questionData) {
   const maxSelect = questionData.maxSelect || 2;
   const selected = new Set();
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   const counter = document.createElement('div');
   counter.style.cssText = 'font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;';
@@ -495,7 +496,8 @@ function renderMultiSelect(container, questionData) {
   questionData.options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
-    btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+    const lettera = letters[i] || String(i + 1);
+    btn.innerHTML = `<span class="option-letter">${lettera}</span><span>${opt}</span>`;
     btn.addEventListener('click', () => {
       if (selected.has(i)) {
         selected.delete(i);
