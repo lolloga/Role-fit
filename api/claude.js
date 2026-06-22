@@ -295,6 +295,23 @@ FORMATO OUTPUT — JSON valido, zero testo fuori:
 }
 `;
 
+// Verifica un access token Supabase chiamando l'endpoint /auth/v1/user.
+// Restituisce true se il token è valido (200). Non richiede la service-role key:
+// basta la anon key + il bearer token dell'utente.
+async function isValidSupabaseUser(token) {
+  const url = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon || !token) return false;
+  try {
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: anon },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -302,6 +319,17 @@ export default async function handler(req, res) {
 
   try {
     const { messages, fase } = req.body;
+
+    // JWT-gate sulle fasi più care (generazione report e valutazione compatibilità):
+    // avvengono solo dopo il login, quindi pretendiamo un token Supabase valido.
+    // Le fasi 'test'/'dizionario' restano anonime (protette a parte da rate-limit/origin).
+    if (fase === 'report' || fase === 'compatibilita') {
+      const auth = req.headers.authorization || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+      if (!(await isValidSupabaseUser(token))) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
 
     // PROMPT_COMPATIBILITA — gestisce DUE casi:
     // 1) ruolo ATTUALE dell'utente (box "E il lavoro che fai adesso?")
@@ -420,6 +448,9 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     return res.status(200).json(data);
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // Non esporre il messaggio d'errore grezzo al client: logghiamo lato server
+    // e restituiamo un 500 generico.
+    console.error('Errore /api/claude:', error);
+    return res.status(500).json({ error: 'Internal error' });
   }
 }

@@ -41,6 +41,31 @@
       <p style="color:var(--text-muted);font-size:0.9rem;font-family:var(--font-display);font-style:italic;" id="loading-text">Sto costruendo il tuo report...</p>
     </div>
 
+    <!-- Gate magic link: mostrato quando il report è pronto ma l'utente non è loggato -->
+    <div id="auth-gate" class="hidden" style="min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+      <div class="card" style="max-width:420px;width:100%;text-align:center;">
+        <div class="label" style="margin-bottom:12px;">Il tuo report è pronto</div>
+        <h2 style="font-family:var(--font-display);font-size:1.6rem;margin-bottom:10px;">Salvalo e guardalo<br><em>quando vuoi.</em></h2>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:20px;">Lascia la tua email: ti mandiamo un link per accedere e vedere il report. Niente password.</p>
+
+        <div id="auth-form">
+          <input
+            type="email"
+            id="auth-email"
+            placeholder="latua@email.com"
+            autocomplete="email"
+            style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;margin-bottom:12px;"
+          />
+          <button id="auth-btn" class="btn btn--primary" style="width:100%;">Inviami il link →</button>
+          <p id="auth-error" class="hidden" style="font-size:0.82rem;color:var(--rose);margin-top:10px;"></p>
+        </div>
+
+        <div id="auth-sent" class="hidden">
+          <p style="font-size:0.95rem;color:var(--emerald-light);line-height:1.6;">✓ Link inviato. Controlla la tua casella (anche lo spam) e clicca il link per vedere il tuo report.</p>
+        </div>
+      </div>
+    </div>
+
     <div id="report-content" class="hidden">
 
       <div class="report-header">
@@ -119,6 +144,6 @@
   </div>
 </div>
 
-<script src="js/report.js"></script>
+<script type="module" src="js/report.js"></script>
 </body>
 </html>

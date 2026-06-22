@@ -1339,9 +1339,15 @@ function goToReport() {
   updatePhase('done');
   document.getElementById('progress-bar').style.width = '100%';
 
-  sessionStorage.setItem('rf_history', JSON.stringify(state.conversationHistory));
-  sessionStorage.setItem('rf_activities', JSON.stringify(state.activityResults));
-  sessionStorage.setItem('rf_aspiration', state.aspirationRole || '');
+  // Handoff verso report.html in localStorage (non sessionStorage): il magic link
+  // di Supabase può aprire una nuova scheda, e sessionStorage è per-scheda — questi
+  // dati andrebbero persi. localStorage sopravvive al cambio di scheda.
+  localStorage.setItem('rf_history', JSON.stringify(state.conversationHistory));
+  localStorage.setItem('rf_activities', JSON.stringify(state.activityResults));
+  localStorage.setItem('rf_aspiration', state.aspirationRole || '');
+  // Nuovo handoff non ancora salvato su Supabase: azzera il flag "consumato"
+  // così report.js sa che deve generare e salvare questo report.
+  localStorage.removeItem('rf_report_saved');
 
   clearState();
 
