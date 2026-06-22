@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoleFit — I miei report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="blob-container">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<a href="index.html" class="nav-home">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Home
+</a>
+
+<div class="report-page">
+  <div class="container">
+
+    <!-- Caricamento -->
+    <div id="account-loading" style="min-height:60svh;display:flex;justify-content:center;align-items:center;">
+      <p style="color:var(--text-muted);font-size:0.9rem;font-family:var(--font-display);font-style:italic;">Carico i tuoi report...</p>
+    </div>
+
+    <!-- Gate magic link (non loggato) -->
+    <div id="account-gate" class="hidden" style="min-height:60svh;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+      <div class="card" style="max-width:420px;width:100%;text-align:center;">
+        <div class="label" style="margin-bottom:12px;">Area personale</div>
+        <h2 style="font-family:var(--font-display);font-size:1.6rem;margin-bottom:10px;">Accedi ai tuoi <em>report.</em></h2>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:20px;">Inserisci la tua email: ti mandiamo un link per accedere. Niente password.</p>
+
+        <div id="account-auth-form">
+          <input
+            type="email"
+            id="account-email"
+            placeholder="latua@email.com"
+            autocomplete="email"
+            style="width:100%;padding:12px 16px;background:var(--deep);border:1px solid var(--card-border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.95rem;color:var(--text-primary);outline:none;margin-bottom:12px;"
+          />
+          <button id="account-auth-btn" class="btn btn--primary" style="width:100%;">Inviami il link →</button>
+          <p id="account-auth-error" class="hidden" style="font-size:0.82rem;color:var(--rose);margin-top:10px;"></p>
+        </div>
+
+        <div id="account-auth-sent" class="hidden">
+          <p style="font-size:0.95rem;color:var(--emerald-light);line-height:1.6;">✓ Link inviato. Controlla la tua casella (anche lo spam) e clicca il link per accedere.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenuto (loggato) -->
+    <div id="account-content" class="hidden">
+      <div class="report-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div class="label" style="margin-bottom:12px;">Area personale</div>
+          <h1 style="margin:0;">I tuoi <em>report.</em></h1>
+        </div>
+        <button id="logout-btn" class="btn btn--ghost">Esci</button>
+      </div>
+
+      <div id="reports-list" style="margin-top:32px;display:flex;flex-direction:column;gap:12px;"></div>
+
+      <div id="reports-empty" class="hidden" style="margin-top:32px;">
+        <div class="card" style="text-align:center;">
+          <p style="color:var(--text-secondary);margin-bottom:16px;">Non hai ancora nessun report salvato.</p>
+          <a href="test.html" class="btn btn--primary">Fai il test →</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module" src="js/account.js"></script>
+</body>
+</html>
