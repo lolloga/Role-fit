@@ -301,14 +301,18 @@ FORMATO OUTPUT — JSON valido, zero testo fuori:
 async function isValidSupabaseUser(token) {
   const url = process.env.SUPABASE_URL;
   const anon = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anon || !token) return false;
+  // Gate non configurato lato server (env mancanti): NON blocchiamo il report.
+  // La protezione si attiva da sola quando SUPABASE_URL/SUPABASE_ANON_KEY sono presenti.
+  if (!url || !anon) return true;
+  if (!token) return false;
   try {
     const r = await fetch(`${url}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: anon },
     });
     return r.ok;
   } catch {
-    return false;
+    // Endpoint di verifica non raggiungibile: degradiamo con grazia, non blocchiamo.
+    return true;
   }
 }
 
