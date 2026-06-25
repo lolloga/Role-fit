@@ -18,24 +18,23 @@
       right: 24px;
       z-index: 100;
     }
-    /* Stato non loggato: pill "Accedi" coerente con .nav-home */
+    /* Stato non loggato: pill "Accedi" rosa, ben visibile */
     .account-login {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--card);
-      border: 1px solid var(--card-border);
+      background: var(--rose);
+      border: 1px solid var(--rose);
       border-radius: var(--radius-xl);
-      padding: 8px 18px;
+      padding: 9px 22px;
       font-size: 0.85rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      backdrop-filter: blur(10px);
-      transition: color var(--transition), border-color var(--transition);
+      font-weight: 600;
+      color: var(--night);
+      transition: background var(--transition), box-shadow var(--transition);
     }
     .account-login:hover {
-      color: var(--text-primary);
-      border-color: var(--emerald);
+      background: var(--rose-light);
+      box-shadow: 0 0 24px var(--rose-glow);
     }
     /* Stato loggato: avatar circolare con iniziali */
     .account-avatar {
