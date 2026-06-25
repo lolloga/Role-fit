@@ -115,8 +115,6 @@ Ricorda: è il ruolo che ricopre ORA. Sii onesto e concreto su cosa funziona, co
 }
 
 // ─── VALUTA RUOLO ASPIRATO ────────────────────────────────────
-// Chiamata solo se l'utente, nell'ultima domanda del test, ha scritto un ruolo
-// a cui aspira. Usa la stessa fase 'compatibilita' ma dichiara che è ASPIRATO.
 async function valutaRuoloAspirato(ruoloInput) {
   const report = JSON.parse(sessionStorage.getItem('rf_report') || '{}');
   const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
@@ -168,9 +166,6 @@ Ricorda: è un SOGNO/ASPIRAZIONE della persona. Non sminuirlo mai. Se il match �
 }
 
 // ─── RENDER BLOCCO RUOLO ASPIRATO ─────────────────────────────
-// Inserisce il risultato della compatibilità del ruolo aspirato nel report,
-// dentro il contenitore #ruolo-aspirato-container (sotto il ruolo attuale).
-// Enfasi sulla precisione se match >= 80.
 function renderRuoloAspirato(ruoloInput, data) {
   const container = document.getElementById('ruolo-aspirato-container');
   if (!container || !data) return;
@@ -185,13 +180,11 @@ function renderRuoloAspirato(ruoloInput, data) {
   wrapper.className = 'card';
   wrapper.style.marginTop = '12px';
 
-  // Quando la precisione è alta, la card si distingue con bordo e sfondo smeraldo
   if (altaPrecisione) {
     wrapper.style.border = '1px solid rgba(29,158,117,0.5)';
     wrapper.style.background = 'rgba(29,158,117,0.06)';
   }
 
-  // Badge di precisione (solo se match >= 80)
   const badgeHtml = altaPrecisione
     ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--emerald-light);background:rgba(29,158,117,0.14);border:1px solid rgba(29,158,117,0.35);border-radius:999px;padding:4px 12px;margin-bottom:14px;">✓ Il test ha colto la tua direzione</div>`
     : '';
@@ -217,13 +210,9 @@ function renderRuoloAspirato(ruoloInput, data) {
 }
 
 // ─── RENDER REPORT ───────────────────────────────────────────
-// savedView=true quando si rivede un report salvato (report.html?id=...): in quel
-// caso NON tocchiamo la sezione ruolo attuale/aspirato basandoci su localStorage
-// (sarebbe stale) — la gestisce renderSavedReport con i dati salvati su Supabase.
 function renderReport(data, { savedView = false } = {}) {
   const report = data.report;
 
-  // Chi sei
   const chiSeiEl = document.getElementById('chi-sei-text');
   ['come_funzioni', 'cosa_ti_alimenta', 'di_cosa_hai_bisogno'].forEach(key => {
     if (report.chi_sei[key]) {
@@ -233,19 +222,16 @@ function renderReport(data, { savedView = false } = {}) {
     }
   });
 
-  // Ruoli
   const ruoliEl = document.getElementById('ruoli-list');
   report.ruoli.forEach((ruolo) => {
     const card = document.createElement('div');
     card.className = 'ruolo-card';
 
-    // Settori — "Dove brilla per te" (guard: presente solo se l'API li ha restituiti)
     let settoriHtml = '';
     if (Array.isArray(ruolo.settori) && ruolo.settori.length > 0) {
       const items = ruolo.settori
         .filter(s => s && s.nome)
         .map(s => {
-          // Aziende esempio (guard: solo se presenti)
           let aziendeHtml = '';
           if (Array.isArray(s.aziende) && s.aziende.length > 0) {
             const tags = s.aziende
@@ -302,7 +288,6 @@ function renderReport(data, { savedView = false } = {}) {
     ruoliEl.appendChild(card);
   });
 
-  // Bonus
   const bonusEl = document.getElementById('bonus-card');
   bonusEl.innerHTML = `
     <div class="bonus-eyebrow">Il ruolo che non ti aspetti</div>
@@ -310,7 +295,6 @@ function renderReport(data, { savedView = false } = {}) {
     <div class="bonus-testo">${report.bonus.testo}</div>
   `;
 
-  // Ruoli mismatch
   if (report.ruoli_mismatch && report.ruoli_mismatch.length > 0) {
     const mismatchSection = document.getElementById('section-mismatch');
     if (mismatchSection) {
@@ -337,21 +321,13 @@ function renderReport(data, { savedView = false } = {}) {
     }
   }
 
-  // Mostra tutto
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('report-content').classList.remove('hidden');
 
-  // Salva per condivisione
   sessionStorage.setItem('rf_report', JSON.stringify(report));
 
-  // In modalità "rivedi report salvato" la sezione ruolo attuale/aspirato è
-  // gestita da renderSavedReport con i dati di Supabase: qui ci fermiamo.
   if (savedView) return;
 
-  // ─── SEZIONE RUOLO ATTUALE + ASPIRATO ───────────────────────
-  // La sezione è unica e contiene entrambi i box. La rendiamo visibile se:
-  //  - l'utente lavora (mostra il form ruolo attuale), OPPURE
-  //  - l'utente ha dichiarato un'aspirazione (mostra solo il box aspirato).
   const worksCurrently = checkWorksCurrently();
   const aspirato = (localStorage.getItem('rf_aspiration') || '').trim();
 
@@ -365,10 +341,8 @@ function renderReport(data, { savedView = false } = {}) {
       section.classList.remove('hidden');
 
       if (worksCurrently) {
-        // Mostra il form del ruolo attuale (comportamento normale)
         if (formWrapper) formWrapper.classList.remove('hidden');
       } else {
-        // Non lavora: nascondiamo il form attuale e adattiamo il titolo all'aspirazione
         if (formWrapper) formWrapper.classList.add('hidden');
         if (titolo) titolo.textContent = 'Il ruolo a cui aspiri';
         if (intro) intro.textContent = 'Hai indicato un ruolo a cui aspiri. Ecco quanto è compatibile con il profilo emerso dal test.';
@@ -376,8 +350,6 @@ function renderReport(data, { savedView = false } = {}) {
     }
   }
 
-  // Avvia il calcolo della compatibilità del ruolo aspirato (se presente).
-  // Non blocca il render: il report è già a schermo.
   if (aspirato) {
     mostraRuoloAspirato(aspirato);
   }
@@ -388,7 +360,6 @@ async function mostraRuoloAspirato(ruoloInput) {
   const container = document.getElementById('ruolo-aspirato-container');
   if (!container) return;
 
-  // Placeholder di caricamento
   const loader = document.createElement('div');
   loader.className = 'card';
   loader.style.marginTop = '12px';
@@ -405,7 +376,6 @@ async function mostraRuoloAspirato(ruoloInput) {
     loader.remove();
     if (data) {
       renderRuoloAspirato(ruoloInput, data);
-      // Persisti la valutazione nel report salvato (best effort)
       if (currentReportId) {
         updateReportEval(currentReportId, { aspired_role_eval: data }).catch(() => {});
       }
@@ -419,10 +389,6 @@ async function mostraRuoloAspirato(ruoloInput) {
 // ─── CONTROLLA SE LAVORA ──────────────────────────────────────
 function checkWorksCurrently() {
   const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
-  // Il segnale ora viene dalla domanda 'momento'. Tutte le sue opzioni indicano
-  // un lavoro in corso TRANNE "Ho appena finito gli studi...".
-  // Le risposte sono loggate come: Risposta: "testo..."
-  // Quindi: lavora se esiste una risposta-momento che NON inizia con "Ho appena finito gli studi".
   const opzioniLavoro = [
     'Ho iniziato a lavorare ma non sono sicuro che sia la strada giusta',
     'Lavoro da anni ma sento che qualcosa non torna',
@@ -436,8 +402,6 @@ function checkWorksCurrently() {
 }
 
 // ─── RENDER RISULTATO RUOLO ATTUALE ───────────────────────────
-// Estratto da submitRuoloAttuale per essere riusato anche alla riapertura
-// di un report salvato (report.html?id=...).
 function renderRuoloAttualeResult(val, data) {
   const risultato = document.getElementById('ruolo-attuale-risultato');
   if (!risultato) return;
@@ -469,7 +433,6 @@ async function submitRuoloAttuale() {
   if (!val) return;
 
   const btn = document.getElementById('ruolo-attuale-btn');
-  const risultato = document.getElementById('ruolo-attuale-risultato');
 
   btn.textContent = 'Analizzo...';
   btn.disabled = true;
@@ -478,15 +441,12 @@ async function submitRuoloAttuale() {
     const data = await valutaRuoloAttuale(val);
     if (!data) throw new Error('Nessun risultato');
 
-    // Persisti la valutazione nel report salvato (best effort, non blocca la UI).
-    // Salviamo anche il ruolo digitato (_input) per poterlo rimostrare alla riapertura.
     if (currentReportId) {
       updateReportEval(currentReportId, { current_role_eval: { ...data, _input: val } }).catch(() => {});
     }
 
     renderRuoloAttualeResult(val, data);
 
-    // Nascondi il form
     document.getElementById('ruolo-attuale-form').classList.add('hidden');
 
   } catch (err) {
@@ -587,7 +547,7 @@ function renderSavedReport(row) {
 
   if (cur) {
     if (formWrapper) formWrapper.classList.remove('hidden');
-    if (form) form.classList.add('hidden'); // non riproponiamo il form in sola lettura
+    if (form) form.classList.add('hidden');
     renderRuoloAttualeResult(cur._input || 'Il tuo ruolo attuale', cur);
   } else {
     if (formWrapper) formWrapper.classList.add('hidden');
@@ -618,7 +578,6 @@ async function init() {
   }
 
   // Modalità "genera nuovo report" dal test appena fatto.
-  // hasHandoff è vero solo se c'è un test non ancora salvato (flag rf_report_saved).
   const hasHandoff = !!localStorage.getItem('rf_history') &&
                      localStorage.getItem('rf_report_saved') !== '1';
 
@@ -628,7 +587,6 @@ async function init() {
     return;
   }
 
-  // Loggato ma senza un test fresco da elaborare → area personale
   if (!hasHandoff) { window.location.href = 'account.html'; return; }
 
   try {
@@ -636,12 +594,16 @@ async function init() {
     if (!data) throw new Error('Report non valido');
     renderReport(data);
 
-    // Salva su Supabase, poi marca l'handoff come consumato (evita salvataggi
-    // doppi se la pagina viene ricaricata). NON cancelliamo rf_history qui: la
-    // valutazione asincrona del ruolo aspirato lo legge ancora dopo questo punto.
     try {
       const aspiration = (localStorage.getItem('rf_aspiration') || '').trim() || null;
-      const saved = await saveReport({ report_json: data.report, aspiration });
+      // Conversazione completa del test (domande + risposte + attività interattive):
+      // serve per valutazioni future basate sulle risposte grezze.
+      const test_history = {
+        history: JSON.parse(localStorage.getItem('rf_history') || '[]'),
+        activities: JSON.parse(localStorage.getItem('rf_activities') || '{}'),
+        savedAt: new Date().toISOString(),
+      };
+      const saved = await saveReport({ report_json: data.report, aspiration, test_history });
       currentReportId = saved.id;
       localStorage.setItem('rf_report_saved', '1');
     } catch (e) {
@@ -655,8 +617,7 @@ async function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
-// Esposizione per gli handler inline in report.html (onclick=...): necessaria
-// perché questo file è ora un modulo ESM e non popola lo scope globale.
+// Esposizione per gli handler inline in report.html (onclick=...)
 window.submitRuoloAttuale = submitRuoloAttuale;
 window.shareReport = shareReport;
 window.restartTest = restartTest;
