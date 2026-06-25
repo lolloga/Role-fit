@@ -2,7 +2,6 @@
 // Modulo unico che incapsula tutto ciò che parla con Supabase: auth (magic link)
 // e accesso ai report. Importato come ESM dalle pagine report.html e account.html.
 //
-// Progetto Supabase "RoleFit" (org BlackBox, region eu-west-1).
 // Questi valori sono PUBBLICI per design: la publishable key è pensata per stare
 // nel frontend, la sicurezza dei dati la fanno le Row Level Security policies.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -19,7 +18,6 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // ─── AUTH ─────────────────────────────────────────────────────
-
 export async function getSession() {
   const { data } = await sb.auth.getSession();
   return data.session; // null se non loggato
@@ -44,14 +42,15 @@ export async function getAccessToken() {
 }
 
 // ─── REPORT ───────────────────────────────────────────────────
-
 // Salva un nuovo report e restituisce la riga creata (con il suo id).
-export async function saveReport({ report_json, aspiration = null }) {
+// test_history: la conversazione completa del test (domande + risposte + attività),
+// serve per valutazioni future basate sulle risposte grezze, non sul report finito.
+export async function saveReport({ report_json, aspiration = null, test_history = null }) {
   const session = await getSession();
   if (!session) throw new Error('Non autenticato');
   const { data, error } = await sb
     .from('reports')
-    .insert({ user_id: session.user.id, report_json, aspiration })
+    .insert({ user_id: session.user.id, report_json, aspiration, test_history })
     .select()
     .single();
   if (error) throw error;
@@ -64,7 +63,7 @@ export async function updateReportEval(id, patch) {
   if (error) throw error;
 }
 
-// Elenco dei report dell'utente (per account.html).
+// Elenco dei report dell'utente (per account.html e storico.html).
 export async function listReports() {
   const { data, error } = await sb
     .from('reports')
