@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Il tuo storico — RoleFit</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .st-wrap { max-width: 440px; margin: 0 auto; padding: 24px 18px 48px; position: relative; overflow: hidden; }
+    .st-blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+    .st-blob-1 { top: -50px; left: -40px; width: 190px; height: 190px;
+      background: radial-gradient(circle, rgba(255,100,150,0.16), transparent 70%); }
+    .st-blob-2 { bottom: -60px; right: -50px; width: 210px; height: 210px;
+      background: radial-gradient(circle, rgba(29,158,117,0.22), transparent 70%); }
+    .st-inner { position: relative; z-index: 1; }
+
+    .st-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+    .st-back { color: #FF6496; cursor: pointer; font-size: 18px; text-decoration: none; }
+    .st-title { font-family: var(--font-display, Georgia), serif; font-size: 21px;
+      font-weight: bold; margin: 0; color: #FF6496; }
+    .st-count { font-size: 12px; color: #7E9488; margin: 2px 0 20px 26px; }
+
+    .st-card { background: var(--card, #12331F); border: 1px solid #1D9E75; border-radius: 12px;
+      padding: 16px 18px; margin-bottom: 10px; cursor: pointer; text-decoration: none; display: block; }
+    .st-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .st-date { font-size: 14px; font-weight: bold; margin: 0; color: #FFFFFF; }
+    .st-badge { background: #FF6496; color: #030F0A; font-size: 10.5px; font-weight: bold;
+      padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .st-roles { font-size: 12.5px; color: #A9C6B8; margin: 0 0 10px; line-height: 1.5; }
+    .st-foot { display: flex; align-items: center; }
+    .st-open { font-size: 12px; color: #5DCAA5; font-weight: bold; }
+
+    .st-empty { text-align: center; padding: 50px 0; color: #A9C6B8; }
+    .st-empty a { color: #5DCAA5; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="st-wrap">
+    <div class="st-blob st-blob-1"></div>
+    <div class="st-blob st-blob-2"></div>
+
+    <div class="st-inner">
+      <div class="st-head">
+        <a href="account.html" class="st-back">‹</a>
+        <p class="st-title">Il tuo storico</p>
+      </div>
+      <p class="st-count" id="st-count">—</p>
+
+      <div id="st-loading" style="text-align:center; padding:40px 0; color:#A9C6B8;">Carico lo storico…</div>
+      <div id="st-list"></div>
+      <div id="st-empty" class="st-empty hidden">
+        Non hai ancora fatto nessun test.<br /><a href="test.html">Fai il primo →</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/storico.js"></script>
+</body>
+</html>
