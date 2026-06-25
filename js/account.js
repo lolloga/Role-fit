@@ -1,10 +1,7 @@
-// ─── AREA PERSONALE — PROFILO ─────────────────────────────────
-// Mantiene il gate magic link e il logout originali del socio.
-// In più popola la pagina Profilo: ultimo risultato, grafico "nel tempo"
-// (>=2 test) o frase d'invito (1 test), header utente.
+// ─── AREA PERSONALE — PROFILO (magic link) ───────────────────
 import { getSession, signInWithMagicLink, signOut, listReports } from './supabase.js';
 
-// ─── Gate magic link (invariato nello spirito, id della pagina account) ───
+// ─── Gate magic link (redirect verso il profilo) ───
 function showGate() {
   document.getElementById('account-loading').classList.add('hidden');
   document.getElementById('account-gate').classList.remove('hidden');
@@ -24,7 +21,8 @@ function showGate() {
     }
     btn.disabled = true;
     btn.textContent = 'Invio…';
-    const { error } = await signInWithMagicLink(email);
+    // Login dalla home/profilo → si torna su account.html (non sul report)
+    const { error } = await signInWithMagicLink(email, 'account.html');
     if (error) {
       btn.disabled = false;
       btn.textContent = 'Inviami il link →';
@@ -51,7 +49,6 @@ function formatShort(iso) {
     return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
   } catch { return ''; }
 }
-// Estrae il ruolo top e il match dal report_json, in modo difensivo.
 function topRole(report_json) {
   const r = report_json?.ruoli?.[0];
   return {
@@ -66,56 +63,6 @@ function initials(email) {
   return (txt || '··').toUpperCase().slice(0, 2);
 }
 
-// ─── Render profilo ───
-function renderProfile(session, reports) {
-  document.getElementById('account-loading').classList.add('hidden');
-  document.getElementById('account-content').classList.remove('hidden');
-
-  const email = session.user?.email || '';
-  document.getElementById('pf-email').textContent = email || '—';
-  document.getElementById('pf-avatar').textContent = initials(email);
-
-  // "Membro da" — usa created_at dell'utente se disponibile
-  const since = session.user?.created_at;
-  document.getElementById('pf-since').textContent =
-    since ? 'Membro da ' + new Date(since).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '';
-
-  // reports arriva ordinato per created_at desc (vedi listReports)
-  if (!reports.length) {
-    // Nessun report ancora: invita a fare il test
-    document.getElementById('pf-last-role').textContent = 'Nessun test ancora';
-    document.getElementById('pf-last-pct').textContent = '';
-    document.getElementById('pf-last-sub').textContent = 'Fai il test per scoprire i ruoli più adatti a te.';
-    document.getElementById('pf-time-invite').classList.remove('hidden');
-    return;
-  }
-
-  // Ultimo risultato (il più recente = primo della lista)
-  const last = reports[0];
-  const lastTop = topRole(last.report_json);
-  document.getElementById('pf-last-role').textContent = lastTop.nome;
-  document.getElementById('pf-last-pct').textContent = (lastTop.match != null) ? '· ' + lastTop.match + '%' : '';
-
-  // Sottotitolo: con 1 test mostra la data, con più test il ruolo ricorrente
-  if (reports.length === 1) {
-    document.getElementById('pf-last-sub').textContent = 'Hai fatto il test il ' + formatDate(last.created_at) + '.';
-  } else {
-    const ricorrente = mostRecurringRole(reports);
-    document.getElementById('pf-last-sub').textContent =
-      'Hai fatto il test ' + reports.length + ' volte. ' +
-      (ricorrente ? 'Il ruolo che torna più spesso è ' + ricorrente + '.' : '');
-  }
-
-  // Box "nel tempo": grafico se >=2 test, altrimenti invito
-  if (reports.length >= 2) {
-    renderChart(reports);
-    document.getElementById('pf-time-chart').classList.remove('hidden');
-  } else {
-    document.getElementById('pf-time-invite').classList.remove('hidden');
-  }
-}
-
-// Ruolo top più frequente tra tutti i test
 function mostRecurringRole(reports) {
   const counts = {};
   reports.forEach((r) => {
@@ -127,9 +74,51 @@ function mostRecurringRole(reports) {
   return best;
 }
 
-// Grafico: ultimi 3 test (più recenti), in ordine cronologico (vecchio → nuovo)
+// ─── Render profilo ───
+function renderProfile(session, reports) {
+  document.getElementById('account-loading').classList.add('hidden');
+  document.getElementById('account-content').classList.remove('hidden');
+
+  const email = session.user?.email || '';
+  document.getElementById('pf-email').textContent = email || '—';
+  document.getElementById('pf-avatar').textContent = initials(email);
+
+  const since = session.user?.created_at;
+  document.getElementById('pf-since').textContent =
+    since ? 'Membro da ' + new Date(since).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '';
+
+  if (!reports.length) {
+    document.getElementById('pf-last-role').textContent = 'Nessun test ancora';
+    document.getElementById('pf-last-pct').textContent = '';
+    document.getElementById('pf-last-sub').textContent = 'Fai il test per scoprire i ruoli più adatti a te.';
+    document.getElementById('pf-time-invite').classList.remove('hidden');
+    return;
+  }
+
+  const last = reports[0];
+  const lastTop = topRole(last.report_json);
+  document.getElementById('pf-last-role').textContent = lastTop.nome;
+  document.getElementById('pf-last-pct').textContent = (lastTop.match != null) ? '· ' + lastTop.match + '%' : '';
+
+  if (reports.length === 1) {
+    document.getElementById('pf-last-sub').textContent = 'Hai fatto il test il ' + formatDate(last.created_at) + '.';
+  } else {
+    const ricorrente = mostRecurringRole(reports);
+    document.getElementById('pf-last-sub').textContent =
+      'Hai fatto il test ' + reports.length + ' volte. ' +
+      (ricorrente ? 'Il ruolo che torna più spesso è ' + ricorrente + '.' : '');
+  }
+
+  if (reports.length >= 2) {
+    renderChart(reports);
+    document.getElementById('pf-time-chart').classList.remove('hidden');
+  } else {
+    document.getElementById('pf-time-invite').classList.remove('hidden');
+  }
+}
+
 function renderChart(reports) {
-  const recent = reports.slice(0, 3).reverse(); // da vecchio a nuovo
+  const recent = reports.slice(0, 3).reverse();
   const bars = document.getElementById('pf-chart-bars');
   const axis = document.getElementById('pf-chart-axis');
   bars.innerHTML = '';
@@ -171,7 +160,6 @@ async function init() {
 
   const pwBtn = document.getElementById('pf-pw-btn');
   if (pwBtn) pwBtn.addEventListener('click', async () => {
-    // Magic link: non c'è password. "Modifica accesso" rimanda a un nuovo login.
     await signOut();
     window.location.reload();
   });
