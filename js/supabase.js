@@ -23,11 +23,13 @@ export async function getSession() {
   return data.session; // null se non loggato
 }
 
-// Invia il magic link. Al click l'utente torna su report.html con la sessione in URL.
-export async function signInWithMagicLink(email) {
+// Invia il magic link. `redirectTo` indica su quale pagina tornare dopo il click:
+//  - 'report.html'  → login fatto dopo il test (default)
+//  - 'account.html' → login fatto dalla home / da "Accedi" → atterra sul profilo
+export async function signInWithMagicLink(email, redirectTo = 'report.html') {
   return sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${location.origin}/report.html` },
+    options: { emailRedirectTo: `${location.origin}/${redirectTo}` },
   });
 }
 
