@@ -10,6 +10,55 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ─── Account corner (avatar / Accedi) — speculare a .nav-home ─── */
+    .account-corner {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 100;
+    }
+    /* Stato non loggato: pill "Accedi" coerente con .nav-home */
+    .account-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-xl);
+      padding: 8px 18px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      backdrop-filter: blur(10px);
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .account-login:hover {
+      color: var(--text-primary);
+      border-color: var(--emerald);
+    }
+    /* Stato loggato: avatar circolare con iniziali */
+    .account-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--emerald);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--emerald-light);
+      backdrop-filter: blur(10px);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .account-avatar:hover {
+      border-color: var(--emerald-light);
+      box-shadow: 0 0 20px var(--emerald-glow);
+    }
+  </style>
 </head>
 <body>
 
@@ -17,6 +66,11 @@
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
   <div class="blob blob-3"></div>
+</div>
+
+<!-- Angolo account: mostrato dopo il controllo sessione (default: Accedi) -->
+<div class="account-corner" id="account-corner">
+  <a href="account.html" class="account-login" id="account-login">Accedi</a>
 </div>
 
 <main>
@@ -74,7 +128,7 @@
         <div class="about-card">
           <div class="about-card-icon">⚡</div>
           <div class="about-card-title">Veloce</div>
-          <div class="about-card-text">Tra 10 e 20 minuti. Niente registrazione, niente email, niente attese.</div>
+          <div class="about-card-text">Tra 10 e 20 minuti. Alla fine crei il tuo profilo per salvare il report e ritrovarlo quando vuoi.</div>
         </div>
         <div class="about-card">
           <div class="about-card-icon">🎲</div>
@@ -104,6 +158,32 @@
 
 <script>
   localStorage.removeItem('rf_state');
+</script>
+
+<!-- Controllo sessione: se loggato mostra l'avatar con le iniziali, altrimenti resta "Accedi" -->
+<script type="module">
+  import { getSession } from './js/supabase.js';
+
+  function iniziali(email) {
+    const base = (email || '').split('@')[0] || '';
+    const parti = base.split(/[.\-_]/).filter(Boolean);
+    const txt = (parti[0]?.[0] || '') + (parti[1]?.[0] || parti[0]?.[1] || '');
+    return (txt || '··').toUpperCase().slice(0, 2);
+  }
+
+  try {
+    const session = await getSession();
+    if (session && session.user) {
+      const corner = document.getElementById('account-corner');
+      corner.innerHTML =
+        '<a href="account.html" class="account-avatar" title="Il tuo profilo">' +
+        iniziali(session.user.email) + '</a>';
+    }
+    // Se non loggato: resta il pill "Accedi" già presente nell'HTML.
+  } catch (e) {
+    // In caso di errore lasciamo "Accedi" come default sicuro.
+    console.error('Controllo sessione non riuscito:', e);
+  }
 </script>
 </body>
 </html>
