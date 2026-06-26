@@ -1,5 +1,5 @@
 // ─── PROFILO LAYOUT D (magic link) ───────────────────────────
-import { getSession, signInWithMagicLink, signOut, listReports } from './supabase.js';
+import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken } from './supabase.js';
 
 // ─── Gate magic link (redirect al profilo) ───
 function showGate() {
@@ -67,6 +67,146 @@ function mostRecurringRole(reports) {
   let best = null, bestN = 0;
   for (const k in counts) { if (counts[k] > bestN) { best = k; bestN = counts[k]; } }
   return best;
+}
+
+// Tiene i report caricati, per il banco di prova ruoli.
+let REPORTS = [];
+
+// ─── BANCO DI PROVA RUOLI ─────────────────────────────────────
+// Costruisce un riassunto testuale del profilo da un report_json salvato,
+// da passare al modello come contesto (al posto della rf_history viva).
+function profiloSintesi(report_json) {
+  const cs = report_json?.chi_sei || {};
+  const ruoli = Array.isArray(report_json?.ruoli) ? report_json.ruoli.map(r => r?.nome).filter(Boolean) : [];
+  const parti = [];
+  if (cs.come_funzioni) parti.push('Come funziona: ' + cs.come_funzioni);
+  if (cs.cosa_ti_alimenta) parti.push('Cosa lo alimenta: ' + cs.cosa_ti_alimenta);
+  if (cs.di_cosa_hai_bisogno) parti.push('Di cosa ha bisogno: ' + cs.di_cosa_hai_bisogno);
+  if (ruoli.length) parti.push('Ruoli più compatibili emersi dal test: ' + ruoli.join(', ') + '.');
+  return parti.join('\n');
+}
+
+// Valuta un ruolo contro UN report salvato (una chiamata a /api/claude, fase compatibilita).
+async function valutaRuoloControReport(ruoloInput, report_json) {
+  const sintesi = profiloSintesi(report_json);
+  const messages = [
+    {
+      role: 'user',
+      content: `Questo è il profilo completo di un utente, emerso dal test RoleFit:\n\n${sintesi}\n\n` +
+        `Valuta un ruolo di tipo ASPIRATO/DESIDERATO. L'utente vuole sapere quanto il ruolo "${ruoloInput}" è compatibile con il suo profilo. ` +
+        `Basati esclusivamente sul profilo qui sopra. Rispondi nel formato JSON richiesto.`
+    }
+  ];
+
+  const token = await getAccessToken();
+  const response = await fetch('/api/claude', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ messages, fase: 'compatibilita' })
+  });
+
+  if (!response.ok) throw new Error('Risposta non ok: ' + response.status);
+  const data = await response.json();
+  const text = data?.content?.[0]?.text;
+  if (!text) return null;
+  try { return JSON.parse(text); }
+  catch {
+    const s = text.indexOf('{'), e = text.lastIndexOf('}');
+    if (s !== -1 && e !== -1 && e > s) { try { return JSON.parse(text.substring(s, e + 1)); } catch { return null; } }
+    return null;
+  }
+}
+
+function setupBanco() {
+  const btn = document.getElementById('banco-btn');
+  const input = document.getElementById('banco-input');
+  const out = document.getElementById('banco-result');
+  if (!btn || !input) return;
+
+  const run = async () => {
+    const ruolo = (input.value || '').trim();
+    if (!ruolo) return;
+    if (!REPORTS.length) {
+      out.innerHTML = '<p class="pcard-sub">Fai prima un test: serve almeno un profilo per valutare un ruolo.</p>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Valuto…';
+    out.innerHTML = '<p class="pcard-sub" style="font-style:italic;">Sto confrontando "' + ruolo + '" con il tuo profilo…</p>';
+
+    try {
+      // Valuta sull'ultimo report (il più attuale) — risultato principale
+      const last = REPORTS[0];
+      const valLast = await valutaRuoloControReport(ruolo, last.report_json);
+      if (!valLast) throw new Error('Nessun risultato');
+
+      const matchColor = valLast.match >= 80 ? '#5DCAA5' : valLast.match >= 55 ? '#5DCAA5' :
+                         valLast.match >= 35 ? '#FFD060' : '#FF6496';
+
+      let html =
+        '<div class="pcard" style="margin-bottom:12px;">' +
+          '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
+            '<div><p class="pcard-label">Ruolo valutato</p>' +
+            '<p class="pcard-title" style="font-size:19px;">' + ruolo + '</p>' +
+            '<p class="pcard-sub" style="color:#5DCAA5;">' + (valLast.titolo || '') + '</p></div>' +
+            '<div style="text-align:right; flex-shrink:0;">' +
+            '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + valLast.match + '%</p>' +
+            '<p style="font-size:10px; color:rgba(240,255,244,0.35); text-transform:uppercase; letter-spacing:0.06em; margin:2px 0 0;">sull\'ultimo test</p></div>' +
+          '</div>' +
+          '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + (valLast.descrizione || '') + '</p>' +
+        '</div>';
+
+      out.innerHTML = html;
+
+      // Se ci sono più report, valuta anche sui precedenti per l'andamento
+      if (REPORTS.length >= 2) {
+        const trend = document.createElement('div');
+        trend.className = 'pcard';
+        trend.innerHTML = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px;">Andamento nel tempo</p>' +
+          '<p class="pcard-sub" style="font-style:italic;">Calcolo come questo ruolo combaciava nei test precedenti…</p>';
+        out.appendChild(trend);
+
+        const righe = [];
+        // Già calcolato l'ultimo; calcola i precedenti (max altri 2)
+        righe.push({ data: last.created_at, match: valLast.match });
+        for (let i = 1; i < Math.min(REPORTS.length, 3); i++) {
+          const v = await valutaRuoloControReport(ruolo, REPORTS[i].report_json);
+          if (v) righe.push({ data: REPORTS[i].created_at, match: v.match });
+        }
+
+        let trendHtml = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
+        righe.forEach((r) => {
+          trendHtml += '<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+            '<span class="pcard-sub">' + formatDate(r.data) + '</span>' +
+            '<span style="font-weight:bold; color:#5DCAA5;">' + r.match + '%</span></div>';
+        });
+        // Lettura della tendenza (primo = più recente, ultimo = più vecchio)
+        if (righe.length >= 2) {
+          const recente = righe[0].match, vecchio = righe[righe.length - 1].match;
+          let lettura = '';
+          if (recente - vecchio >= 8) lettura = 'La tua compatibilità con questo ruolo è cresciuta nel tempo: ti ci stai avvicinando.';
+          else if (vecchio - recente >= 8) lettura = 'La tua compatibilità con questo ruolo è calata nel tempo: il tuo profilo si sta muovendo altrove.';
+          else lettura = 'La tua compatibilità con questo ruolo è rimasta stabile nel tempo.';
+          trendHtml += '<p class="pcard-sub" style="margin-top:12px; font-style:italic;">' + lettura + '</p>';
+        }
+        trend.innerHTML = trendHtml;
+      }
+
+    } catch (e) {
+      console.error('Banco di prova fallito:', e);
+      out.innerHTML = '<p class="pcard-sub" style="color:#FF6496;">Non sono riuscito a valutare il ruolo. Riprova tra poco.</p>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Valuta ruolo';
+    }
+  };
+
+  btn.addEventListener('click', run);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
 }
 
 // ─── Navigazione tra sezioni (sidebar + bottom bar) ───
@@ -182,7 +322,9 @@ async function init() {
 
   try {
     const reports = await listReports();
+    REPORTS = reports;
     renderProfile(session, reports);
+    setupBanco();
   } catch (e) {
     console.error('Errore nel caricare i report:', e);
   }
