@@ -6,83 +6,117 @@
   <title>Il tuo profilo — RoleFit</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    /* ─── Profilo: mobile-first, poi desktop ─── */
-    .pf-wrap {
-      width: 100%;
-      max-width: 440px;        /* mobile */
-      margin: 0 auto;
-      padding: 24px 18px 48px;
-      position: relative;
-      overflow: hidden;
+    /* ═══ LAYOUT D — sidebar desktop / bottom bar mobile ═══ */
+    .app { position: relative; z-index: 1; min-height: 100svh; }
+
+    /* — SIDEBAR (desktop) — */
+    .app-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 230px;
+      background: rgba(13,41,24,0.5);
+      border-right: 1px solid rgba(29,158,117,0.3);
+      backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 32px 16px; z-index: 50;
     }
-    /* Desktop: colonna più ampia e centrata, coerente col resto del sito */
-    @media (min-width: 700px) {
-      .pf-wrap { max-width: 640px; padding: 56px 24px 80px; }
-      .pf-card-title { font-size: 22px !important; }
-      .pf-chart { height: 110px !important; }
+    .sb-avatar {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: var(--surface, #0D2918); border: 1px solid #FF6496;
+      display: flex; align-items: center; justify-content: center;
+      color: #FF6496; font-weight: bold; font-size: 18px; margin-bottom: 12px;
     }
+    .sb-email { margin: 0; color: #FF6496; font-weight: bold; font-size: 12.5px; text-align: center; word-break: break-all; }
+    .sb-since { margin: 3px 0 26px; color: #FF6496; opacity: 0.6; font-size: 10.5px; }
+    .sb-nav { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+    .sb-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; border-radius: 9px;
+      color: var(--text-secondary, rgba(240,255,244,0.65));
+      font-size: 13px; cursor: pointer; background: none; border: none;
+      width: 100%; text-align: left; font-family: var(--font-body, sans-serif);
+      transition: background var(--transition, 0.2s), color var(--transition, 0.2s);
+    }
+    .sb-item .ico { font-size: 15px; width: 18px; text-align: center; }
+    .sb-item:hover { color: var(--text-primary, #F0FFF4); background: rgba(255,255,255,0.04); }
+    .sb-item.active { background: rgba(29,158,117,0.15); color: #5DCAA5; font-weight: bold; }
+    .sb-logout { margin-top: auto; color: #FF6496; font-size: 12px; background: none; border: none; cursor: pointer; padding: 8px; }
 
-    .pf-blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
-    .pf-blob-1 { top: -60px; right: -50px; width: 220px; height: 220px;
-      background: radial-gradient(circle, rgba(29,158,117,0.22), transparent 70%); }
-    .pf-blob-2 { top: 300px; left: -70px; width: 240px; height: 240px;
-      background: radial-gradient(circle, rgba(255,100,150,0.14), transparent 70%); }
-    .pf-inner { position: relative; z-index: 1; }
+    /* — AREA CONTENUTI — */
+    .app-main {
+      margin-left: 230px; padding: 48px 40px 60px;
+      max-width: 760px; position: relative;
+    }
+    .app-blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: -1; }
+    .app-blob-1 { top: -40px; right: 20px; width: 220px; height: 220px;
+      background: radial-gradient(circle, rgba(29,158,117,0.16), transparent 70%); }
 
-    .pf-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-    .pf-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--surface, #0D2918);
-      border: 1px solid #FF6496; display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 16px; color: #FF6496; flex-shrink: 0; }
-    .pf-email { font-weight: bold; font-size: 15px; margin: 0; color: #FF6496; word-break: break-all; }
-    .pf-since { font-size: 12px; color: #FF6496; opacity: 0.75; margin: 2px 0 0; }
+    .sec-title { font-family: var(--font-display, Georgia), serif; font-size: 24px; font-weight: bold; color: #F0FFF4; margin: 0 0 20px; }
 
-    .pf-card { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
-      border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; backdrop-filter: blur(10px); }
-    .pf-card-label { font-size: 10.5px; color: #5DCAA5; margin: 0 0 4px;
-      text-transform: uppercase; letter-spacing: 0.04em; font-weight: bold; }
-    .pf-card-title { font-family: var(--font-display, Georgia), serif; font-size: 19px;
-      font-weight: bold; margin: 0 0 7px; color: #F0FFF4; }
-    .pf-card-title .pct { color: #5DCAA5; }
-    .pf-card-sub { font-size: 13px; color: rgba(240,255,244,0.65); margin: 0; line-height: 1.55; }
+    .pcard { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
+      border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; backdrop-filter: blur(10px); }
+    .pcard-label { font-size: 10.5px; color: #5DCAA5; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: bold; }
+    .pcard-title { font-family: var(--font-display, Georgia), serif; font-size: 21px; font-weight: bold; margin: 0 0 7px; color: #F0FFF4; }
+    .pcard-title .pct { color: #5DCAA5; }
+    .pcard-sub { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0; line-height: 1.55; }
 
-    .pf-time-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
-    .pf-time-head .ico { font-size: 14px; color: #FF6496; }
-    .pf-time-head p { font-size: 13px; font-weight: bold; margin: 0; color: #F0FFF4; }
-
-    .pf-chart { display: flex; align-items: flex-end; gap: 12px; height: 80px; margin-bottom: 8px; }
+    /* grafico */
+    .pf-chart { display: flex; align-items: flex-end; gap: 14px; height: 100px; margin-bottom: 8px; }
     .pf-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
-    .pf-bar { width: 100%; max-width: 46px; background: rgba(255,100,150,0.3); border-radius: 4px 4px 0 0; }
+    .pf-bar { width: 100%; max-width: 50px; background: rgba(255,100,150,0.3); border-radius: 4px 4px 0 0; }
     .pf-bar.last { background: #FF6496; }
-    .pf-xaxis { display: flex; gap: 12px; }
+    .pf-xaxis { display: flex; gap: 14px; }
     .pf-xcell { flex: 1; text-align: center; }
-    .pf-xdate { font-size: 10.5px; color: rgba(240,255,244,0.35); margin: 0; }
-    .pf-xrole { font-size: 10px; color: rgba(240,255,244,0.35); margin: 1px 0 0; line-height: 1.2;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pf-xpct { font-size: 12px; font-weight: bold; margin: 1px 0 0; color: rgba(240,255,244,0.65); }
+    .pf-xdate { font-size: 11px; color: rgba(240,255,244,0.35); margin: 0; }
+    .pf-xrole { font-size: 10px; color: rgba(240,255,244,0.35); margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pf-xpct { font-size: 12.5px; font-weight: bold; margin: 1px 0 0; color: rgba(240,255,244,0.65); }
     .pf-xcell.last .pf-xpct { color: #FF6496; }
 
-    .pf-btn { width: 100%; background: #1D9E75; color: #030F0A; border: none; font-weight: bold;
-      padding: 13px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+    .pf-btn { display: inline-flex; align-items: center; gap: 6px; background: #1D9E75; color: #030F0A;
+      border: none; font-weight: bold; padding: 12px 24px; border-radius: 10px; font-size: 14px;
+      cursor: pointer; text-decoration: none; }
     .pf-btn:hover { background: #5DCAA5; }
-    .pf-link-card { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
-      border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
-      cursor: pointer; margin-bottom: 18px; text-decoration: none; }
-    .pf-link-card .left { display: flex; align-items: center; gap: 9px; }
-    .pf-link-card .ico { font-size: 15px; color: #5DCAA5; }
-    .pf-link-card .txt { font-size: 13px; font-weight: bold; color: #F0FFF4; }
-    .pf-link-card .chev { color: #5DCAA5; font-size: 15px; }
 
-    .pf-footer { padding-top: 14px; border-top: 1px solid rgba(93,202,165,0.25);
-      display: flex; justify-content: space-between; }
-    .pf-footer button { background: transparent; border: none; font-size: 12px; padding: 4px 0; cursor: pointer; }
-    .pf-foot-pw { color: rgba(240,255,244,0.35); }
-    .pf-foot-out { color: #FF6496; }
+    /* storico card */
+    .st-card { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; cursor: pointer; text-decoration: none; display: block; }
+    .st-card:hover { border-color: #5DCAA5; }
+    .st-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .st-date { font-size: 14px; font-weight: bold; margin: 0; color: #F0FFF4; }
+    .st-badge { background: #FF6496; color: #030F0A; font-size: 10.5px; font-weight: bold; padding: 2px 8px; border-radius: 20px; }
+    .st-roles { font-size: 12.5px; color: rgba(240,255,244,0.65); margin: 0 0 10px; line-height: 1.5; }
+    .st-open { font-size: 12px; color: #5DCAA5; font-weight: bold; }
+
+    /* placeholder "in arrivo" */
+    .soon { text-align: center; padding: 40px 20px; }
+    .soon-ico { font-size: 34px; margin-bottom: 12px; }
+    .soon-title { font-family: var(--font-display, Georgia), serif; font-size: 18px; color: #F0FFF4; margin: 0 0 6px; }
+    .soon-text { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0 auto; max-width: 360px; line-height: 1.6; }
+    .soon-badge { display: inline-block; margin-bottom: 16px; font-size: 10.5px; font-weight: bold; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #5DCAA5; background: rgba(29,158,117,0.14); border: 1px solid rgba(29,158,117,0.3); border-radius: 20px; padding: 3px 12px; }
+
+    /* gate */
+    .gate-wrap { max-width: 440px; margin: 0 auto; padding: 80px 20px; }
+    .pf-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #1D9E75;
+      background: var(--deep, #071A10); color: #F0FFF4; margin-bottom: 10px; box-sizing: border-box; font-size: 0.95rem; outline: none; }
+
+    /* — BOTTOM BAR (mobile) — */
+    .app-bottombar { display: none; }
 
     .hidden { display: none !important; }
-    .pf-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #1D9E75;
-      background: var(--deep, #071A10); color: #F0FFF4; margin-bottom: 10px; box-sizing: border-box;
-      font-family: var(--font-body, sans-serif); font-size: 0.95rem; outline: none; }
+
+    @media (max-width: 700px) {
+      .app-sidebar { display: none; }
+      .app-main { margin-left: 0; padding: 28px 18px 90px; max-width: 100%; }
+      .sec-title { font-size: 20px; }
+      .app-bottombar {
+        display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+        background: rgba(7,26,16,0.95); border-top: 1px solid rgba(29,158,117,0.3);
+        backdrop-filter: blur(12px); z-index: 50; padding: 8px 4px 10px;
+      }
+      .bb-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+        background: none; border: none; color: rgba(240,255,244,0.45); font-size: 9.5px; cursor: pointer; padding: 4px 2px; font-family: var(--font-body, sans-serif); }
+      .bb-item .ico { font-size: 18px; }
+      .bb-item.active { color: #5DCAA5; }
+    }
   </style>
 </head>
 <body>
@@ -92,85 +126,113 @@
   <div class="blob blob-2"></div>
 </div>
 
-<a href="index.html" class="nav-home">
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-    <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  Home
-</a>
+<!-- Caricamento -->
+<div id="account-loading" style="text-align:center; padding:90px 0; position:relative; z-index:1;">
+  <p style="color:rgba(240,255,244,0.65);">Carico il tuo profilo…</p>
+</div>
 
-<div class="pf-wrap">
-  <div class="pf-blob pf-blob-1"></div>
-  <div class="pf-blob pf-blob-2"></div>
-
-  <div class="pf-inner">
-
-    <!-- Caricamento -->
-    <div id="account-loading" style="text-align:center; padding:80px 0;">
-      <p style="color:rgba(240,255,244,0.65);">Carico il tuo profilo…</p>
-    </div>
-
-    <!-- Gate magic link -->
-    <div id="account-gate" class="hidden">
-      <div class="pf-card" style="text-align:center;">
-        <p class="pf-card-title" style="font-size:18px;">Accedi al tuo profilo</p>
-        <p class="pf-card-sub" style="margin-bottom:16px;">Inserisci la tua email: ti mandiamo un link per entrare, senza password.</p>
-        <div id="account-auth-form">
-          <input id="account-email" type="email" placeholder="nome@email.it" class="pf-input" />
-          <p id="account-auth-error" class="hidden" style="color:#FF6496; font-size:12px; margin:0 0 10px;"></p>
-          <button id="account-auth-btn" class="pf-btn">Inviami il link →</button>
-        </div>
-        <div id="account-auth-sent" class="hidden">
-          <p class="pf-card-sub">Ti abbiamo mandato un'email. Apri il link per entrare nel tuo profilo.</p>
-        </div>
+<!-- Gate magic link -->
+<div id="account-gate" class="hidden">
+  <div class="gate-wrap">
+    <div class="pcard" style="text-align:center;">
+      <p class="pcard-title" style="font-size:18px;">Accedi al tuo profilo</p>
+      <p class="pcard-sub" style="margin-bottom:16px;">Inserisci la tua email: ti mandiamo un link per entrare, senza password.</p>
+      <div id="account-auth-form">
+        <input id="account-email" type="email" placeholder="nome@email.it" class="pf-input" />
+        <p id="account-auth-error" class="hidden" style="color:#FF6496; font-size:12px; margin:0 0 10px;"></p>
+        <button id="account-auth-btn" class="pf-btn" style="width:100%; justify-content:center;">Inviami il link →</button>
+      </div>
+      <div id="account-auth-sent" class="hidden">
+        <p class="pcard-sub">Ti abbiamo mandato un'email. Apri il link per entrare nel tuo profilo.</p>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Contenuto profilo -->
-    <div id="account-content" class="hidden">
+<!-- App (loggato) -->
+<div id="account-content" class="app hidden">
 
-      <div class="pf-header">
-        <div id="pf-avatar" class="pf-avatar">··</div>
-        <div style="min-width:0;">
-          <p id="pf-email" class="pf-email">—</p>
-          <p id="pf-since" class="pf-since">—</p>
-        </div>
+  <!-- SIDEBAR desktop -->
+  <aside class="app-sidebar">
+    <div id="sb-avatar" class="sb-avatar">··</div>
+    <p id="sb-email" class="sb-email">—</p>
+    <p id="sb-since" class="sb-since">—</p>
+    <nav class="sb-nav">
+      <button class="sb-item active" data-sec="panoramica"><span class="ico">◈</span> Panoramica</button>
+      <button class="sb-item" data-sec="storico"><span class="ico">🕒</span> Storico</button>
+      <button class="sb-item" data-sec="cv"><span class="ico">📄</span> Il mio CV</button>
+      <button class="sb-item" data-sec="banco"><span class="ico">⚖</span> Banco di prova ruoli</button>
+      <a class="sb-item" href="test.html"><span class="ico">↻</span> Rifai il test</a>
+    </nav>
+    <button class="sb-logout" id="logout-btn">Esci</button>
+  </aside>
+
+  <!-- CONTENUTO -->
+  <main class="app-main">
+    <div class="app-blob app-blob-1"></div>
+
+    <!-- PANORAMICA -->
+    <section class="app-sec" data-sec="panoramica">
+      <h1 class="sec-title">Panoramica</h1>
+      <div class="pcard" id="pf-last-card">
+        <p class="pcard-label">Il tuo ultimo risultato</p>
+        <p class="pcard-title"><span id="pf-last-role">—</span> <span class="pct" id="pf-last-pct"></span></p>
+        <p class="pcard-sub" id="pf-last-sub">—</p>
       </div>
-
-      <div class="pf-card" id="pf-last-card">
-        <p class="pf-card-label">Il tuo ultimo risultato</p>
-        <p class="pf-card-title"><span id="pf-last-role">—</span> <span class="pct" id="pf-last-pct"></span></p>
-        <p class="pf-card-sub" id="pf-last-sub">—</p>
-      </div>
-
-      <div class="pf-card hidden" id="pf-time-chart">
-        <p class="pf-card-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Come si è confermato nel tempo</p>
+      <div class="pcard hidden" id="pf-time-chart">
+        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Come si è confermato nel tempo</p>
         <div class="pf-chart" id="pf-chart-bars"></div>
         <div class="pf-xaxis" id="pf-chart-axis"></div>
       </div>
-
-      <div class="pf-card hidden" id="pf-time-invite">
-        <div class="pf-time-head">
-          <span class="ico">↻</span>
-          <p>Il tuo profilo nel tempo</p>
-        </div>
-        <p class="pf-card-sub">Questo è il tuo profilo oggi. Torna a fare il test e qui vedrai l'evoluzione o la conferma dei tuoi risultati.</p>
+      <div class="pcard hidden" id="pf-time-invite">
+        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:6px;">↻ Il tuo profilo nel tempo</p>
+        <p class="pcard-sub">Questo è il tuo profilo oggi. Torna a fare il test e qui vedrai l'evoluzione o la conferma dei tuoi risultati.</p>
       </div>
+      <div style="margin-top:8px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
+    </section>
 
-      <a href="test.html" class="pf-btn">↻ Rifai il test</a>
-
-      <a href="storico.html" class="pf-link-card">
-        <span class="left"><span class="ico">🕒</span><span class="txt">Vedi tutto lo storico</span></span>
-        <span class="chev">›</span>
-      </a>
-
-      <div class="pf-footer">
-        <button class="pf-foot-pw" id="pf-pw-btn">Cambia account</button>
-        <button class="pf-foot-out" id="logout-btn">Esci</button>
+    <!-- STORICO -->
+    <section class="app-sec hidden" data-sec="storico">
+      <h1 class="sec-title">Il tuo storico</h1>
+      <p id="st-count" style="font-size:12px; color:rgba(240,255,244,0.35); margin:-12px 0 18px;">—</p>
+      <div id="st-list"></div>
+      <div id="st-empty" class="hidden" style="text-align:center; padding:40px 0; color:rgba(240,255,244,0.65);">
+        Non hai ancora fatto nessun test.<br /><a href="test.html" style="color:#5DCAA5;">Fai il primo →</a>
       </div>
+    </section>
 
-    </div>
-  </div>
+    <!-- CV (placeholder) -->
+    <section class="app-sec hidden" data-sec="cv">
+      <h1 class="sec-title">Il mio CV</h1>
+      <div class="pcard soon">
+        <span class="soon-badge">In arrivo</span>
+        <div class="soon-ico">📄</div>
+        <p class="soon-title">Carica il tuo CV</p>
+        <p class="soon-text">Presto potrai caricare il tuo curriculum per arricchire il profilo. Stiamo ancora lavorando a come usarlo nel modo giusto.</p>
+      </div>
+    </section>
+
+    <!-- BANCO DI PROVA (placeholder) -->
+    <section class="app-sec hidden" data-sec="banco">
+      <h1 class="sec-title">Banco di prova ruoli</h1>
+      <div class="pcard soon">
+        <span class="soon-badge">In arrivo</span>
+        <div class="soon-ico">⚖</div>
+        <p class="soon-title">Prova qualsiasi ruolo</p>
+        <p class="soon-text">Presto potrai scrivere un ruolo e vedere quanto combacia con i tuoi test — confrontandolo nel tempo, non con una media.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM BAR mobile -->
+  <nav class="app-bottombar">
+    <button class="bb-item active" data-sec="panoramica"><span class="ico">◈</span>Profilo</button>
+    <button class="bb-item" data-sec="storico"><span class="ico">🕒</span>Storico</button>
+    <button class="bb-item" data-sec="cv"><span class="ico">📄</span>CV</button>
+    <button class="bb-item" data-sec="banco"><span class="ico">⚖</span>Ruoli</button>
+    <a class="bb-item" href="test.html"><span class="ico">↻</span>Test</a>
+  </nav>
+
 </div>
 
 <script type="module" src="js/account.js"></script>
