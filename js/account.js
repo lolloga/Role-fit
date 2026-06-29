@@ -266,6 +266,84 @@ function renderProfile(session, reports) {
 
   // Storico (dentro la sezione)
   renderStorico(reports);
+
+  // Radar 6 dimensioni (visibile da 3 test con assi)
+  renderRadar(reports);
+}
+
+const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const RADAR_COLORS = [
+  { border: '#b4b2a9', bg: 'rgba(180,178,169,0.06)', dash: [4, 3] },
+  { border: '#85b7eb', bg: 'rgba(133,183,235,0.06)', dash: [6, 3] },
+  { border: '#e87ba4', bg: 'rgba(232,123,164,0.14)', dash: [] }
+];
+
+function renderRadar(reports) {
+  const card = document.getElementById('pf-radar-card');
+  if (!card) return;
+
+  const conAssi = reports
+    .filter(r => r.report_json && r.report_json.assi && typeof r.report_json.assi === 'object')
+    .slice(0, 3)
+    .reverse();
+
+  // Mostriamo il radar da 2 test con assi in su (più test = più linee, max 3)
+  if (conAssi.length < 2) return;
+  card.classList.remove('hidden');
+
+  const sub = document.getElementById('pf-radar-sub');
+  if (sub) {
+    sub.textContent = (conAssi.length === 2)
+      ? 'Confronto tra i tuoi ultimi 2 test. Con un altro test vedrai la traiettoria completa.'
+      : 'Come il tuo profilo si è mosso nei tuoi ultimi 3 test.';
+  }
+
+  const canvas = document.getElementById('pf-radar');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  const datasets = conAssi.map((r, i) => {
+    const a = r.report_json.assi;
+    const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
+    return {
+      data: ASSI_FISSI.map(k => (typeof a[k] === 'number' ? a[k] : 0)),
+      borderColor: c.border,
+      backgroundColor: c.bg,
+      pointBackgroundColor: c.border,
+      borderWidth: 2,
+      borderDash: c.dash,
+      pointRadius: 2
+    };
+  });
+
+  new Chart(canvas, {
+    type: 'radar',
+    data: { labels: ASSI_FISSI, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          suggestedMin: 0, suggestedMax: 100,
+          ticks: { display: false, stepSize: 25 },
+          grid: { color: '#2c2c2a' },
+          angleLines: { color: '#2c2c2a' },
+          pointLabels: { color: '#A9C6B8', font: { size: 12 } }
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  const legend = document.getElementById('pf-radar-legend');
+  if (legend) {
+    legend.innerHTML = conAssi.map((r, i) => {
+      const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
+      const stile = c.dash.length ? 'dashed' : 'solid';
+      const etichetta = (i === conAssi.length - 1) ? formatShort(r.created_at) + ' (attuale)' : formatShort(r.created_at);
+      return '<span style="display:flex; align-items:center; gap:5px;">' +
+        '<span style="width:14px; height:0; border-top:2px ' + stile + ' ' + c.border + ';"></span>' + etichetta + '</span>';
+    }).join('');
+  }
 }
 
 function renderChart(reports) {
