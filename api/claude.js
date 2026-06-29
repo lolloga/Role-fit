@@ -220,6 +220,21 @@ Blocco 3 — I 3 RUOLI CHE NON FANNO PER TE
 Blocco Bonus — IL RUOLO CHE NON TI ASPETTI
 Stesso DNA psicologico, settore lontanissimo. Deve far sorridere e avere una logica cristallina. Chiudi con una frase leggera — non motivazionale.
 
+Blocco ASSI — IL PROFILO IN 6 DIMENSIONI (per il grafico radar)
+Oltre a tutto il resto, assegna un valore da 0 a 100 a ciascuna di queste 6 dimensioni fisse, basandoti sul profilo emerso dal test. Questi valori servono a disegnare un grafico radar del profilo. Le 6 dimensioni sono SEMPRE queste, in quest'ordine, mai cambiarle:
+
+1. "Analisi" — quanto la persona crea valore ragionando su dati, logica, problemi da scomporre. Alto = mente analitica, si fida dei numeri e del ragionamento. Basso = preferisce intuito e relazione al dato.
+2. "Relazione" — quanto funziona attraverso le persone: capire, convincere, coordinare, prendersi cura. Alto = le persone sono il suo canale naturale. Basso = preferisce lavorare su cose/idee più che su persone.
+3. "Creatività" — quanto è spinta a generare idee nuove, dare forma, esprimere, immaginare soluzioni non ovvie. Alto = pensa fuori dagli schemi, ama il foglio bianco. Basso = preferisce migliorare l'esistente piuttosto che inventare.
+4. "Curiosità" — quanto cerca il nuovo, l'incerto, l'imparare, l'esplorare territori non familiari. Alto = si annoia nel noto, insegue ciò che non conosce. Basso = preferisce padroneggiare a fondo ciò che già conosce.
+5. "Leadership" — propensione a prendere l'iniziativa, orientare gli altri, assumersi la guida. IMPORTANTE: misura la PROPENSIONE a guidare/iniziare, NON il valore della persona. Un valore basso significa "tende a contribuire più che a guidare", MAI "è un cattivo leader". Trattalo senza alcun giudizio.
+6. "Metodo" — quanto si muove con ordine, struttura, processi, precisione e cura del dettaglio. Alto = pianifica, organizza, segue un metodo. Basso = improvvisa, preferisce flessibilità a struttura.
+
+Regole per gli assi:
+- Ancora ogni valore a segnali reali del test, non a impressioni. Se un asse non ha segnali chiari, assegnagli un valore medio (intorno a 50) invece di inventare.
+- I valori NON devono sommare a 100: sono indipendenti l'uno dall'altro. Una persona può essere alta o bassa su tutti.
+- Usa l'intero range: se qualcuno è chiaramente analitico, "Analisi" può essere 85-90; se è chiaramente poco strutturato, "Metodo" può essere 25-30. Evita di appiattire tutto su valori medi se i segnali sono netti.
+
 REGOLE DI SCRITTURA
 - Usa "tu" sempre, mai terza persona
 - La prova del nove di ogni frase del blocco CHI SEI: "L'utente poteva scrivere questa frase da solo dopo aver fatto il test?" Se sì, è parafrasi: riscrivila come sintesi o tensione tra più segnali.
@@ -265,7 +280,15 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (il primo carattere deve essere
         "match": 22,
         "perche_no": "spiegazione liberatoria del mismatch"
       }
-    ]
+    ],
+    "assi": {
+      "Analisi": 70,
+      "Relazione": 80,
+      "Creatività": 60,
+      "Curiosità": 75,
+      "Leadership": 55,
+      "Metodo": 65
+    }
   }
 }
 `;
@@ -388,8 +411,6 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     const temperature = temperatures[fase] ?? 0.3;
 
     // Modello scelto per fase. Per ora tutte le fasi usano Sonnet 4.6.
-    // In futuro si possono spostare le fasi frequenti (test) su Haiku per ridurre i costi:
-    // es. test: 'claude-haiku-4-5-20251001', report: 'claude-sonnet-4-6'.
     const models = {
       test: 'claude-sonnet-4-6',
       report: 'claude-sonnet-4-6',
@@ -398,9 +419,6 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     };
     const model = models[fase] || 'claude-sonnet-4-6';
 
-    // NOTA: Sonnet 4.6 non supporta il prefill dei messaggi assistant.
-    // Per ottenere JSON pulito ci affidiamo all'istruzione "solo JSON" nei prompt
-    // e alla pulizia/riparazione qui sotto (prima { ... ultima }).
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -420,9 +438,6 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     const data = await response.json();
 
     if (data.content && data.content[0] && data.content[0].text) {
-      // Senza prefill, il testo contiene già la { iniziale.
-      // Isoliamo comunque il JSON tra la prima { e l'ultima } per scartare
-      // eventuale testo prima o dopo.
       let text = data.content[0].text;
 
       const startIdx = text.indexOf('{');
@@ -452,8 +467,6 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     return res.status(200).json(data);
 
   } catch (error) {
-    // Non esporre il messaggio d'errore grezzo al client: logghiamo lato server
-    // e restituiamo un 500 generico.
     console.error('Errore /api/claude:', error);
     return res.status(500).json({ error: 'Internal error' });
   }
