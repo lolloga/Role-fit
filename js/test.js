@@ -794,25 +794,43 @@ function renderTermometro(container, scenarios) {
   container.appendChild(grid);
 }
 
+// ─── DILEMMA ──────────────────────────────────────────────────
+// Le due opzioni vengono forzate AFFIANCATE anche su mobile, con stili inline,
+// così la coppia resta sempre leggibile come "A | o | B" e non si impila
+// verticalmente creando confusione su schermi stretti.
 function renderDilemma(container, pairs) {
   const results = {};
   let completed = 0;
 
+  // Mini-istruzione per chiarire l'azione su mobile
+  const hint = document.createElement('div');
+  hint.style.cssText = 'font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5;';
+  hint.textContent = 'Per ogni coppia, tocca l\'opzione che senti più tua. Le due scelte sono affiancate.';
+  container.appendChild(hint);
+
   pairs.forEach((pair, i) => {
     const pairEl = document.createElement('div');
     pairEl.className = 'dilemma-pair';
+    // Layout forzato affiancato (anche su mobile): le due card occupano metà larghezza
+    pairEl.style.cssText = 'display:flex;align-items:stretch;justify-content:center;gap:8px;margin-bottom:14px;width:100%;';
+
+    const optStyle = 'flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:14px 10px;font-size:0.82rem;line-height:1.35;border-radius:var(--radius-md);hyphens:auto;overflow-wrap:anywhere;';
 
     const optA = document.createElement('button');
     optA.className = 'dilemma-option';
     optA.textContent = pair.a;
+    optA.style.cssText = optStyle;
 
     const vs = document.createElement('span');
     vs.className = 'dilemma-vs';
     vs.textContent = 'o';
+    // "o" centrale compatto, non si stringe
+    vs.style.cssText = 'flex:0 0 auto;align-self:center;font-size:0.8rem;color:var(--text-muted);padding:0 2px;';
 
     const optB = document.createElement('button');
     optB.className = 'dilemma-option';
     optB.textContent = pair.b;
+    optB.style.cssText = optStyle;
 
     const select = (chosen, other, value) => {
       const wasSelected = chosen.classList.contains('selected');
@@ -835,9 +853,15 @@ function renderDilemma(container, pairs) {
   });
 }
 
+// ─── COSTRUISCI LA SETTIMANA ──────────────────────────────────
+// L'ORDINE di selezione conta: la prima scelta = priorità 1 (più istintiva),
+// la quinta = priorità 5. Il badge di ogni card selezionata mostra il numero
+// di priorità (1-5) invece della lettera/numero dell'item, ed è evidenziato in
+// emerald. Un hint in rosa comunica esplicitamente che l'ordine influisce sul
+// risultato. Il salvataggio include { attivita, priorita } per ogni scelta.
 function renderCostruisci(container) {
   const maxSelect = 5;
-  const selected = new Set();
+  const selectedOrder = []; // array ordinato di indici → l'ordine È il segnale
   const pool = [
     'Analizzare dati e trovare pattern',
     'Incontrare clienti o partner nuovi',
@@ -860,6 +884,11 @@ function renderCostruisci(container) {
   ];
   const items = [...pool].sort(() => Math.random() - 0.5).slice(0, 10);
 
+  // Hint esplicito: l'ordine conta
+  const orderHint = document.createElement('div');
+  orderHint.style.cssText = 'font-size:0.8rem;color:var(--rose);font-weight:500;margin-bottom:10px;line-height:1.5;';
+  orderHint.textContent = 'L\'ordine in cui scegli conta: la prima attività è la tua priorità n.1, l\'ultima la n.5. Influisce sul risultato.';
+
   const counter = document.createElement('div');
   counter.style.cssText = 'font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;';
   counter.textContent = `0 / ${maxSelect} selezionate`;
@@ -867,31 +896,56 @@ function renderCostruisci(container) {
   const grid = document.createElement('div');
   grid.className = 'options-grid';
 
+  const buttons = []; // riferimento ai bottoni per indice item
+
+  // Ridisegna badge e stato di tutte le card in base a selectedOrder
+  const refresh = () => {
+    buttons.forEach((btn, i) => {
+      const pos = selectedOrder.indexOf(i); // -1 se non selezionata
+      const text = items[i];
+      if (pos >= 0) {
+        btn.classList.add('selected');
+        // badge = numero di priorità (pos+1), evidenziato
+        btn.innerHTML = `<span class="option-letter" style="background:var(--emerald);color:#fff;">${pos + 1}</span><span>${text}</span>`;
+      } else {
+        btn.classList.remove('selected');
+        // badge di default = numero progressivo dell'item
+        btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${text}</span>`;
+      }
+    });
+    counter.textContent = `${selectedOrder.length} / ${maxSelect} selezionate`;
+  };
+
   items.forEach((item, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
     btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${item}</span>`;
 
     btn.addEventListener('click', () => {
-      if (selected.has(i)) {
-        selected.delete(i);
-        btn.classList.remove('selected');
-      } else if (selected.size < maxSelect) {
-        selected.add(i);
-        btn.classList.add('selected');
+      const pos = selectedOrder.indexOf(i);
+      if (pos >= 0) {
+        // deseleziona: rimuovi e ri-numera le rimanenti
+        selectedOrder.splice(pos, 1);
+      } else if (selectedOrder.length < maxSelect) {
+        selectedOrder.push(i);
       }
 
-      counter.textContent = `${selected.size} / ${maxSelect} selezionate`;
+      refresh();
 
-      if (selected.size === maxSelect) {
-        const result = [...selected].map(idx => items[idx]);
+      if (selectedOrder.length === maxSelect) {
+        const result = selectedOrder.map((idx, order) => ({
+          attivita: items[idx],
+          priorita: order + 1
+        }));
         setTimeout(() => completeActivity('costruisci', { scelte: result }), 400);
       }
     });
 
+    buttons.push(btn);
     grid.appendChild(btn);
   });
 
+  container.appendChild(orderHint);
   container.appendChild(counter);
   container.appendChild(grid);
 }
