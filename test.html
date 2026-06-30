@@ -11,26 +11,21 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
 <div class="blob-container">
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
 </div>
-
 <div class="progress-bar-wrap">
   <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
 </div>
-
 <a href="index.html" class="nav-home" onclick="localStorage.removeItem('rf_state')">
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
   Home
 </a>
-
 <div class="test-page">
   <div class="container">
-
     <div class="test-header">
       <div class="test-logo">RoleFit</div>
       <div class="phase-indicator">
@@ -41,9 +36,7 @@
         <span class="phase-label" id="phase-label">Stiamo costruendo il tuo profilo</span>
       </div>
     </div>
-
     <div class="question-area" id="question-area">
-
       <div class="ai-thinking hidden" id="thinking-state">
         <div class="ai-orb">
           <div class="ai-orb-ring2"></div>
@@ -57,26 +50,21 @@
         </div>
         <div class="ai-thinking-phrases" id="thinking-phrase">Sto elaborando...</div>
       </div>
-
       <div id="active-question" class="hidden">
         <div class="question-text" id="question-text"></div>
         <div class="question-context" id="question-context"></div>
         <div id="question-input"></div>
-        <button class="back-btn" id="back-btn" onclick="goBack()">
+        <button class="back-btn" id="back-btn" onclick="goBack()" style="color: var(--emerald-light);">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           Cambia risposta
         </button>
       </div>
-
       <div id="activity-area" class="hidden"></div>
-
     </div>
-
   </div>
 </div>
-
 <script src="js/test.js"></script>
 </body>
 </html>
