@@ -6,12 +6,8 @@
 // Inserisce un promemoria in cima a #report-content e il form in fondo.
 // Salva su Supabase (tabella public.feedback), legato a quel report. Nessuna email.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-// Credenziali pubbliche per design (gia' presenti nel frontend)
-const SUPABASE_URL = 'https://tywckwehbitvxjxhldiv.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_UDvK7F8-b_30X4QYyRsnEQ_3rmvPJrI';
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Usa il client Supabase condiviso (stessa sessione e config del resto del progetto)
+import { sb } from './supabase.js';
 
 const DOMANDE = [
   { key: 'q1_rispecchio',     testo: 'Quanto ti rispecchi nel report generato?' },
