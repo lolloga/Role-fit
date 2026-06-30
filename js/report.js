@@ -1,4 +1,5 @@
 import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport } from './supabase.js';
+import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
 // Serve per ri-persistere le valutazioni ruolo attuale/aspirato calcolate dopo.
@@ -570,6 +571,8 @@ async function init() {
       const row = await getReport(viewId);
       currentReportId = row.id;
       renderSavedReport(row);
+      // [feedback] report salvato mostrato: attiva la sezione feedback per questo report
+      window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: row.id } }));
     } catch (e) {
       console.error('Report non trovato:', e);
       showLoadingError('Report non trovato o non accessibile.');
@@ -606,6 +609,8 @@ async function init() {
       const saved = await saveReport({ report_json: data.report, aspiration, test_history });
       currentReportId = saved.id;
       localStorage.setItem('rf_report_saved', '1');
+      // [feedback] report appena generato e salvato: attiva la sezione feedback per questo report
+      window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: saved.id } }));
     } catch (e) {
       console.error('Salvataggio report fallito:', e);
     }
