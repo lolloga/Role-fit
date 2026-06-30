@@ -58,6 +58,10 @@
     .pcard-title .pct { color: #5DCAA5; }
     .pcard-sub { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0; line-height: 1.55; }
 
+    /* invito a fare 3 test (per il radar più preciso) */
+    .pcard-invite { border: 1px solid #FF6496; background: rgba(255,100,150,0.06); }
+    .pcard-invite .pcard-label { color: #FF6496; }
+
     /* grafico */
     .pf-chart { display: flex; align-items: flex-end; gap: 14px; height: 100px; margin-bottom: 8px; }
     .pf-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
@@ -187,6 +191,12 @@
       <div class="pcard hidden" id="pf-time-invite">
         <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:6px;">↻ Il tuo profilo nel tempo</p>
         <p class="pcard-sub">Questo è il tuo profilo oggi. Torna a fare il test e qui vedrai l'evoluzione o la conferma dei tuoi risultati.</p>
+      </div>
+
+      <!-- [precisione-radar] invito a fare 3 test, sparisce al raggiungimento -->
+      <div class="pcard pcard-invite hidden" id="pf-radar-invite">
+        <p class="pcard-label">Rendi il grafico più preciso</p>
+        <p class="pcard-sub">Fai il test almeno 3 volte per avere il grafico delle competenze più preciso.</p>
       </div>
 
       <div class="pcard hidden" id="pf-radar-card">
