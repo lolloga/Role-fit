@@ -399,13 +399,11 @@ function renderMultipleChoice(container, questionData) {
 
   container.appendChild(grid);
 
-// Link per risposta libera — box rosa pieno, evidente, testo nero
+// Link per risposta libera — solo testo, colore rosa della palette
   const openLink = document.createElement('button');
   openLink.className = 'open-toggle';
   openLink.textContent = 'Preferisco rispondere con parole mie';
-  openLink.style.cssText = 'display:inline-block;margin-top:16px;border:1px solid var(--rose);background:var(--rose);color:var(--night);border-radius:12px;padding:10px 18px;cursor:pointer;font:inherit;font-size:0.9rem;font-weight:600;transition:filter 0.15s;';
-  openLink.addEventListener('mouseenter', () => { openLink.style.filter = 'brightness(0.95)'; });
-  openLink.addEventListener('mouseleave', () => { openLink.style.filter = 'none'; });
+  openLink.style.color = 'var(--rose)';
   openLink.addEventListener('click', () => {
     container.innerHTML = '';
     renderOpenInput(container, questionData);
