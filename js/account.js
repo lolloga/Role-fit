@@ -267,7 +267,7 @@ function renderProfile(session, reports) {
   // Storico (dentro la sezione)
   renderStorico(reports);
 
-  // Radar 6 dimensioni (visibile da 3 test con assi)
+  // Radar 6 dimensioni (visibile da 1 test con assi) + invito a fare 3 test
   renderRadar(reports);
 }
 
@@ -278,6 +278,26 @@ const RADAR_COLORS = [
   { border: '#e87ba4', bg: 'rgba(232,123,164,0.14)', dash: [] }
 ];
 
+// [precisione-radar] Invito a fare più test, finché non se ne hanno 3 con assi.
+// Sparisce automaticamente al raggiungimento dei 3 test (richiesta esplicita).
+function renderRadarInvite(conAssiCount) {
+  const box = document.getElementById('pf-radar-invite');
+  if (!box) return;
+
+  if (conAssiCount >= 3) {
+    box.classList.add('hidden');
+    return;
+  }
+
+  const mancanti = 3 - conAssiCount;
+  const testo = (mancanti === 1)
+    ? 'Ti manca solo 1 test per avere il grafico delle competenze più preciso.'
+    : 'Fai il test almeno 3 volte per avere il grafico delle competenze più preciso: te ne mancano ancora ' + mancanti + '.';
+
+  box.querySelector('.pcard-sub').textContent = testo;
+  box.classList.remove('hidden');
+}
+
 function renderRadar(reports) {
   const card = document.getElementById('pf-radar-card');
   if (!card) return;
@@ -287,15 +307,19 @@ function renderRadar(reports) {
     .slice(0, 3)
     .reverse();
 
-  // Mostriamo il radar da 2 test con assi in su (più test = più linee, max 3)
-  if (conAssi.length < 2) return;
+  // [precisione-radar] invito a fare più test, indipendente dalla soglia del radar sotto
+  renderRadarInvite(conAssi.length);
+
+  // Mostriamo il radar già da 1 test con assi (1 linea = fotografia, poi evoluzione)
+  if (conAssi.length < 1) return;
   card.classList.remove('hidden');
 
   const sub = document.getElementById('pf-radar-sub');
   if (sub) {
-    sub.textContent = (conAssi.length === 2)
-      ? 'Confronto tra i tuoi ultimi 2 test. Con un altro test vedrai la traiettoria completa.'
-      : 'Come il tuo profilo si è mosso nei tuoi ultimi 3 test.';
+    sub.textContent =
+      (conAssi.length === 1) ? 'Questa è la tua prima fotografia. Rifai il test per vedere come evolvi nel tempo.' :
+      (conAssi.length === 2) ? 'Confronto tra i tuoi ultimi 2 test. Con un altro test vedrai la traiettoria completa.' :
+      'Come il tuo profilo si è mosso nei tuoi ultimi 3 test.';
   }
 
   const canvas = document.getElementById('pf-radar');
