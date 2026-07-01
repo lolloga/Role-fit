@@ -1,129 +1,188 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RoleFit — Il tuo lavoro, il mio obiettivo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/rolefitbrand.css">
-<style>
-  .rf-hero {
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    align-items: center;
-    gap: 56px;
-    min-height: calc(100vh - 66px);
-    padding: 40px 0 60px;
-  }
-  .rf-hero-copy { max-width: 540px; }
-  .rf-hero .rf-h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); margin-top: 20px; }
-  .rf-hero .rf-sub { font-size: 1.05rem; max-width: 460px; }
-
-  .rf-venn-wrap {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .rf-venn {
-    width: 100%;
-    max-width: 420px;
-    height: auto;
-    display: block;
-  }
-
-  @media (max-width: 860px) {
-    .rf-hero {
-      grid-template-columns: 1fr;
-      gap: 36px;
-      min-height: 0;
-      padding: 36px 0 56px;
-      text-align: left;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoleFit — Trova la tua direzione professionale</title>
+  <meta name="description" content="RoleFit ti aiuta a capire in quale direzione professionale stai andando — e se è quella giusta per te.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ─── Account corner (avatar / Accedi) — speculare a .nav-home ─── */
+    .account-corner {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 100;
     }
-    .rf-venn-wrap { order: -1; justify-content: flex-start; }
-    .rf-venn { max-width: 300px; }
-  }
-  @media (max-width: 480px) {
-    .rf-venn { max-width: 240px; }
-  }
-</style>
+    /* Stato non loggato: pill "Accedi" rosa, ben visibile */
+    .account-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--rose);
+      border: 1px solid var(--rose);
+      border-radius: var(--radius-xl);
+      padding: 9px 22px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--night);
+      transition: background var(--transition), box-shadow var(--transition);
+    }
+    .account-login:hover {
+      background: var(--rose-light);
+      box-shadow: 0 0 24px var(--rose-glow);
+    }
+    /* Stato loggato: avatar circolare con iniziali */
+    .account-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--emerald);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--emerald-light);
+      backdrop-filter: blur(10px);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .account-avatar:hover {
+      border-color: var(--emerald-light);
+      box-shadow: 0 0 20px var(--emerald-glow);
+    }
+  </style>
 </head>
 <body>
 
-<nav class="rf-nav">
-  <div class="rf-nav-inner">
-    <a class="rf-logo" href="index.html">RoleFit</a>
+<div class="blob-container">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
 
-    <div class="rf-nav-links">
-      <a class="rf-navlink" href="account.html">Il tuo profilo</a>
-      <a class="rf-navlink active" href="funzionamento.html">Funzionamento</a>
-      <a class="rf-navlink" href="dizionario.html">Dizionario dei ruoli</a>
-      <a class="rf-navlink" href="chi-siamo.html">Chi siamo</a>
-      <a class="rf-accedi" href="account.html">Accedi</a>
+<!-- Angolo account: mostrato dopo il controllo sessione (default: Accedi) -->
+<div class="account-corner" id="account-corner">
+  <a href="account.html" class="account-login" id="account-login">Accedi</a>
+</div>
+
+<main>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__eyebrow">
+        <span>✦</span>
+        Orientamento professionale
+      </div>
+
+      <h1 class="hero__title">
+        Stai andando<br>
+        nella direzione<br>
+        <em>giusta per te?</em>
+      </h1>
+
+      <p class="hero__subtitle">
+        RoleFit non ti trova un lavoro. Ti aiuta a capire chi sei professionalmente — e dove puoi arrivare partendo da lì.
+      </p>
+
+      <div class="hero__actions">
+        <a href="test.html" class="btn btn--primary">
+          Scopri il tuo profilo
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a href="dizionario.html" class="btn btn--rose">
+          Dizionario dei ruoli →
+        </a>
+      </div>
     </div>
+  </section>
 
-    <button class="rf-nav-toggle" id="rf-nav-toggle" aria-label="Apri il menu" aria-expanded="false">&#9776;</button>
-  </div>
+  <section class="about-section">
+    <div class="container--wide">
+      <div class="container" style="padding:0;">
+        <div class="label" style="margin-bottom:12px;">Come funziona</div>
+        <h2>Un test che ti <em style="font-style:italic;color:var(--rose-light);">ascolta davvero</em></h2>
+        <p style="max-width:520px;margin-top:12px;">Non è un questionario a risposta multipla. È una conversazione adattiva che si costruisce su ciò che dici — e si ferma solo quando ha capito chi sei.</p>
+      </div>
 
-  <div class="rf-nav-mobile-panel" id="rf-nav-mobile-panel">
-    <a class="rf-navlink" href="account.html">Il tuo profilo</a>
-    <a class="rf-navlink active" href="funzionamento.html">Funzionamento</a>
-    <a class="rf-navlink" href="dizionario.html">Dizionario dei ruoli</a>
-    <a class="rf-navlink" href="chi-siamo.html">Chi siamo</a>
-    <a class="rf-accedi" href="account.html">Accedi</a>
-  </div>
-</nav>
-
-<main class="rf-container rf-hero">
-
-  <div class="rf-hero-copy">
-    <span class="rf-eyebrow"><span class="rf-eyebrow-dot"></span> due lati, un match</span>
-    <h1 class="rf-h1">Il tuo lavoro, il mio obiettivo.</h1>
-    <p class="rf-sub">Le tue caratteristiche sono il punto di partenza. Le richieste di chi assume, il traguardo.</p>
-
-    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-      <a class="rf-btn rf-btn-rosa" href="test.html">Scopri il tuo profilo &rarr;</a>
-      <a class="rf-btn rf-btn-verde" href="funzionamento.html#aziende">Per la tua azienda &rarr;</a>
-      <span class="rf-tag-soon">in arrivo</span>
+      <div class="about-grid" style="margin-top:40px;">
+        <div class="about-card">
+          <div class="about-card-icon">🧠</div>
+          <div class="about-card-title">Adattivo</div>
+          <div class="about-card-text">Ogni domanda nasce dalla risposta precedente. Nessun test è uguale a un altro.</div>
+        </div>
+        <div class="about-card">
+          <div class="about-card-icon">🎯</div>
+          <div class="about-card-title">Preciso</div>
+          <div class="about-card-text">Il report non è generico. Ogni parola è ancorata a qualcosa che hai detto tu.</div>
+        </div>
+        <div class="about-card">
+          <div class="about-card-icon">⚡</div>
+          <div class="about-card-title">Veloce</div>
+          <div class="about-card-text">Tra 10 e 20 minuti. Alla fine crei il tuo profilo per salvare il report e ritrovarlo quando vuoi.</div>
+        </div>
+        <div class="about-card">
+          <div class="about-card-icon">🎲</div>
+          <div class="about-card-title">Sorprendente</div>
+          <div class="about-card-text">Il report include un ruolo bonus che non ti saresti mai aspettato — ma che ha senso.</div>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="rf-venn-wrap">
-    <svg class="rf-venn" viewBox="0 0 320 200" role="img" aria-label="Diagramma di compatibilita tra persona e azienda, con il match nell'area di sovrapposizione">
-      <circle cx="128" cy="100" r="72" fill="#FF5C93" opacity="0.12"/>
-      <circle cx="128" cy="100" r="72" fill="none" stroke="#FF5C93" stroke-width="1.8"/>
-      <circle cx="192" cy="100" r="72" fill="#1D9E75" opacity="0.12"/>
-      <circle cx="192" cy="100" r="72" fill="none" stroke="#1D9E75" stroke-width="1.8"/>
-      <defs>
-        <clipPath id="rfVennClip"><circle cx="128" cy="100" r="72"/></clipPath>
-      </defs>
-      <g clip-path="url(#rfVennClip)">
-        <circle cx="192" cy="100" r="72" fill="#E8B454"/>
-      </g>
-      <text x="72" y="44" fill="#FF5C93" font-family="Archivo, sans-serif" font-size="12" font-weight="600">Persona</text>
-      <text x="208" y="44" fill="#1D9E75" font-family="Archivo, sans-serif" font-size="12" font-weight="600">Azienda</text>
-      <text x="160" y="105" fill="#13151A" font-family="Archivo, sans-serif" font-size="12" font-weight="700" text-anchor="middle">Match</text>
-    </svg>
-  </div>
+  <section class="dizionario-highlight">
+    <div class="container--wide">
+      <div class="container" style="padding:0;">
+        <div class="label" style="margin-bottom:12px;">Strumento gratuito</div>
+        <h2>Il <em style="font-style:italic;color:var(--emerald-light);">Dizionario</em> dei ruoli</h2>
+        <p style="max-width:480px;margin-top:12px;">Scrivi qualsiasi job title o incolla un annuncio. Ti spieghiamo in linguaggio umano cosa fa davvero quel ruolo, come si entra, quanto si guadagna e se è un mercato in crescita.</p>
+      </div>
+
+      <div class="diz-search-preview">
+        <div class="diz-input-fake">Es. Product Manager, Key Account, Policy Officer...</div>
+        <a href="dizionario.html" class="btn btn--primary">Cerca →</a>
+      </div>
+    </div>
+  </section>
 
 </main>
 
-<footer class="rf-footer">
-  <div class="rf-footer-inner">
-    <span class="rf-footer-logo">RoleFit</span>
-    <span class="rf-footer-copy">&copy; 2026 RoleFit</span>
-  </div>
-</footer>
-
 <script>
-  const toggle = document.getElementById('rf-nav-toggle');
-  const panel = document.getElementById('rf-nav-mobile-panel');
-  toggle.addEventListener('click', () => {
-    const isOpen = panel.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    toggle.innerHTML = isOpen ? '&#10005;' : '&#9776;';
-  });
+  localStorage.removeItem('rf_state');
 </script>
 
+<!-- Controllo sessione: se loggato mostra l'avatar con le iniziali, altrimenti resta "Accedi" -->
+<script type="module">
+  import { getSession } from './js/supabase.js';
+
+  function iniziali(email) {
+    const base = (email || '').split('@')[0] || '';
+    const parti = base.split(/[.\-_]/).filter(Boolean);
+    const txt = (parti[0]?.[0] || '') + (parti[1]?.[0] || parti[0]?.[1] || '');
+    return (txt || '··').toUpperCase().slice(0, 2);
+  }
+
+  try {
+    const session = await getSession();
+    if (session && session.user) {
+      const corner = document.getElementById('account-corner');
+      corner.innerHTML =
+        '<a href="account.html" class="account-avatar" title="Il tuo profilo">' +
+        iniziali(session.user.email) + '</a>';
+    }
+    // Se non loggato: resta il pill "Accedi" già presente nell'HTML.
+  } catch (e) {
+    // In caso di errore lasciamo "Accedi" come default sicuro.
+    console.error('Controllo sessione non riuscito:', e);
+  }
+</script>
 </body>
 </html>
