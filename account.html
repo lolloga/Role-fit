@@ -1,254 +1,260 @@
-/* ═══════════════════════════════════════════════════════════
-   RoleFit — Design system: persona (rosa) / azienda (verde) / match (oro)
-   Font: Bricolage Grotesque (headline) + Archivo (UI/body)
-   ═══════════════════════════════════════════════════════════ */
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Il tuo profilo — RoleFit</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ═══ LAYOUT D — sidebar desktop / bottom bar mobile ═══ */
+    .app { position: relative; z-index: 1; min-height: 100svh; }
 
-:root {
-  --rf-ink: #13151A;
-  --rf-rosa: #FF5C93;
-  --rf-rosa-dark-text: #1a0510;
-  --rf-verde: #1D9E75;
-  --rf-verde-light: #5FCBA0;
-  --rf-verde-dark-text: #0b1f16;
-  --rf-oro: #E8B454;
-  --rf-cream: #F2EFE4;
-  --rf-muted: #A3AAA5;
-  --rf-border: rgba(255,255,255,0.08);
+    /* — SIDEBAR (desktop) — */
+    .app-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 230px;
+      background: rgba(13,41,24,0.5);
+      border-right: 1px solid rgba(29,158,117,0.3);
+      backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 32px 16px; z-index: 50;
+    }
+    .sb-avatar {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: var(--surface, #0D2918); border: 1px solid #FF6496;
+      display: flex; align-items: center; justify-content: center;
+      color: #FF6496; font-weight: bold; font-size: 18px; margin-bottom: 12px;
+    }
+    .sb-email { margin: 0; color: #FF6496; font-weight: bold; font-size: 12.5px; text-align: center; word-break: break-all; }
+    .sb-since { margin: 3px 0 26px; color: #FF6496; opacity: 0.6; font-size: 10.5px; }
+    .sb-nav { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+    .sb-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; border-radius: 9px;
+      color: var(--text-secondary, rgba(240,255,244,0.65));
+      font-size: 13px; cursor: pointer; background: none; border: none;
+      width: 100%; text-align: left; font-family: var(--font-body, sans-serif);
+      transition: background var(--transition, 0.2s), color var(--transition, 0.2s);
+    }
+    .sb-item .ico { font-size: 15px; width: 18px; text-align: center; }
+    .sb-item:hover { color: var(--text-primary, #F0FFF4); background: rgba(255,255,255,0.04); }
+    .sb-item.active { background: rgba(29,158,117,0.15); color: #5DCAA5; font-weight: bold; }
+    .sb-logout { margin-top: auto; color: #FF6496; font-size: 12px; background: none; border: none; cursor: pointer; padding: 8px; }
 
-  --rf-font-display: 'Bricolage Grotesque', sans-serif;
-  --rf-font-body: 'Archivo', sans-serif;
-}
+    /* — AREA CONTENUTI — */
+    .app-main {
+      margin-left: 230px; padding: 48px 40px 60px;
+      max-width: 760px; position: relative;
+    }
+    .app-blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: -1; }
+    .app-blob-1 { top: -40px; right: 20px; width: 220px; height: 220px;
+      background: radial-gradient(circle, rgba(29,158,117,0.16), transparent 70%); }
 
-* { box-sizing: border-box; }
+    .sec-title { font-family: var(--font-display, Georgia), serif; font-size: 24px; font-weight: bold; color: #F0FFF4; margin: 0 0 20px; }
 
-html, body {
-  margin: 0;
-  background: var(--rf-ink);
-  color: var(--rf-cream);
-  font-family: var(--rf-font-body);
-  -webkit-font-smoothing: antialiased;
-}
+    .pcard { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
+      border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; backdrop-filter: blur(10px); }
+    .pcard-label { font-size: 10.5px; color: #5DCAA5; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: bold; }
+    .pcard-title { font-family: var(--font-display, Georgia), serif; font-size: 21px; font-weight: bold; margin: 0 0 7px; color: #F0FFF4; }
+    .pcard-title .pct { color: #5DCAA5; }
+    .pcard-sub { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0; line-height: 1.55; }
 
-a { color: inherit; text-decoration: none; }
+    /* invito a fare 3 test (per il radar più preciso) */
+    .pcard-invite { border: 1px solid #FF6496; background: rgba(255,100,150,0.06); }
+    .pcard-invite .pcard-label { color: #FF6496; }
 
-.rf-container {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
+    /* grafico */
+    .pf-chart { display: flex; align-items: flex-end; gap: 14px; height: 100px; margin-bottom: 8px; }
+    .pf-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+    .pf-bar { width: 100%; max-width: 50px; background: rgba(255,100,150,0.3); border-radius: 4px 4px 0 0; }
+    .pf-bar.last { background: #FF6496; }
+    .pf-xaxis { display: flex; gap: 14px; }
+    .pf-xcell { flex: 1; text-align: center; }
+    .pf-xdate { font-size: 11px; color: rgba(240,255,244,0.35); margin: 0; }
+    .pf-xrole { font-size: 10px; color: rgba(240,255,244,0.35); margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pf-xpct { font-size: 12.5px; font-weight: bold; margin: 1px 0 0; color: rgba(240,255,244,0.65); }
+    .pf-xcell.last .pf-xpct { color: #FF6496; }
 
-/* ─── NAV ─────────────────────────────────────────────── */
+    .pf-btn { display: inline-flex; align-items: center; gap: 6px; background: #1D9E75; color: #030F0A;
+      border: none; font-weight: bold; padding: 12px 24px; border-radius: 10px; font-size: 14px;
+      cursor: pointer; text-decoration: none; }
+    .pf-btn:hover { background: #5DCAA5; }
 
-.rf-nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(19,21,26,0.85);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--rf-border);
-}
+    /* storico card */
+    .st-card { background: var(--card, rgba(255,255,255,0.05)); border: 1px solid #1D9E75;
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; cursor: pointer; text-decoration: none; display: block; }
+    .st-card:hover { border-color: #5DCAA5; }
+    .st-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .st-date { font-size: 14px; font-weight: bold; margin: 0; color: #F0FFF4; }
+    .st-badge { background: #FF6496; color: #030F0A; font-size: 10.5px; font-weight: bold; padding: 2px 8px; border-radius: 20px; }
+    .st-roles { font-size: 12.5px; color: rgba(240,255,244,0.65); margin: 0 0 10px; line-height: 1.5; }
+    .st-open { font-size: 12px; color: #5DCAA5; font-weight: bold; }
 
-.rf-nav-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  max-width: 1120px;
-  margin: 0 auto;
-}
+    /* placeholder "in arrivo" */
+    .soon { text-align: center; padding: 40px 20px; }
+    .soon-ico { font-size: 34px; margin-bottom: 12px; }
+    .soon-title { font-family: var(--font-display, Georgia), serif; font-size: 18px; color: #F0FFF4; margin: 0 0 6px; }
+    .soon-text { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0 auto; max-width: 360px; line-height: 1.6; }
+    .soon-badge { display: inline-block; margin-bottom: 16px; font-size: 10.5px; font-weight: bold; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #5DCAA5; background: rgba(29,158,117,0.14); border: 1px solid rgba(29,158,117,0.3); border-radius: 20px; padding: 3px 12px; }
 
-.rf-logo {
-  font-family: var(--rf-font-display);
-  font-weight: 600;
-  font-size: 1.05rem;
-  color: var(--rf-cream);
-}
+    /* gate */
+    .gate-wrap { max-width: 440px; margin: 0 auto; padding: 80px 20px; }
+    .pf-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #1D9E75;
+      background: var(--deep, #071A10); color: #F0FFF4; margin-bottom: 10px; box-sizing: border-box; font-size: 0.95rem; outline: none; }
 
-.rf-nav-links {
-  display: flex;
-  align-items: center;
-  gap: 26px;
-}
+    /* — BOTTOM BAR (mobile) — */
+    .app-bottombar { display: none; }
 
-.rf-navlink {
-  font-size: 0.85rem;
-  color: var(--rf-muted);
-  transition: color 0.15s ease;
-}
-.rf-navlink:hover { color: var(--rf-cream); }
-.rf-navlink.active { color: var(--rf-cream); font-weight: 600; }
+    .hidden { display: none !important; }
 
-.rf-accedi {
-  font-family: var(--rf-font-body);
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--rf-cream);
-  border: 1.5px solid rgba(255,255,255,0.18);
-  border-radius: 100px;
-  padding: 8px 18px;
-  cursor: pointer;
-  background: transparent;
-  transition: border-color 0.15s ease;
-}
-.rf-accedi:hover { border-color: rgba(255,255,255,0.4); }
+    @media (max-width: 700px) {
+      .app-sidebar { display: none; }
+      .app-main { margin-left: 0; padding: 28px 18px 90px; max-width: 100%; }
+      .sec-title { font-size: 20px; }
+      .app-bottombar {
+        display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+        background: rgba(7,26,16,0.95); border-top: 1px solid rgba(29,158,117,0.3);
+        backdrop-filter: blur(12px); z-index: 50; padding: 8px 4px 10px;
+      }
+      .bb-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+        background: none; border: none; color: rgba(240,255,244,0.45); font-size: 9.5px; cursor: pointer; padding: 4px 2px; font-family: var(--font-body, sans-serif); }
+      .bb-item .ico { font-size: 18px; }
+      .bb-item.active { color: #5DCAA5; }
+    }
+  </style>
+</head>
+<body>
 
-/* Toggle menu mobile: nascosto su desktop */
-.rf-nav-toggle {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--rf-cream);
-  font-size: 1.4rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  line-height: 1;
-}
+<div class="blob-container">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
 
-.rf-nav-mobile-panel {
-  display: none;
-}
+<!-- Caricamento -->
+<div id="account-loading" style="text-align:center; padding:90px 0; position:relative; z-index:1;">
+  <p style="color:rgba(240,255,244,0.65);">Carico il tuo profilo…</p>
+</div>
 
-@media (max-width: 780px) {
-  .rf-nav-links { display: none; }
-  .rf-nav-toggle { display: block; }
+<!-- Gate magic link -->
+<div id="account-gate" class="hidden">
+  <div class="gate-wrap">
+    <div class="pcard" style="text-align:center;">
+      <p class="pcard-title" style="font-size:18px;">Accedi al tuo profilo</p>
+      <p class="pcard-sub" style="margin-bottom:16px;">Inserisci la tua email: ti mandiamo un link per entrare, senza password.</p>
+      <div id="account-auth-form">
+        <input id="account-email" type="email" placeholder="nome@email.it" class="pf-input" />
+        <p id="account-auth-error" class="hidden" style="color:#FF6496; font-size:12px; margin:0 0 10px;"></p>
+        <button id="account-auth-btn" class="pf-btn" style="width:100%; justify-content:center;">Inviami il link →</button>
+      </div>
+      <div id="account-auth-sent" class="hidden">
+        <p class="pcard-sub">Ti abbiamo mandato un'email. Apri il link per entrare nel tuo profilo.</p>
+      </div>
+    </div>
+  </div>
+</div>
 
-  .rf-nav-mobile-panel {
-    display: none;
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px 24px 20px;
-    border-top: 1px solid var(--rf-border);
-  }
-  .rf-nav-mobile-panel.open { display: flex; }
+<!-- App (loggato) -->
+<div id="account-content" class="app hidden">
 
-  .rf-nav-mobile-panel .rf-navlink {
-    padding: 12px 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-size: 0.92rem;
-  }
-  .rf-nav-mobile-panel .rf-accedi {
-    margin-top: 12px;
-    width: 100%;
-    text-align: center;
-  }
-}
+  <!-- SIDEBAR desktop -->
+  <aside class="app-sidebar">
+    <div id="sb-avatar" class="sb-avatar">··</div>
+    <p id="sb-email" class="sb-email">—</p>
+    <p id="sb-since" class="sb-since">—</p>
+    <nav class="sb-nav">
+      <button class="sb-item active" data-sec="panoramica"><span class="ico">◈</span> Panoramica</button>
+      <button class="sb-item" data-sec="storico"><span class="ico">🕒</span> Storico</button>
+      <button class="sb-item" data-sec="cv"><span class="ico">📄</span> Il mio CV</button>
+      <button class="sb-item" data-sec="banco"><span class="ico">⚖</span> Banco di prova ruoli</button>
+      <a class="sb-item" href="test.html"><span class="ico">↻</span> Rifai il test</a>
+    </nav>
+    <button class="sb-logout" id="logout-btn">Esci</button>
+  </aside>
 
-/* ─── EYEBROW TAG (pillola oro) ─────────────────────────── */
+  <!-- CONTENUTO -->
+  <main class="app-main">
+    <div class="app-blob app-blob-1"></div>
 
-.rf-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(232,180,84,0.14);
-  color: var(--rf-oro);
-  font-family: var(--rf-font-body);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 6px 12px;
-  border-radius: 100px;
-}
-.rf-eyebrow-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--rf-oro);
-}
+    <!-- PANORAMICA -->
+    <section class="app-sec" data-sec="panoramica">
+      <h1 class="sec-title">Panoramica</h1>
+      <div class="pcard" id="pf-last-card">
+        <p class="pcard-label">Il tuo ultimo risultato</p>
+        <p class="pcard-title"><span id="pf-last-role">—</span> <span class="pct" id="pf-last-pct"></span></p>
+        <p class="pcard-sub" id="pf-last-sub">—</p>
+      </div>
+      <div class="pcard hidden" id="pf-time-chart">
+        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Come si è confermato nel tempo</p>
+        <div class="pf-chart" id="pf-chart-bars"></div>
+        <div class="pf-xaxis" id="pf-chart-axis"></div>
+      </div>
+      <div class="pcard hidden" id="pf-time-invite">
+        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:6px;">↻ Il tuo profilo nel tempo</p>
+        <p class="pcard-sub">Questo è il tuo profilo oggi. Torna a fare il test e qui vedrai l'evoluzione o la conferma dei tuoi risultati.</p>
+      </div>
 
-/* ─── BOTTONI (stile outline unificato) ──────────────────── */
+      <!-- [precisione-radar] invito a fare 3 test, sparisce al raggiungimento -->
+      <div class="pcard pcard-invite hidden" id="pf-radar-invite">
+        <p class="pcard-label">Rendi il grafico più preciso</p>
+        <p class="pcard-sub">Fai il test almeno 3 volte per avere il grafico delle competenze più preciso.</p>
+      </div>
 
-.rf-btn {
-  font-family: var(--rf-font-body);
-  font-weight: 600;
-  font-size: 0.88rem;
-  padding: 13px 22px;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  border-width: 1.5px;
-  border-style: solid;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.rf-btn:hover { transform: translateY(-1px); }
+      <div class="pcard hidden" id="pf-radar-card">
+        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:4px;">Il tuo profilo in 6 dimensioni</p>
+        <p class="pcard-sub" id="pf-radar-sub" style="margin-bottom:12px;">Come il tuo profilo si è mosso nei tuoi test.</p>
+        <div style="position:relative; width:100%; height:300px;">
+          <canvas id="pf-radar" role="img" aria-label="Grafico radar del profilo su 6 dimensioni attraverso i test"></canvas>
+        </div>
+        <div id="pf-radar-legend" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:11.5px; color:rgba(240,255,244,0.65);"></div>
+      </div>
+      <div style="margin-top:8px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
+    </section>
 
-.rf-btn-rosa { border-color: var(--rf-rosa); color: var(--rf-rosa); }
-.rf-btn-rosa:hover { background: rgba(255,92,147,0.08); }
+    <!-- STORICO -->
+    <section class="app-sec hidden" data-sec="storico">
+      <h1 class="sec-title">Il tuo storico</h1>
+      <p id="st-count" style="font-size:12px; color:rgba(240,255,244,0.35); margin:-12px 0 18px;">—</p>
+      <div id="st-list"></div>
+      <div id="st-empty" class="hidden" style="text-align:center; padding:40px 0; color:rgba(240,255,244,0.65);">
+        Non hai ancora fatto nessun test.<br /><a href="test.html" style="color:#5DCAA5;">Fai il primo →</a>
+      </div>
+    </section>
 
-.rf-btn-verde { border-color: var(--rf-verde); color: var(--rf-verde-light); }
-.rf-btn-verde:hover { background: rgba(29,158,117,0.08); }
+    <!-- CV (placeholder) -->
+    <section class="app-sec hidden" data-sec="cv">
+      <h1 class="sec-title">Il mio CV</h1>
+      <div class="pcard soon">
+        <span class="soon-badge">In arrivo</span>
+        <div class="soon-ico">📄</div>
+        <p class="soon-title">Carica il tuo CV</p>
+        <p class="soon-text">Presto potrai caricare il tuo curriculum per arricchire il profilo. Stiamo ancora lavorando a come usarlo nel modo giusto.</p>
+      </div>
+    </section>
 
-.rf-tag-soon {
-  font-family: var(--rf-font-body);
-  font-size: 0.68rem;
-  color: #6b756f;
-}
+    <!-- BANCO DI PROVA -->
+    <section class="app-sec hidden" data-sec="banco">
+      <h1 class="sec-title">Banco di prova ruoli</h1>
+      <div class="pcard">
+        <p class="pcard-sub" style="margin-bottom:14px;">Scrivi un ruolo e scopri quanto combacia con il tuo profilo. Se hai fatto più test, vedrai anche come la compatibilità è cambiata nel tempo.</p>
+        <input id="banco-input" type="text" placeholder="Es. Product Manager, Data Analyst, HR Specialist…" class="pf-input" style="margin-bottom:10px;" />
+        <button id="banco-btn" class="pf-btn" style="width:100%; justify-content:center;">Valuta ruolo</button>
+      </div>
+      <div id="banco-result"></div>
+    </section>
+  </main>
 
-/* ─── TIPOGRAFIA ──────────────────────────────────────────── */
+  <!-- BOTTOM BAR mobile -->
+  <nav class="app-bottombar">
+    <button class="bb-item active" data-sec="panoramica"><span class="ico">◈</span>Profilo</button>
+    <button class="bb-item" data-sec="storico"><span class="ico">🕒</span>Storico</button>
+    <button class="bb-item" data-sec="cv"><span class="ico">📄</span>CV</button>
+    <button class="bb-item" data-sec="banco"><span class="ico">⚖</span>Ruoli</button>
+    <a class="bb-item" href="test.html"><span class="ico">↻</span>Test</a>
+  </nav>
 
-.rf-h1 {
-  font-family: var(--rf-font-display);
-  font-weight: 500;
-  font-size: clamp(1.9rem, 5vw, 2.5rem);
-  line-height: 1.22;
-  color: var(--rf-cream);
-  margin: 0 0 14px;
-}
+</div>
 
-.rf-sub {
-  font-family: var(--rf-font-body);
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--rf-muted);
-  margin: 0 0 30px;
-  max-width: 480px;
-}
-
-.rf-page-title {
-  font-family: var(--rf-font-display);
-  font-weight: 500;
-  font-size: clamp(1.4rem, 3.5vw, 1.7rem);
-  color: var(--rf-cream);
-  margin: 0 0 36px;
-}
-
-.rf-section-label {
-  font-family: var(--rf-font-body);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 18px;
-}
-
-/* ─── FOOTER minimale ─────────────────────────────────────── */
-
-.rf-footer {
-  border-top: 1px solid var(--rf-border);
-  padding: 28px 24px;
-  margin-top: 60px;
-}
-.rf-footer-inner {
-  max-width: 1120px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.rf-footer-logo {
-  font-family: var(--rf-font-display);
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--rf-muted);
-}
-.rf-footer-copy {
-  font-family: var(--rf-font-body);
-  font-size: 0.75rem;
-  color: #6b756f;
-}
-
-/* ─── UTILITY ─────────────────────────────────────────────── */
-.rf-hidden { display: none !important; }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script type="module" src="js/account.js"></script>
+</body>
+</html>
