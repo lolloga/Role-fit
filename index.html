@@ -5,20 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RoleFit — Il tuo lavoro, il mio obiettivo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/rolefit-brand.css">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/rolefitbrand.css">
 <style>
   .rf-hero {
-    padding: 56px 0 70px;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: center;
+    gap: 56px;
+    min-height: calc(100vh - 66px);
+    padding: 40px 0 60px;
+  }
+  .rf-hero-copy { max-width: 540px; }
+  .rf-hero .rf-h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); margin-top: 20px; }
+  .rf-hero .rf-sub { font-size: 1.05rem; max-width: 460px; }
+
+  .rf-venn-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
   .rf-venn {
-    width: 220px;
+    width: 100%;
+    max-width: 420px;
     height: auto;
     display: block;
-    margin-bottom: 30px;
+  }
+
+  @media (max-width: 860px) {
+    .rf-hero {
+      grid-template-columns: 1fr;
+      gap: 36px;
+      min-height: 0;
+      padding: 36px 0 56px;
+      text-align: left;
+    }
+    .rf-venn-wrap { order: -1; justify-content: flex-start; }
+    .rf-venn { max-width: 300px; }
   }
   @media (max-width: 480px) {
-    .rf-venn { width: 180px; }
+    .rf-venn { max-width: 240px; }
   }
 </style>
 </head>
@@ -36,7 +62,7 @@
       <a class="rf-accedi" href="account.html">Accedi</a>
     </div>
 
-    <button class="rf-nav-toggle" id="rf-nav-toggle" aria-label="Apri il menu" aria-expanded="false">☰</button>
+    <button class="rf-nav-toggle" id="rf-nav-toggle" aria-label="Apri il menu" aria-expanded="false">&#9776;</button>
   </div>
 
   <div class="rf-nav-mobile-panel" id="rf-nav-mobile-panel">
@@ -50,31 +76,34 @@
 
 <main class="rf-container rf-hero">
 
-  <span class="rf-eyebrow"><span class="rf-eyebrow-dot"></span> due lati, un match</span>
+  <div class="rf-hero-copy">
+    <span class="rf-eyebrow"><span class="rf-eyebrow-dot"></span> due lati, un match</span>
+    <h1 class="rf-h1">Il tuo lavoro, il mio obiettivo.</h1>
+    <p class="rf-sub">Le tue caratteristiche sono il punto di partenza. Le richieste di chi assume, il traguardo.</p>
 
-  <svg class="rf-venn" viewBox="0 0 320 170" role="img" aria-label="Diagramma di compatibilità tra persona e azienda, con il match nell'area di sovrapposizione" style="margin-top: 22px;">
-    <circle cx="130" cy="85" r="62" fill="#FF5C93" opacity="0.12"/>
-    <circle cx="130" cy="85" r="62" fill="none" stroke="#FF5C93" stroke-width="1.6"/>
-    <circle cx="192" cy="85" r="62" fill="#1D9E75" opacity="0.12"/>
-    <circle cx="192" cy="85" r="62" fill="none" stroke="#1D9E75" stroke-width="1.6"/>
-    <defs>
-      <clipPath id="rfVennClip"><circle cx="130" cy="85" r="62"/></clipPath>
-    </defs>
-    <g clip-path="url(#rfVennClip)">
-      <circle cx="192" cy="85" r="62" fill="#E8B454"/>
-    </g>
-    <text x="80" y="40" fill="#FF5C93" font-family="Archivo, sans-serif" font-size="11" font-weight="600">Persona</text>
-    <text x="205" y="40" fill="#1D9E75" font-family="Archivo, sans-serif" font-size="11" font-weight="600">Azienda</text>
-    <text x="161" y="89" fill="#13151A" font-family="Archivo, sans-serif" font-size="10.5" font-weight="600" text-anchor="middle">Match</text>
-  </svg>
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <a class="rf-btn rf-btn-rosa" href="test.html">Scopri il tuo profilo &rarr;</a>
+      <a class="rf-btn rf-btn-verde" href="funzionamento.html#aziende">Per la tua azienda &rarr;</a>
+      <span class="rf-tag-soon">in arrivo</span>
+    </div>
+  </div>
 
-  <h1 class="rf-h1">Il tuo lavoro, il mio obiettivo.</h1>
-  <p class="rf-sub">Le tue caratteristiche sono il punto di partenza. Le richieste di chi assume, il traguardo.</p>
-
-  <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-    <a class="rf-btn rf-btn-rosa" href="test.html">Scopri il tuo profilo →</a>
-    <a class="rf-btn rf-btn-verde" href="funzionamento.html#aziende">Per la tua azienda →</a>
-    <span class="rf-tag-soon">in arrivo</span>
+  <div class="rf-venn-wrap">
+    <svg class="rf-venn" viewBox="0 0 320 200" role="img" aria-label="Diagramma di compatibilita tra persona e azienda, con il match nell'area di sovrapposizione">
+      <circle cx="128" cy="100" r="72" fill="#FF5C93" opacity="0.12"/>
+      <circle cx="128" cy="100" r="72" fill="none" stroke="#FF5C93" stroke-width="1.8"/>
+      <circle cx="192" cy="100" r="72" fill="#1D9E75" opacity="0.12"/>
+      <circle cx="192" cy="100" r="72" fill="none" stroke="#1D9E75" stroke-width="1.8"/>
+      <defs>
+        <clipPath id="rfVennClip"><circle cx="128" cy="100" r="72"/></clipPath>
+      </defs>
+      <g clip-path="url(#rfVennClip)">
+        <circle cx="192" cy="100" r="72" fill="#E8B454"/>
+      </g>
+      <text x="72" y="44" fill="#FF5C93" font-family="Archivo, sans-serif" font-size="12" font-weight="600">Persona</text>
+      <text x="208" y="44" fill="#1D9E75" font-family="Archivo, sans-serif" font-size="12" font-weight="600">Azienda</text>
+      <text x="160" y="105" fill="#13151A" font-family="Archivo, sans-serif" font-size="12" font-weight="700" text-anchor="middle">Match</text>
+    </svg>
   </div>
 
 </main>
@@ -82,7 +111,7 @@
 <footer class="rf-footer">
   <div class="rf-footer-inner">
     <span class="rf-footer-logo">RoleFit</span>
-    <span class="rf-footer-copy">© 2026 RoleFit</span>
+    <span class="rf-footer-copy">&copy; 2026 RoleFit</span>
   </div>
 </footer>
 
@@ -92,7 +121,7 @@
   toggle.addEventListener('click', () => {
     const isOpen = panel.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    toggle.textContent = isOpen ? '✕' : '☰';
+    toggle.innerHTML = isOpen ? '&#10005;' : '&#9776;';
   });
 </script>
 
