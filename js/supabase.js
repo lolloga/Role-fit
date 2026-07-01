@@ -94,14 +94,16 @@ export async function getReport(id) {
 // ─── BOZZE (input del test, prima del login) ──────────────────
 // Salva gli input del test come bozza anonima e restituisce { id }. L'id finisce
 // nel magic link, così il report sopravvive anche se il link si apre altrove.
+// L'id lo generiamo qui (uuid): così non serve farci restituire la riga con
+// .select() — che richiederebbe una policy di lettura anonima sulle bozze. Gli
+// anonimi possono solo INSERIRE, mai leggere: la sicurezza resta intatta.
 export async function createDraft({ history, activities = null, aspiration = null }) {
-  const { data, error } = await sb
+  const id = crypto.randomUUID();
+  const { error } = await sb
     .from('report_drafts')
-    .insert({ history, activities, aspiration })
-    .select('id')
-    .single();
+    .insert({ id, history, activities, aspiration });
   if (error) throw error;
-  return data; // { id }
+  return { id };
 }
 
 // Reclama la bozza dopo il login: la legge, la elimina e restituisce i dati
