@@ -144,17 +144,17 @@ function setupBanco() {
       const valLast = await valutaRuoloControReport(ruolo, last.report_json);
       if (!valLast) throw new Error('Nessun risultato');
 
-      const matchColor = valLast.match >= 80 ? '#5FCBA0' : valLast.match >= 55 ? '#5FCBA0' :
-                         valLast.match >= 35 ? '#E8B454' : '#FF5C93';
+      const matchColor = valLast.match >= 80 ? '#5DCAA5' : valLast.match >= 55 ? '#5DCAA5' :
+                         valLast.match >= 35 ? '#FFD060' : '#FF6496';
 
       let html =
         '<div class="pcard" style="margin-bottom:12px;">' +
           '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
             '<div><p class="pcard-label">Ruolo valutato</p>' +
             '<p class="pcard-title" style="font-size:19px;">' + ruolo + '</p>' +
-            '<p class="pcard-sub" style="color:#5FCBA0;">' + (valLast.titolo || '') + '</p></div>' +
+            '<p class="pcard-sub" style="color:#5DCAA5;">' + (valLast.titolo || '') + '</p></div>' +
             '<div style="text-align:right; flex-shrink:0;">' +
-            '<p style="font-family:\'Bricolage Grotesque\',sans-serif; font-size:34px; font-weight:500; color:' + matchColor + '; line-height:1; margin:0;">' + valLast.match + '%</p>' +
+            '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + valLast.match + '%</p>' +
             '<p style="font-size:10px; color:rgba(240,255,244,0.35); text-transform:uppercase; letter-spacing:0.06em; margin:2px 0 0;">sull\'ultimo test</p></div>' +
           '</div>' +
           '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + (valLast.descrizione || '') + '</p>' +
@@ -166,7 +166,7 @@ function setupBanco() {
       if (REPORTS.length >= 2) {
         const trend = document.createElement('div');
         trend.className = 'pcard';
-        trend.innerHTML = '<p class="pcard-label" style="color:#F2EFE4; text-transform:none; font-size:13px;">Andamento nel tempo</p>' +
+        trend.innerHTML = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px;">Andamento nel tempo</p>' +
           '<p class="pcard-sub" style="font-style:italic;">Calcolo come questo ruolo combaciava nei test precedenti…</p>';
         out.appendChild(trend);
 
@@ -178,11 +178,11 @@ function setupBanco() {
           if (v) righe.push({ data: REPORTS[i].created_at, match: v.match });
         }
 
-        let trendHtml = '<p class="pcard-label" style="color:#F2EFE4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
+        let trendHtml = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
         righe.forEach((r) => {
           trendHtml += '<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
             '<span class="pcard-sub">' + formatDate(r.data) + '</span>' +
-            '<span style="font-weight:bold; color:#5FCBA0;">' + r.match + '%</span></div>';
+            '<span style="font-weight:bold; color:#5DCAA5;">' + r.match + '%</span></div>';
         });
         // Lettura della tendenza (primo = più recente, ultimo = più vecchio)
         if (righe.length >= 2) {
@@ -198,7 +198,7 @@ function setupBanco() {
 
     } catch (e) {
       console.error('Banco di prova fallito:', e);
-      out.innerHTML = '<p class="pcard-sub" style="color:#FF5C93;">Non sono riuscito a valutare il ruolo. Riprova tra poco.</p>';
+      out.innerHTML = '<p class="pcard-sub" style="color:#FF6496;">Non sono riuscito a valutare il ruolo. Riprova tra poco.</p>';
     } finally {
       btn.disabled = false;
       btn.textContent = 'Valuta ruolo';
@@ -272,11 +272,10 @@ function renderProfile(session, reports) {
 }
 
 const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-// Palette radar: test più vecchio in grigio muted, intermedio in verde, il più recente (attuale) in rosa solido.
 const RADAR_COLORS = [
-  { border: '#7d8480', bg: 'rgba(125,132,128,0.06)', dash: [4, 3] },
-  { border: '#1D9E75', bg: 'rgba(29,158,117,0.08)', dash: [6, 3] },
-  { border: '#FF5C93', bg: 'rgba(255,92,147,0.12)', dash: [] }
+  { border: '#b4b2a9', bg: 'rgba(180,178,169,0.06)', dash: [4, 3] },
+  { border: '#85b7eb', bg: 'rgba(133,183,235,0.06)', dash: [6, 3] },
+  { border: '#e87ba4', bg: 'rgba(232,123,164,0.14)', dash: [] }
 ];
 
 // [precisione-radar] Invito a fare più test, finché non se ne hanno 3 con assi.
@@ -350,9 +349,9 @@ function renderRadar(reports) {
         r: {
           suggestedMin: 0, suggestedMax: 100,
           ticks: { display: false, stepSize: 25 },
-          grid: { color: 'rgba(255,255,255,0.09)' },
-          angleLines: { color: 'rgba(255,255,255,0.09)' },
-          pointLabels: { color: '#A3AAA5', font: { size: 12, family: "'Archivo', sans-serif" } }
+          grid: { color: '#2c2c2a' },
+          angleLines: { color: '#2c2c2a' },
+          pointLabels: { color: '#A9C6B8', font: { size: 12 } }
         }
       },
       plugins: { legend: { display: false } }
