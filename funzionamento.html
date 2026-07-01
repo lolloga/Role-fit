@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Funzionamento — RoleFit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/rolefit-brand.css">
+<style>
+  .rf-funz-main { padding: 48px 0 70px; }
+
+  .rf-steps { max-width: 560px; margin-bottom: 52px; }
+
+  .rf-step {
+    display: flex;
+    gap: 18px;
+    position: relative;
+    padding-bottom: 30px;
+  }
+  .rf-step:last-child { padding-bottom: 0; }
+
+  .rf-step-line {
+    position: absolute;
+    left: 15px;
+    top: 36px;
+    bottom: 2px;
+    width: 1px;
+    background: rgba(255,92,147,0.25);
+  }
+
+  .rf-step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid var(--rf-rosa);
+    color: var(--rf-rosa);
+    font-family: var(--rf-font-body);
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--rf-ink);
+    z-index: 1;
+  }
+  .rf-step-num.oro { border-color: var(--rf-oro); color: var(--rf-oro); }
+
+  .rf-step-title {
+    font-family: var(--rf-font-display);
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: var(--rf-cream);
+    margin: 0 0 6px;
+  }
+  .rf-step-text {
+    font-family: var(--rf-font-body);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--rf-muted);
+    margin: 0;
+  }
+  .rf-step-text ul {
+    margin: 10px 0 0;
+    padding-left: 18px;
+  }
+  .rf-step-text li { margin-bottom: 6px; }
+  .rf-step-text li b { color: var(--rf-cream); font-weight: 600; }
+
+  .rf-azienda-block {
+    border-left: 2px solid var(--rf-verde);
+    padding: 4px 0 4px 20px;
+    max-width: 480px;
+  }
+  .rf-azienda-title {
+    font-family: var(--rf-font-display);
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: var(--rf-cream);
+  }
+</style>
+</head>
+<body>
+
+<nav class="rf-nav">
+  <div class="rf-nav-inner">
+    <a class="rf-logo" href="index.html">RoleFit</a>
+
+    <div class="rf-nav-links">
+      <a class="rf-navlink" href="account.html">Il tuo profilo</a>
+      <a class="rf-navlink active" href="funzionamento.html">Funzionamento</a>
+      <a class="rf-navlink" href="dizionario.html">Dizionario dei ruoli</a>
+      <a class="rf-navlink" href="chi-siamo.html">Chi siamo</a>
+      <a class="rf-accedi" href="account.html">Accedi</a>
+    </div>
+
+    <button class="rf-nav-toggle" id="rf-nav-toggle" aria-label="Apri il menu" aria-expanded="false">☰</button>
+  </div>
+
+  <div class="rf-nav-mobile-panel" id="rf-nav-mobile-panel">
+    <a class="rf-navlink" href="account.html">Il tuo profilo</a>
+    <a class="rf-navlink active" href="funzionamento.html">Funzionamento</a>
+    <a class="rf-navlink" href="dizionario.html">Dizionario dei ruoli</a>
+    <a class="rf-navlink" href="chi-siamo.html">Chi siamo</a>
+    <a class="rf-accedi" href="account.html">Accedi</a>
+  </div>
+</nav>
+
+<main class="rf-container rf-funz-main">
+
+  <h1 class="rf-page-title">Funzionamento</h1>
+
+  <!-- PER TE -->
+  <div class="rf-section-label" style="color: var(--rf-rosa);">Per te</div>
+
+  <div class="rf-steps">
+    <div class="rf-step">
+      <div class="rf-step-line"></div>
+      <div class="rf-step-num">1</div>
+      <div>
+        <p class="rf-step-title">Si parte da una base comune</p>
+        <p class="rf-step-text">Le prime cinque domande sono uguali per tutti: età, momento professionale, background, cosa ti attrae davvero, settori che ti interessano.</p>
+      </div>
+    </div>
+
+    <div class="rf-step">
+      <div class="rf-step-line"></div>
+      <div class="rf-step-num">2</div>
+      <div>
+        <p class="rf-step-title">Da qui, il percorso è tuo</p>
+        <p class="rf-step-text">Ogni domanda successiva si adatta a quello che rispondi prima — non è un percorso fisso uguale per tutti. Ci sono anche piccole attività pratiche, come scegliere tra riunioni diverse o costruire una settimana ideale.</p>
+      </div>
+    </div>
+
+    <div class="rf-step">
+      <div class="rf-step-num oro">3</div>
+      <div>
+        <p class="rf-step-title">Un report basato sui fatti</p>
+        <p class="rf-step-text">
+          Non un'etichetta unica. Un profilo costruito su come ti sei comportato davvero durante il test, non su come ti descriveresti tu.
+          <ul>
+            <li><b>Il tuo profilo comportamentale</b> — le tendenze che emergono con più forza dalle tue risposte</li>
+            <li><b>Ruoli concreti da cercare</b> — nomi di posizioni reali e le parole chiave giuste da usare nella tua ricerca</li>
+            <li><b>Un confronto con la tua aspirazione</b> — se hai già in mente un ruolo, il report lo confronta col profilo emerso</li>
+          </ul>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- PER LE AZIENDE -->
+  <div id="aziende" class="rf-section-label" style="color: var(--rf-verde-light);">Per le aziende</div>
+
+  <div class="rf-azienda-block">
+    <span class="rf-azienda-title">In arrivo</span>
+  </div>
+
+</main>
+
+<footer class="rf-footer">
+  <div class="rf-footer-inner">
+    <span class="rf-footer-logo">RoleFit</span>
+    <span class="rf-footer-copy">© 2026 RoleFit</span>
+  </div>
+</footer>
+
+<script>
+  const toggle = document.getElementById('rf-nav-toggle');
+  const panel = document.getElementById('rf-nav-mobile-panel');
+  toggle.addEventListener('click', () => {
+    const isOpen = panel.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    toggle.textContent = isOpen ? '✕' : '☰';
+  });
+</script>
+
+</body>
+</html>
