@@ -1,4 +1,4 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
@@ -504,14 +504,33 @@ function showAuthGate() {
     }
     btn.disabled = true;
     btn.textContent = 'Invio...';
-    const { error } = await signInWithMagicLink(email);
-    if (error) {
+
+    const fail = () => {
       btn.disabled = false;
       btn.textContent = 'Inviami il link →';
       errEl.textContent = 'Qualcosa è andato storto. Riprova tra poco.';
       errEl.classList.remove('hidden');
-      return;
+    };
+
+    // Salviamo gli input del test come bozza: il suo id va nel link, così i dati
+    // tornano anche se il magic link si apre in un'altra scheda/browser.
+    let draftId = null;
+    try {
+      const history = JSON.parse(localStorage.getItem('rf_history') || 'null');
+      const activities = JSON.parse(localStorage.getItem('rf_activities') || 'null');
+      const aspiration = (localStorage.getItem('rf_aspiration') || '').trim() || null;
+      if (history) {
+        const draft = await createDraft({ history, activities, aspiration });
+        draftId = draft.id;
+      }
+    } catch (e) {
+      console.error('Creazione bozza fallita:', e);
+      return fail();
     }
+
+    const { error } = await signInWithMagicLink(email, 'report.html', draftId);
+    if (error) return fail();
+
     form.classList.add('hidden');
     sent.classList.remove('hidden');
   };
@@ -560,38 +579,11 @@ function renderSavedReport(row) {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
-async function init() {
-  const viewId = new URLSearchParams(location.search).get('id');
-  const session = await getSession();
 
-  // Modalità "rivedi report salvato"
-  if (viewId) {
-    if (!session) { showAuthGate(); return; }
-    try {
-      const row = await getReport(viewId);
-      currentReportId = row.id;
-      renderSavedReport(row);
-      // [feedback] report salvato mostrato: attiva la sezione feedback per questo report
-      window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: row.id } }));
-    } catch (e) {
-      console.error('Report non trovato:', e);
-      showLoadingError('Report non trovato o non accessibile.');
-    }
-    return;
-  }
-
-  // Modalità "genera nuovo report" dal test appena fatto.
-  const hasHandoff = !!localStorage.getItem('rf_history') &&
-                     localStorage.getItem('rf_report_saved') !== '1';
-
-  if (!session) {
-    if (!hasHandoff) { window.location.href = 'test.html'; return; }
-    showAuthGate();
-    return;
-  }
-
-  if (!hasHandoff) { window.location.href = 'account.html'; return; }
-
+// Genera il report dagli input in localStorage, lo mostra e lo salva su Supabase.
+// Marca l'handoff come consumato per evitare doppi salvataggi al reload. NON
+// cancella rf_history: la valutazione asincrona del ruolo aspirato lo legge dopo.
+async function generateAndSave() {
   try {
     const data = await generateReport();
     if (!data) throw new Error('Report non valido');
@@ -618,6 +610,69 @@ async function init() {
     console.error('Errore generazione report:', err);
     document.querySelector('#loading-state p').textContent = 'Qualcosa è andato storto. Riprova.';
   }
+}
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const viewId = params.get('id');
+  const draftId = params.get('draft');
+  const session = await getSession();
+
+  // Modalità "rivedi report salvato"
+  if (viewId) {
+    if (!session) { showAuthGate(); return; }
+    try {
+      const row = await getReport(viewId);
+      currentReportId = row.id;
+      renderSavedReport(row);
+      // [feedback] report salvato mostrato: attiva la sezione feedback per questo report
+      window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: row.id } }));
+    } catch (e) {
+      console.error('Report non trovato:', e);
+      showLoadingError('Report non trovato o non accessibile.');
+    }
+    return;
+  }
+
+  // Ritorno dal magic link con bozza (?draft=): recuperiamo gli input del test dal
+  // server, non dal localStorage — che potrebbe essere di un altro browser/scheda.
+  if (draftId) {
+    if (!session) {
+      showLoadingError('Link non valido o scaduto. Torna al test e richiedi di nuovo l\'accesso.');
+      return;
+    }
+    let draft;
+    try {
+      draft = await claimDraft(draftId);
+    } catch (e) {
+      console.error('Recupero bozza fallito:', e);
+      showLoadingError('Non riesco a recuperare il tuo test. Riprova.');
+      return;
+    }
+    // Bozza già consumata (es. link cliccato due volte): il report è già salvato.
+    if (!draft) { window.location.href = 'account.html'; return; }
+
+    localStorage.setItem('rf_history', JSON.stringify(draft.history));
+    localStorage.setItem('rf_activities', JSON.stringify(draft.activities || {}));
+    localStorage.setItem('rf_aspiration', draft.aspiration || '');
+    localStorage.removeItem('rf_report_saved');
+    await generateAndSave();
+    return;
+  }
+
+  // Modalità "genera nuovo report" dal test appena fatto.
+  const hasHandoff = !!localStorage.getItem('rf_history') &&
+                     localStorage.getItem('rf_report_saved') !== '1';
+
+  if (!session) {
+    if (!hasHandoff) { window.location.href = 'test.html'; return; }
+    showAuthGate();
+    return;
+  }
+
+  if (!hasHandoff) { window.location.href = 'account.html'; return; }
+
+  await generateAndSave();
 }
 
 document.addEventListener('DOMContentLoaded', init);
