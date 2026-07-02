@@ -11,11 +11,16 @@ export const maxDuration = 30;
 
 const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
 
+// Le env var Supabase esistenti su Vercel sono minuscole (supabase_url,
+// supabase_anon_key), diverse dal case usato altrove nel codice: leggiamo
+// entrambe le varianti per non dipendere dal case esatto.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.supabase_url;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.supabase_service_role_key;
+
 function supabaseHeaders() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
     'Content-Type': 'application/json',
   };
 }
@@ -43,7 +48,7 @@ async function creaAzienda(body, res) {
   if (!company_name || !contact_email) {
     return res.status(400).json({ error: 'company_name e contact_email sono obbligatori' });
   }
-  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/company_profiles`, {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/company_profiles`, {
     method: 'POST',
     headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
     body: JSON.stringify({ company_name, contact_name: contact_name || null, contact_email }),
@@ -58,7 +63,7 @@ async function creaJob(body, res) {
   if (!company_id || !role_title || !target_profile) {
     return res.status(400).json({ error: 'company_id, role_title e target_profile sono obbligatori' });
   }
-  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/job_requests`, {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/job_requests`, {
     method: 'POST',
     headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
     body: JSON.stringify({
@@ -78,7 +83,7 @@ async function calcolaMatch(body, res) {
   if (!job_id) return res.status(400).json({ error: 'job_id obbligatorio' });
 
   const jobRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/job_requests?id=eq.${job_id}&select=*`,
+    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${job_id}&select=*`,
     { headers: supabaseHeaders() }
   );
   if (!jobRes.ok) return res.status(500).json({ error: 'Impossibile leggere la ricerca' });
@@ -86,7 +91,7 @@ async function calcolaMatch(body, res) {
   if (!job) return res.status(404).json({ error: 'Ricerca non trovata' });
 
   const reportsRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/reports?select=id,user_id,report_json,created_at`,
+    `${SUPABASE_URL}/rest/v1/reports?select=id,user_id,report_json,created_at`,
     { headers: supabaseHeaders() }
   );
   if (!reportsRes.ok) return res.status(500).json({ error: 'Impossibile leggere i candidati' });
@@ -118,7 +123,7 @@ async function calcolaMatch(body, res) {
 
   const userIds = candidates.map((c) => c.user_id);
   const profilesRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/profiles?id=in.(${userIds.join(',')})&select=id,email`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=in.(${userIds.join(',')})&select=id,email`,
     { headers: supabaseHeaders() }
   );
   const profiles = profilesRes.ok ? await profilesRes.json() : [];
@@ -138,7 +143,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return res.status(500).json({ error: 'Configurazione server incompleta' });
   }
 
