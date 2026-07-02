@@ -27,10 +27,12 @@ Assegna un punteggio finale 0-100 per candidato, partendo dal punteggio sui 6 as
 - Se il ruolo cercato coincide o è chiaramente affine a uno dei ruoli NON compatibili del candidato, il punteggio finale deve scendere sotto 40 — anche se il punteggio sui 6 assi era alto.
 - Se non c'è una relazione chiara né in un senso né nell'altro, mantieni il punteggio sui 6 assi come punteggio finale.
 
+INOLTRE, per ciascun candidato scrivi un campo "perche_azienda": 2-3 frasi rivolte all'AZIENDA (mai al candidato), che spiegano perché QUESTA persona può fare al caso di QUESTA ricerca specifica. Non è il "come funziona" del candidato riscritto — è un giudizio di idoneità per il ruolo, ancorato a un confronto esplicito tra cosa serve (dalla sintesi del profilo cercato) e cosa emerge dal candidato (i suoi ruoli compatibili, come funziona). Scrivi in terza persona, tono diretto e concreto, come un recruiter che spiega la sua scelta a un collega — non in seconda persona come se parlassi al candidato. Se il match è nella fascia bassa dell'accettabile (75-80%), sii onesto anche su cosa andrebbe verificato in un colloquio, non solo sui punti di forza.
+
 FORMATO OUTPUT — JSON valido, zero testo fuori dal JSON (primo carattere {, ultimo }):
 {
   "risultati": [
-    { "candidate_id": "id esatto ricevuto in input", "match_finale": 82 }
+    { "candidate_id": "id esatto ricevuto in input", "match_finale": 82, "perche_azienda": "..." }
   ]
 }
 `;
@@ -72,7 +74,9 @@ async function validaMatchSemantico(job, candidati) {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
     const parsed = JSON.parse(text.substring(start, end + 1));
-    const byId = new Map(parsed.risultati.map((r) => [r.candidate_id, r.match_finale]));
+    const byId = new Map(
+      parsed.risultati.map((r) => [r.candidate_id, { match: r.match_finale, perche: r.perche_azienda || null }])
+    );
     return byId;
   } catch {
     return null;
@@ -196,10 +200,14 @@ async function calcolaMatch(body, res) {
   const matchFinaliById = await validaMatchSemantico(job, shortlist);
 
   const candidates = shortlist
-    .map((c) => ({
-      ...c,
-      match: matchFinaliById?.get(c.user_id) ?? c.match,
-    }))
+    .map((c) => {
+      const validato = matchFinaliById?.get(c.user_id);
+      return {
+        ...c,
+        match: validato?.match ?? c.match,
+        perche_azienda: validato?.perche ?? null,
+      };
+    })
     .filter((c) => c.match >= SOGLIA_MATCH)
     .sort((a, b) => b.match - a.match)
     .slice(0, 10);
@@ -220,7 +228,9 @@ async function calcolaMatch(body, res) {
     email: emailById.get(c.user_id) || null,
     match: c.match,
     ruoli: c.ruoli,
-    come_funzioni: c.come_funzioni,
+    // Se la validazione AI non è disponibile (errore/timeout), ripieghiamo su
+    // un'unica frase informativa invece di lasciare vuota la spiegazione.
+    perche_azienda: c.perche_azienda || `Compatibilità calcolata sul profilo psicologico-professionale rispetto al ruolo di ${job.role_title}.`,
   }));
 
   return res.status(200).json({ job, candidates: result });

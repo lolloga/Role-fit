@@ -36,10 +36,10 @@ function renderCandidati(candidates) {
           <span class="ruolo-match-label">compatibilità</span>
         </div>
       </div>
-      ${c.come_funzioni ? `
+      ${c.perche_azienda ? `
       <div class="ruolo-detail">
-        <div class="ruolo-detail-label">Come funziona</div>
-        <div class="ruolo-detail-text">${c.come_funzioni}</div>
+        <div class="ruolo-detail-label">Perché può fare al caso vostro</div>
+        <div class="ruolo-detail-text">${c.perche_azienda}</div>
       </div>` : ''}
       ${c.ruoli && c.ruoli.length > 0 ? `
       <div class="ruolo-detail">
