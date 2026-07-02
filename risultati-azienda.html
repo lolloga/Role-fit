@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoleFit per le aziende — Candidati compatibili</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="blob-container">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<a href="azienda.html" class="nav-home">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Home
+</a>
+
+<div class="report-page">
+  <div class="container">
+
+    <div id="loading-state" style="min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:24px;">
+      <div class="ai-orb">
+        <div class="ai-orb-ring2"></div>
+        <div class="ai-orb-ring"></div>
+        <div class="ai-orb-core"></div>
+        <div class="ai-orb-particles">
+          <div class="ai-particle"></div>
+          <div class="ai-particle"></div>
+          <div class="ai-particle"></div>
+        </div>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-family:var(--font-display);font-style:italic;">Sto calcolando i candidati compatibili...</p>
+    </div>
+
+    <div id="error-state" class="hidden" style="min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;">
+      <p style="color:var(--rose);">Non sono riuscito a caricare i risultati. Il link potrebbe non essere valido.</p>
+      <a href="azienda.html" class="btn btn--primary">Torna alla home aziende</a>
+    </div>
+
+    <div id="results-content" class="hidden">
+
+      <div class="report-header">
+        <div class="label" style="margin-bottom:12px;">Profilo target</div>
+        <h1 id="ruolo-titolo">Chi cercate,<br><em>tradotto in numeri.</em></h1>
+      </div>
+
+      <div class="report-section" id="section-target">
+        <div class="chi-sei-text" id="target-sintesi"></div>
+        <div class="card" style="margin-top:20px;">
+          <div id="target-assi"></div>
+        </div>
+      </div>
+
+      <div class="report-section" id="section-candidati">
+        <div class="report-section-label">
+          <span class="label">Candidati compatibili</span>
+        </div>
+        <div id="candidati-list"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script src="js/risultati-azienda.js"></script>
+</body>
+</html>
