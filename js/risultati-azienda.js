@@ -23,7 +23,7 @@ function renderAssi(assi) {
 function renderCandidati(candidates) {
   const list = document.getElementById('candidati-list');
   if (candidates.length === 0) {
-    list.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">Nessun candidato compatibile trovato al momento — il pool di profili su RoleFit è ancora piccolo, riprova più avanti.</p>';
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">Nessun candidato sopra la soglia di compatibilità (75%) al momento — il pool di profili su RoleFit è ancora piccolo, riprova più avanti.</p>';
     return;
   }
 

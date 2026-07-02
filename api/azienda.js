@@ -1,4 +1,4 @@
-export const maxDuration = 30;
+export const maxDuration = 45;
 
 // Endpoint lato server per il flusso aziende: creare un'azienda/ricerca e
 // calcolare il matching con i candidati già presenti su RoleFit.
@@ -10,6 +10,74 @@ export const maxDuration = 30;
 // candidati, solo al risultato già filtrato che questo endpoint restituisce.
 
 const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const SOGLIA_MATCH = 75;
+// Quanti candidati (già ordinati per compatibilità sui 6 assi) passano al
+// controllo semantico AI. Tenerlo basso limita costo/latenza della validazione.
+const MAX_CANDIDATI_DA_VALIDARE = 15;
+
+const PROMPT_MATCH_VALIDAZIONE = `
+Sei un validatore di matching per RoleFit lato aziende. Ricevi una richiesta di ruolo (titolo + sintesi del profilo cercato) e una lista di candidati che hanno già superato una soglia numerica di compatibilità calcolata sui 6 assi psicologici del profilo. Il tuo compito è verificare, per ciascun candidato, se il ruolo cercato dall'azienda è REALMENTE coerente con quello che è emerso dal suo test — non solo sui numeri astratti, ma guardando i ruoli concreti che il suo test gli ha assegnato come compatibili o incompatibili.
+
+REGOLA CHIAVE: due profili possono avere assi psicologici numericamente simili ma essere adatti a ruoli completamente diversi (es. un Business Analyst e un Account Manager possono avere entrambi punteggi alti su Analisi e Relazione, ma il primo lavora sui dati, il secondo sulle persone). Il tuo lavoro è catturare proprio le differenze che i soli numeri non vedono, usando i ruoli reali emersi dal test di ciascun candidato.
+
+Per ciascun candidato ricevi: i suoi ruoli compatibili (con match% dal suo report), i suoi ruoli non compatibili, e una frase su come funziona.
+
+Assegna un punteggio finale 0-100 per candidato, partendo dal punteggio sui 6 assi che ricevi come riferimento:
+- Se il ruolo cercato dall'azienda coincide o è chiaramente affine (anche con nome diverso ma stessa sostanza) a uno dei ruoli COMPATIBILI del candidato, il punteggio finale deve restare alto o salire leggermente.
+- Se il ruolo cercato coincide o è chiaramente affine a uno dei ruoli NON compatibili del candidato, il punteggio finale deve scendere sotto 40 — anche se il punteggio sui 6 assi era alto.
+- Se non c'è una relazione chiara né in un senso né nell'altro, mantieni il punteggio sui 6 assi come punteggio finale.
+
+FORMATO OUTPUT — JSON valido, zero testo fuori dal JSON (primo carattere {, ultimo }):
+{
+  "risultati": [
+    { "candidate_id": "id esatto ricevuto in input", "match_finale": 82 }
+  ]
+}
+`;
+
+async function validaMatchSemantico(job, candidati) {
+  const payload = {
+    ruolo_cercato: job.role_title,
+    sintesi_profilo_cercato: job.target_profile?.sintesi || '',
+    candidati: candidati.map((c) => ({
+      candidate_id: c.user_id,
+      match_assi: c.match,
+      ruoli_compatibili: c.ruoli,
+      ruoli_non_compatibili: c.ruoli_mismatch,
+      come_funziona: c.come_funzioni,
+    })),
+  };
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      temperature: 0.2,
+      system: PROMPT_MATCH_VALIDAZIONE,
+      messages: [{ role: 'user', content: JSON.stringify(payload) }],
+    }),
+  });
+
+  const data = await response.json();
+  const text = data?.content?.[0]?.text;
+  if (!text) return null;
+
+  try {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    const parsed = JSON.parse(text.substring(start, end + 1));
+    const byId = new Map(parsed.risultati.map((r) => [r.candidate_id, r.match_finale]));
+    return byId;
+  } catch {
+    return null;
+  }
+}
 
 // Le env var Supabase esistenti su Vercel sono minuscole (supabase_url,
 // supabase_anon_key), diverse dal case usato altrove nel codice: leggiamo
@@ -106,14 +174,33 @@ async function calcolaMatch(body, res) {
     }
   }
 
-  const candidates = Array.from(latestByUser.values())
+  const shortlist = Array.from(latestByUser.values())
     .map((r) => ({
       user_id: r.user_id,
       match: computeMatch(job.target_profile?.assi, r.report_json?.assi),
       ruoli: (r.report_json?.ruoli || []).map((x) => x.nome),
+      ruoli_mismatch: (r.report_json?.ruoli_mismatch || []).map((x) => x.nome),
       come_funzioni: r.report_json?.chi_sei?.come_funzioni || null,
     }))
     .filter((c) => c.match !== null)
+    .sort((a, b) => b.match - a.match)
+    .slice(0, MAX_CANDIDATI_DA_VALIDARE);
+
+  if (shortlist.length === 0) {
+    return res.status(200).json({ job, candidates: [] });
+  }
+
+  // Passo 2: validazione semantica sui ruoli reali emersi dal test di ognuno,
+  // non solo sui 6 numeri — un profilo può avere assi vicini ma essere adatto
+  // a un ruolo completamente diverso da quello cercato.
+  const matchFinaliById = await validaMatchSemantico(job, shortlist);
+
+  const candidates = shortlist
+    .map((c) => ({
+      ...c,
+      match: matchFinaliById?.get(c.user_id) ?? c.match,
+    }))
+    .filter((c) => c.match >= SOGLIA_MATCH)
     .sort((a, b) => b.match - a.match)
     .slice(0, 10);
 
