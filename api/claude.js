@@ -429,10 +429,12 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (primo carattere {, ultimo }):
 // Restituisce true se il token è valido (200). Non richiede la service-role key:
 // basta la anon key + il bearer token dell'utente.
 async function isValidSupabaseUser(token) {
-  const url = process.env.SUPABASE_URL;
-  const anon = process.env.SUPABASE_ANON_KEY;
+  // Le env var su Vercel sono salvate minuscole (supabase_url, supabase_anon_key):
+  // leggiamo entrambe le varianti per non dipendere dal case esatto.
+  const url = process.env.SUPABASE_URL || process.env.supabase_url;
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.supabase_anon_key;
   // Gate non configurato lato server (env mancanti): NON blocchiamo il report.
-  // La protezione si attiva da sola quando SUPABASE_URL/SUPABASE_ANON_KEY sono presenti.
+  // La protezione si attiva da sola quando le env var Supabase sono presenti.
   if (!url || !anon) return true;
   if (!token) return false;
   try {
