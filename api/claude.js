@@ -390,6 +390,7 @@ REGOLE ASSOLUTE
 4. Ogni domanda ha ESATTAMENTE 4 opzioni concrete.
 5. Mai fermarsi sotto 5 domande adattive, mai superare 10.
 6. Rispondi SEMPRE e SOLO con JSON valido — il primo carattere deve essere { e l'ultimo }.
+7. TERMINOLOGIA DI SETTORE PRECISA: molti settori hanno ruoli o figure professionali distinte che è facile confondere (es. nel settore assicurativo un broker lavora esternamente all'agenzia su più compagnie, un agente lavora dentro un'agenzia; nel settore finanziario un consulente indipendente non è lo stesso di un private banker). Usa SEMPRE il termine coerente con il contesto specifico dato dall'azienda (nome azienda, ruolo cercato, settore) — mai un termine adiacente ma tecnicamente diverso. Se non sei sicuro della distinzione esatta in quel settore, usa una formulazione più generica ("un cliente", "un collega", "un partner esterno") invece di un termine tecnico che potrebbe essere sbagliato.
 `;
 
 const PROMPT_AZIENDA_REPORT = `
