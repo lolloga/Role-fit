@@ -10,7 +10,7 @@ export const maxDuration = 45;
 // candidati, solo al risultato già filtrato che questo endpoint restituisce.
 
 const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-const SOGLIA_MATCH = 75;
+const SOGLIA_MATCH = 80;
 // Quanti candidati (già ordinati per compatibilità sui 6 assi) passano al
 // controllo semantico AI. Tenerlo basso limita costo/latenza della validazione.
 const MAX_CANDIDATI_DA_VALIDARE = 15;
@@ -37,6 +37,15 @@ FORMATO OUTPUT — JSON valido, zero testo fuori dal JSON (primo carattere {, ul
 }
 `;
 
+function parseRisultati(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  const parsed = JSON.parse(text.substring(start, end + 1));
+  return new Map(
+    parsed.risultati.map((r) => [r.candidate_id, { match: r.match_finale, perche: r.perche_azienda || null }])
+  );
+}
+
 async function validaMatchSemantico(job, candidati) {
   const payload = {
     ruolo_cercato: job.role_title,
@@ -59,7 +68,10 @@ async function validaMatchSemantico(job, candidati) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
+      // Fino a 15 candidati con 2-3 frasi ciascuno: a 1500 il JSON si troncava
+      // a metà e falliva silenziosamente il parse, facendo ricadere tutti sul
+      // messaggio di fallback generico. ~500 token per candidato è abbondante.
+      max_tokens: 7500,
       temperature: 0.2,
       system: PROMPT_MATCH_VALIDAZIONE,
       messages: [{ role: 'user', content: JSON.stringify(payload) }],
@@ -68,18 +80,29 @@ async function validaMatchSemantico(job, candidati) {
 
   const data = await response.json();
   const text = data?.content?.[0]?.text;
-  if (!text) return null;
+  if (!text) {
+    console.error('Errore validazione match: risposta AI senza contenuto', data?.error || data);
+    return null;
+  }
 
   try {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    const parsed = JSON.parse(text.substring(start, end + 1));
-    const byId = new Map(
-      parsed.risultati.map((r) => [r.candidate_id, { match: r.match_finale, perche: r.perche_azienda || null }])
-    );
-    return byId;
+    return parseRisultati(text);
   } catch {
-    return null;
+    // Riprova ripulendo virgole finali e caratteri di controllo, come nel
+    // parser di api/claude.js — capita con output lunghi vicini al limite.
+    try {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      const controlChars = new RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]', 'g');
+      const repaired = text.substring(start, end + 1)
+        .replace(controlChars, '')
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']');
+      return parseRisultati(repaired);
+    } catch (e2) {
+      console.error('Errore parsing validazione match (anche dopo repair):', e2, text.slice(0, 500));
+      return null;
+    }
   }
 }
 
