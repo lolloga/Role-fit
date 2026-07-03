@@ -400,7 +400,8 @@ p { color: var(--text-secondary); line-height: 1.75; }
   flex-wrap: wrap;
   gap: 16px;
 }
-.site-footer .foot-logo { font-family: var(--font-display); font-weight: 700; }
+.site-footer .foot-logo { font-family: var(--font-display); font-weight: 700; color: var(--emerald-light); }
+.site-footer .foot-logo .logo-fit { color: var(--rose-light); }
 .site-footer .foot-links { display: flex; gap: 22px; font-size: 0.82rem; color: var(--text-muted); }
 .site-footer .foot-links a { text-decoration: none; color: inherit; }
 .site-footer .foot-links a:hover { color: var(--text-secondary); }
