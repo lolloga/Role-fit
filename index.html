@@ -4,125 +4,125 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RoleFit — Trova la tua direzione professionale</title>
-  <meta name="description" content="RoleFit ti aiuta a capire in quale direzione professionale stai andando — e se è quella giusta per te.">
+  <meta name="description" content="RoleFit ti aiuta a capire in quale direzione professionale stai andando, e ti mette in contatto con le aziende che cercano davvero un profilo come il tuo.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500&display=swap">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
   <link rel="stylesheet" href="css/style.css">
-  <style>
-    /* ─── Account corner (avatar / Accedi) — speculare a .nav-home ─── */
-    .account-corner {
-      position: fixed;
-      top: 20px;
-      right: 24px;
-      z-index: 100;
-    }
-    /* Stato non loggato: pill "Accedi" rosa, ben visibile */
-    .account-login {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--rose);
-      border: 1px solid var(--rose);
-      border-radius: var(--radius-xl);
-      padding: 9px 22px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--night);
-      transition: background var(--transition), box-shadow var(--transition);
-    }
-    .account-login:hover {
-      background: var(--rose-light);
-      box-shadow: 0 0 24px var(--rose-glow);
-    }
-    /* Stato loggato: avatar circolare con iniziali */
-    .account-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--surface);
-      border: 1px solid var(--emerald);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-body);
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--emerald-light);
-      backdrop-filter: blur(10px);
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .account-avatar:hover {
-      border-color: var(--emerald-light);
-      box-shadow: 0 0 20px var(--emerald-glow);
-    }
-  </style>
 </head>
 <body>
 
-<div class="blob-container">
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-  <div class="blob blob-3"></div>
-</div>
-
-<!-- Angolo account: mostrato dopo il controllo sessione (default: Accedi) -->
-<div class="account-corner" id="account-corner">
-  <a href="account.html" class="account-login" id="account-login">Accedi</a>
-</div>
+<nav class="site-nav">
+  <div class="container--wide">
+    <a href="index.html" class="site-nav-logo">RoleFit</a>
+    <div class="site-nav-links">
+      <a href="#come-funziona">Come funziona il test</a>
+      <a href="dizionario.html">Dizionario dei ruoli</a>
+      <a href="chi-siamo.html">Chi siamo</a>
+    </div>
+    <a href="account.html" class="site-nav-cta" id="site-nav-cta">Il tuo profilo</a>
+  </div>
+</nav>
 
 <main>
 
   <section class="hero">
+    <canvas id="hero-signal"></canvas>
     <div class="container">
-      <div class="hero__eyebrow">
-        <span>✦</span>
-        Orientamento professionale
-      </div>
+      <div class="hero__eyebrow">Orientamento professionale e matching</div>
 
       <h1 class="hero__title">
-        Stai andando<br>
-        nella direzione<br>
-        <em>giusta per te?</em>
+        <span class="line"><span>Il tuo lavoro,</span></span>
+        <span class="line"><span><em>il mio obiettivo.</em></span></span>
       </h1>
 
       <p class="hero__subtitle">
-        RoleFit non ti trova un lavoro. Ti aiuta a capire chi sei professionalmente — e dove puoi arrivare partendo da lì.
+        RoleFit ti restituisce chi sei, professionalmente — e dà alle aziende lo spazio per trovare le persone giuste. Il resto è solo questione di match.
       </p>
-    </div>
-  </section>
 
-  <section class="hub-section">
-    <div class="container--wide">
-      <div class="hub-grid">
-
-        <a href="test.html" class="hub-card hub-card--utente">
-          <div class="hub-card-icon">🧭</div>
-          <div class="hub-card-title">Sei una persona?</div>
-          <div class="hub-card-text">Scopri chi sei professionalmente con un test adattivo di 10-20 minuti, e quali ruoli ti si addicono davvero — non genericamente, ma ancorati a quello che dici tu.</div>
-          <div class="hub-card-cta">Scopri il tuo profilo →</div>
+      <div class="hero__actions">
+        <a href="test.html" class="btn btn--primary">
+          Scopri il tuo profilo
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </a>
-
-        <a href="azienda.html" class="hub-card hub-card--azienda">
-          <div class="hub-card-icon">🏢</div>
-          <div class="hub-card-title">Sei un'azienda?</div>
-          <div class="hub-card-text">Descrivi il profilo umano che ti serve per un ruolo aperto. RoleFit lo confronta con chi ha già fatto il test e ti mostra i candidati più compatibili, in percentuale.</div>
-          <div class="hub-card-cta">Descrivi il ruolo →</div>
+        <a href="azienda.html" class="btn btn--rose">
+          Sei un'azienda?
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </a>
-
-        <a href="dizionario.html" class="hub-card hub-card--dizionario">
-          <div class="hub-card-icon">📖</div>
-          <div class="hub-card-title">Vuoi solo informarti?</div>
-          <div class="hub-card-text">Scrivi un job title o incolla un annuncio. Ti spieghiamo in linguaggio umano cosa fa davvero quel ruolo, come si entra e quanto si guadagna.</div>
-          <div class="hub-card-cta">Esplora il dizionario →</div>
-        </a>
-
       </div>
     </div>
   </section>
 
-  <section class="about-section">
+  <section class="trust-band">
+    <div class="container--wide">
+      <span class="trust-band-label">Cosa misuriamo</span>
+      <div class="trust-tags">
+        <span class="trust-tag">Analisi</span><span class="trust-tag">Relazione</span><span class="trust-tag">Creatività</span>
+        <span class="trust-tag">Curiosità</span><span class="trust-tag">Leadership</span><span class="trust-tag">Metodo</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="container--wide">
+    <div class="paths">
+
+      <div class="path path--utente">
+        <div class="path-copy">
+          <div class="path-num">01 — Per le persone</div>
+          <h2>Un test che ti ascolta davvero, non un questionario a caselle.</h2>
+          <p>Ogni domanda nasce dalla risposta precedente. Il report che ricevi è ancorato a quello che hai detto tu — non a un template.</p>
+          <ul class="path-list">
+            <li>10-20 minuti, mai due test uguali</li>
+            <li>3 ruoli compatibili, con la percentuale reale</li>
+            <li>Un ruolo bonus che non ti aspetti</li>
+          </ul>
+          <a class="path-cta" href="test.html">Scopri il tuo profilo <span class="arrow">→</span></a>
+        </div>
+        <div class="preview">
+          <div class="preview-label">Anteprima — il tuo profilo</div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Analisi</div><div class="mini-axis-bar"><span style="--w:70%"></span></div><div class="mini-axis-val">70</div></div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Relazione</div><div class="mini-axis-bar"><span style="--w:82%"></span></div><div class="mini-axis-val">82</div></div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Creatività</div><div class="mini-axis-bar"><span style="--w:58%"></span></div><div class="mini-axis-val">58</div></div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Curiosità</div><div class="mini-axis-bar"><span style="--w:76%"></span></div><div class="mini-axis-val">76</div></div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Leadership</div><div class="mini-axis-bar"><span style="--w:54%"></span></div><div class="mini-axis-val">54</div></div>
+          <div class="mini-axis-row"><div class="mini-axis-name">Metodo</div><div class="mini-axis-bar"><span style="--w:65%"></span></div><div class="mini-axis-val">65</div></div>
+        </div>
+      </div>
+
+      <div class="path path--azienda reverse">
+        <div class="path-copy">
+          <div class="path-num">02 — Per le aziende</div>
+          <h2>Non serve solo qualcuno che sa fare. Serve chi è giusto.</h2>
+          <p>Descrivi il ruolo che devi ricoprire — non i requisiti tecnici, quelli li avete già chiari. Confrontiamo con chi ha già fatto il test.</p>
+          <ul class="path-list">
+            <li>Solo candidati sopra l'80% di compatibilità reale</li>
+            <li>Spiegazione ancorata alla vostra ricerca, non generica</li>
+            <li>Nessun requisito tecnico chiesto — solo il lato umano</li>
+          </ul>
+          <a class="path-cta" href="azienda.html">Descrivi il ruolo <span class="arrow">→</span></a>
+        </div>
+        <div class="preview">
+          <div class="preview-label">Anteprima — un match trovato</div>
+          <div class="mini-match">
+            <div class="mini-match-top"><div class="mini-match-name">ebianconi@outlook.com</div><div class="mini-match-pct">91%</div></div>
+            <div class="mini-match-why">Coincide con l'area in cui il candidato ha già mostrato di muoversi meglio: incrocio dati e relazione commerciale.</div>
+          </div>
+          <div class="mini-match">
+            <div class="mini-match-top"><div class="mini-match-name">stefano.tinari@hotmail.com</div><div class="mini-match-pct">88%</div></div>
+            <div class="mini-match-why">Profilo analitico con propensione relazionale confermata da due segnali indipendenti del test.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <section class="about-section" id="come-funziona">
     <div class="container--wide">
       <div class="container" style="padding:0;">
         <div class="label" style="margin-bottom:12px;">Come funziona il test</div>
@@ -157,34 +157,29 @@
 
 </main>
 
+<footer class="site-footer">
+  <div class="container--wide">
+    <div class="foot-logo">RoleFit</div>
+    <div class="foot-links">
+      <a href="#come-funziona">Come funziona il test</a>
+      <a href="dizionario.html">Dizionario dei ruoli</a>
+      <a href="chi-siamo.html">Chi siamo</a>
+    </div>
+  </div>
+</footer>
+
 <script>
   localStorage.removeItem('rf_state');
 </script>
-
-<!-- Controllo sessione: se loggato mostra l'avatar con le iniziali, altrimenti resta "Accedi" -->
-<script type="module">
-  import { getSession } from './js/supabase.js';
-
-  function iniziali(email) {
-    const base = (email || '').split('@')[0] || '';
-    const parti = base.split(/[.\-_]/).filter(Boolean);
-    const txt = (parti[0]?.[0] || '') + (parti[1]?.[0] || parti[0]?.[1] || '');
-    return (txt || '··').toUpperCase().slice(0, 2);
-  }
-
-  try {
-    const session = await getSession();
-    if (session && session.user) {
-      const corner = document.getElementById('account-corner');
-      corner.innerHTML =
-        '<a href="account.html" class="account-avatar" title="Il tuo profilo">' +
-        iniziali(session.user.email) + '</a>';
-    }
-    // Se non loggato: resta il pill "Accedi" già presente nell'HTML.
-  } catch (e) {
-    // In caso di errore lasciamo "Accedi" come default sicuro.
-    console.error('Controllo sessione non riuscito:', e);
-  }
+<script src="js/hero-signal.js"></script>
+<script type="module" src="js/site-nav.js"></script>
+<script>
+  // Rivelazione delle sezioni Persone/Aziende allo scroll.
+  const revealEls = document.querySelectorAll('.path-copy, .preview');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); } });
+  }, { threshold: 0.25 });
+  revealEls.forEach((el) => io.observe(el));
 </script>
 </body>
 </html>
