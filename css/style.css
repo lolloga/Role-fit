@@ -584,8 +584,11 @@ p { color: var(--text-secondary); line-height: 1.75; }
   font-size: 1.15rem;
   letter-spacing: -0.01em;
   text-decoration: none;
-  color: var(--text-primary);
+  color: var(--emerald-light);
   flex-shrink: 0;
+}
+.site-nav-logo .logo-fit {
+  color: var(--rose-light);
 }
 .site-nav-links {
   display: flex;
