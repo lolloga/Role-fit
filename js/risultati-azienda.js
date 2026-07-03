@@ -20,15 +20,17 @@ function renderAssi(assi) {
   }).join('');
 }
 
-function renderCandidati(candidates) {
+function renderCandidati(candidates, jobId) {
   const list = document.getElementById('candidati-list');
   if (candidates.length === 0) {
     list.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">Nessun candidato sopra la soglia di compatibilità (75%) al momento — il pool di profili su RoleFit è ancora piccolo, riprova più avanti.</p>';
     return;
   }
 
-  list.innerHTML = candidates.map((c) => `
-    <div class="ruolo-card">
+  list.innerHTML = candidates.map((c) => {
+    const href = `candidato-azienda.html?job_id=${encodeURIComponent(jobId)}&user_id=${encodeURIComponent(c.user_id)}&perche=${encodeURIComponent(c.perche_azienda || '')}`;
+    return `
+    <a class="ruolo-card" href="${href}" style="display:block;text-decoration:none;color:inherit;cursor:pointer;">
       <div class="ruolo-header">
         <div class="ruolo-nome">${c.email || 'Candidato'}</div>
         <div class="ruolo-match">
@@ -46,8 +48,10 @@ function renderCandidati(candidates) {
         <div class="ruolo-detail-label">I suoi ruoli compatibili su RoleFit</div>
         <div class="ruolo-detail-text">${c.ruoli.join(', ')}</div>
       </div>` : ''}
-    </div>
-  `).join('');
+      <div class="ruolo-detail-label" style="margin-top:10px;color:var(--emerald-light);">Vedi profilo completo →</div>
+    </a>
+  `;
+  }).join('');
 }
 
 (async function init() {
@@ -73,7 +77,7 @@ function renderCandidati(candidates) {
     document.getElementById('ruolo-titolo').innerHTML = `${data.job.role_title},<br><em>tradotto in numeri.</em>`;
     document.getElementById('target-sintesi').innerHTML = `<p>${data.job.target_profile.sintesi}</p>`;
     renderAssi(data.job.target_profile.assi);
-    renderCandidati(data.candidates);
+    renderCandidati(data.candidates, jobId);
 
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('results-content').classList.remove('hidden');

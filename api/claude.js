@@ -100,7 +100,8 @@ Se continui:
     "text": "testo della domanda",
     "context": "micro-contesto di 1 riga",
     "type": "multiple_choice",
-    "options": ["opzione concreta 1", "opzione concreta 2", "opzione concreta 3", "opzione concreta 4"]
+    "options": ["opzione concreta 1", "opzione concreta 2", "opzione concreta 3", "opzione concreta 4"],
+    "indiretta": true
   },
   "internal": {
     "dim1": "CHIARO|PROBABILE|AMBIGUO|MANCANTE",
@@ -110,6 +111,8 @@ Se continui:
     "next_target": "cosa stai cercando di capire con questa domanda"
   }
 }
+
+Il campo "indiretta" nella domanda: true SOLO per le domande di scenario di vita fuori dal lavoro (vedi sezione DOMANDE INDIRETTE), false per tutte le altre. Questo campo viene poi usato per decidere cosa mostrare o nascondere a terzi (es. aziende): le domande indirette toccano la vita privata e non vanno mai esposte fuori dal report personale del candidato — segnalale sempre con precisione.
 
 Se sei pronto per il report:
 {
@@ -139,6 +142,7 @@ REGOLE ASSOLUTE
 11. VIETATO ASSOLUTAMENTE fare domande che richiedono informazioni già note dalle 5 domande standard, anche se riformulate. In particolare: MAI chiedere se l'utente sta lavorando o che lavoro fa (lo sai già dalla domanda sul momento professionale), che età ha, che studi ha fatto, o in che settore vorrebbe lavorare. Queste risposte le hai GIÀ. Prima di generare ogni domanda, verifica che non duplichi nulla di già chiesto nella conversazione.
 12. In ogni test, 2 o 3 domande adattive devono essere domande indirette su scenari di vita fuori dal lavoro (vedi sezione DOMANDE INDIRETTE). Mai più di 3, mai due consecutive.
 13. Rispondi SEMPRE e SOLO con JSON valido — zero testo fuori dal JSON. Il primo carattere della tua risposta DEVE essere { e l'ultimo }. Nessuna introduzione, nessun commento, nessun blocco markdown.
+14. Ogni domanda adattiva deve avere il campo "indiretta": true se è una domanda di scenario di vita fuori dal lavoro, false per tutte le altre (comprese quelle di lavoro). Non dimenticarlo mai, viene usato per decidere cosa è mostrabile a terzi.
 `;
 
 const PROMPT_REPORT = `

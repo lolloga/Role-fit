@@ -558,17 +558,23 @@ async function submitAnswer(value, questionData) {
     content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
 
+  const isStandard = state.fixedCount < STANDARD_QUESTIONS.length;
+  // Le domande standard non sono mai personali. Per le adattive, ci fidiamo
+  // solo di un "indiretta: false" esplicito dell'AI — qualunque altra cosa
+  // (true, o il campo mancante) viene trattata come domanda da non esporre
+  // a terzi (es. aziende), per non rischiare di rivelare risposte personali.
   state.answers.push({
     id: questionData.id,
     question: questionData.text,
     answer: value,
     time: responseTime,
-    isOpen: false
+    isOpen: false,
+    indiretta: isStandard ? false : questionData.indiretta !== false
   });
 
   state.questionCount++;
 
-  if (state.fixedCount < STANDARD_QUESTIONS.length) {
+  if (isStandard) {
     state.fixedCount++;
   } else {
     state.adaptiveCount++;
@@ -1399,6 +1405,7 @@ function goToReport() {
   // dati andrebbero persi. localStorage sopravvive al cambio di scheda.
   localStorage.setItem('rf_history', JSON.stringify(state.conversationHistory));
   localStorage.setItem('rf_activities', JSON.stringify(state.activityResults));
+  localStorage.setItem('rf_answers', JSON.stringify(state.answers));
   localStorage.setItem('rf_aspiration', state.aspirationRole || '');
   // Nuovo handoff non ancora salvato su Supabase: azzera il flag "consumato"
   // così report.js sa che deve generare e salvare questo report.
