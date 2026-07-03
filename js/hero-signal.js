@@ -21,11 +21,12 @@
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-    // Su schermi stretti il nucleo si centra di più (meno spazio a destra),
-    // su desktop resta spostato verso destra come prima.
+    // Su schermi stretti il testo occupa tutta la larghezza e sta in alto:
+    // il nucleo scende sotto ai pulsanti invece di stare dietro al testo,
+    // altrimenti resta illeggibile. Su desktop resta spostato a destra.
     const mobile = W < 700;
     CX = W * (mobile ? 0.5 : 0.76);
-    CY = H * (mobile ? 0.3 : 0.42);
+    CY = H * (mobile ? 0.8 : 0.42);
 
     // Raggio massimo che tiene ogni nodo dentro i bordi, margine di 20px,
     // tenendo conto che l'ellisse dei nodi è schiacciata verticalmente (×0.62).
