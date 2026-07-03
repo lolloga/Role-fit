@@ -596,6 +596,9 @@ async function generateAndSave() {
       const test_history = {
         history: JSON.parse(localStorage.getItem('rf_history') || '[]'),
         activities: JSON.parse(localStorage.getItem('rf_activities') || '{}'),
+        // answers: elenco pulito domanda/risposta con il flag "indiretta" —
+        // usato per mostrare alle aziende solo le domande non personali.
+        answers: JSON.parse(localStorage.getItem('rf_answers') || '[]'),
         savedAt: new Date().toISOString(),
       };
       const saved = await saveReport({ report_json: data.report, aspiration, test_history });

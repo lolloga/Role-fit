@@ -248,6 +248,7 @@ async function calcolaMatch(body, res) {
   const emailById = new Map(profiles.map((p) => [p.id, p.email]));
 
   const result = candidates.map((c) => ({
+    user_id: c.user_id,
     email: emailById.get(c.user_id) || null,
     match: c.match,
     ruoli: c.ruoli,
@@ -257,6 +258,43 @@ async function calcolaMatch(body, res) {
   }));
 
   return res.status(200).json({ job, candidates: result });
+}
+
+async function dettaglioCandidato(body, res) {
+  const { user_id } = body;
+  if (!user_id) return res.status(400).json({ error: 'user_id obbligatorio' });
+
+  const reportsRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/reports?user_id=eq.${user_id}&select=report_json,test_history,created_at&order=created_at.desc&limit=1`,
+    { headers: supabaseHeaders() }
+  );
+  if (!reportsRes.ok) return res.status(500).json({ error: 'Impossibile leggere il candidato' });
+  const [report] = await reportsRes.json();
+  if (!report) return res.status(404).json({ error: 'Candidato non trovato' });
+
+  const profileRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user_id}&select=email`,
+    { headers: supabaseHeaders() }
+  );
+  const [profile] = profileRes.ok ? await profileRes.json() : [];
+
+  // Log domande/risposte per l'azienda: SOLO le domande esplicitamente
+  // marcate come non personali (indiretta: false). Se il test è stato
+  // fatto prima che questo campo esistesse, non c'è modo di sapere quali
+  // domande fossero personali — meglio non mostrare nulla che rischiare di
+  // esporre una risposta privata per errore.
+  const answers = report.test_history?.answers;
+  const qaDisponibile = Array.isArray(answers);
+  const qaLog = qaDisponibile
+    ? answers.filter((a) => a.indiretta === false).map((a) => ({ domanda: a.question, risposta: a.answer }))
+    : [];
+
+  return res.status(200).json({
+    email: profile?.email || null,
+    report: report.report_json,
+    qa_log: qaLog,
+    qa_disponibile: qaDisponibile,
+  });
 }
 
 export default async function handler(req, res) {
@@ -272,6 +310,7 @@ export default async function handler(req, res) {
     if (action === 'crea_azienda') return await creaAzienda(req.body, res);
     if (action === 'crea_job') return await creaJob(req.body, res);
     if (action === 'match') return await calcolaMatch(req.body, res);
+    if (action === 'dettaglio_candidato') return await dettaglioCandidato(req.body, res);
     return res.status(400).json({ error: 'action non valida' });
   } catch (error) {
     console.error('Errore /api/azienda:', error);
