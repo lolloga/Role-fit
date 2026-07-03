@@ -132,6 +132,74 @@ function showThinking() {
   startThinking();
 }
 
+// Griglia di opzioni + link per rispondere con parole proprie, identico
+// al comportamento del test utente (js/test.js).
+function renderOptionsGrid(container, questionData) {
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'options-grid';
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  questionData.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="option-letter">${letters[i] || i + 1}</span><span>${opt}</span>`;
+    btn.addEventListener('click', () => handleAnswer(opt));
+    grid.appendChild(btn);
+  });
+  container.appendChild(grid);
+
+  const openLink = document.createElement('button');
+  openLink.className = 'open-toggle';
+  openLink.textContent = 'Preferisco rispondere con parole mie';
+  openLink.style.color = 'var(--rose)';
+  openLink.addEventListener('click', () => renderOpenInput(container, questionData));
+  container.appendChild(openLink);
+}
+
+function renderOpenInput(container, questionData) {
+  container.innerHTML = '';
+  const area = document.createElement('div');
+  area.className = 'open-input-area';
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'open-input';
+  textarea.placeholder = 'Scrivi qui la tua risposta...';
+
+  const actions = document.createElement('div');
+  actions.className = 'open-input-actions';
+
+  const backLink = document.createElement('button');
+  backLink.className = 'open-toggle';
+  backLink.textContent = '← Torna alle opzioni';
+  backLink.style.marginRight = 'auto';
+  backLink.addEventListener('click', () => renderOptionsGrid(container, questionData));
+  actions.appendChild(backLink);
+
+  const submit = () => {
+    const val = textarea.value.trim();
+    if (val) handleAnswer(val);
+  };
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--primary';
+  btn.textContent = 'Continua';
+  btn.addEventListener('click', submit);
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  actions.appendChild(btn);
+  area.appendChild(textarea);
+  area.appendChild(actions);
+  container.appendChild(area);
+
+  setTimeout(() => textarea.focus(), 100);
+}
+
 function renderQuestion({ text, context, type, options, placeholder }) {
   stopThinking();
   document.getElementById('thinking-state').classList.add('hidden');
@@ -150,17 +218,7 @@ function renderQuestion({ text, context, type, options, placeholder }) {
   input.innerHTML = '';
 
   if (type === 'multiple_choice') {
-    const grid = document.createElement('div');
-    grid.className = 'options-grid';
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    options.forEach((opt, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'option-btn';
-      btn.innerHTML = `<span class="option-letter">${letters[i] || i + 1}</span><span>${opt}</span>`;
-      btn.addEventListener('click', () => handleAnswer(opt));
-      grid.appendChild(btn);
-    });
-    input.appendChild(grid);
+    renderOptionsGrid(input, { text, context, type, options });
   } else {
     const wrap = document.createElement('div');
     const field = document.createElement('input');
