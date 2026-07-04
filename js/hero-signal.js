@@ -35,7 +35,10 @@
       // così i raggi si vedono bene ma non escono mai dal riquadro.
       const availX = (W / 2) * 0.92;
       const availY = ((H / 2) * 0.92) / 0.62;
-      scale = Math.max(0.3, Math.min(1, availX / MAX_NODE_RADIUS, availY / MAX_NODE_RADIUS));
+      // Nessun minimo artificiale: lo spazio tra le frasi resta quello
+      // originale, quindi il grafico si rimpicciolisce quanto serve per
+      // starci dentro senza mai tagliare i raggi sul bordo.
+      scale = Math.max(0.12, Math.min(1, availX / MAX_NODE_RADIUS, availY / MAX_NODE_RADIUS));
     } else {
       W = hero.clientWidth; H = hero.clientHeight;
       canvas.style.top = '0px';

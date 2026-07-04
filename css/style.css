@@ -656,9 +656,11 @@ p { color: var(--text-secondary); line-height: 1.75; }
 
 @media (max-width: 760px) {
   .site-nav-links { display: none; }
-  /* Riserva lo spazio tra il titolo e la descrizione dell'hero per il
-     grafico animato: da mobile non deve più stare dietro al testo. */
-  .hero-signal-slot { display: block; height: 190px; margin: 4px 0 20px; }
+  /* Spazio per il grafico animato tra il titolo e la descrizione
+     dell'hero: da mobile non deve più stare dietro al testo, ma la
+     distanza tra le due frasi deve restare quella originale (il grafico
+     si adatta a uno spazio piccolo, non lo allarga). */
+  .hero-signal-slot { display: block; height: 60px; margin: 0; }
 }
 
 /* Il body di ogni pagina deve avere respiro sotto la nav fissa (68px). */
