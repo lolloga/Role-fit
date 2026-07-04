@@ -7,46 +7,11 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Da mobile il grafico non deve più coprire l'intera hero (finiva dietro al
-  // testo): questo slot vuoto, visibile solo sotto i 760px (vedi style.css),
-  // riserva lo spazio esatto tra il titolo e la descrizione. Il canvas resta
-  // un elemento unico: qui lo ridimensioniamo/riposizioniamo su quello slot
-  // invece che sull'intera hero, senza toccare nulla del comportamento desktop.
-  const mobileSlot = document.querySelector('.hero-signal-slot');
-  const MAX_NODE_RADIUS = 240; // 90 + 150, il raggio massimo generato sotto
-  let W, H, DPR, scale = 1, cxFrac = 0.76, cyFrac = 0.42;
+  let W, H, DPR;
 
   function resize() {
     const hero = canvas.parentElement;
-    const isMobileLayout = mobileSlot && getComputedStyle(mobileSlot).display !== 'none';
-
-    if (isMobileLayout) {
-      const heroRect = hero.getBoundingClientRect();
-      const slotRect = mobileSlot.getBoundingClientRect();
-      W = slotRect.width; H = slotRect.height;
-      canvas.style.top = (slotRect.top - heroRect.top) + 'px';
-      canvas.style.left = (slotRect.left - heroRect.left) + 'px';
-      // Nel riquadro dello slot il nucleo sta al centro (non allo 0.76 usato
-      // in hero desktop): così ha margine uguale su entrambi i lati per far
-      // vedere i raggi per intero invece di tagliarli sul bordo.
-      cxFrac = 0.5; cyFrac = 0.5;
-      // Scala il raggio massimo delle orbite in base allo spazio realmente
-      // disponibile intorno al centro (con un piccolo margine di sicurezza),
-      // così i raggi si vedono bene ma non escono mai dal riquadro.
-      const availX = (W / 2) * 0.92;
-      const availY = ((H / 2) * 0.92) / 0.62;
-      // Nessun minimo artificiale: lo spazio tra le frasi resta quello
-      // originale, quindi il grafico si rimpicciolisce quanto serve per
-      // starci dentro senza mai tagliare i raggi sul bordo.
-      scale = Math.max(0.12, Math.min(1, availX / MAX_NODE_RADIUS, availY / MAX_NODE_RADIUS));
-    } else {
-      W = hero.clientWidth; H = hero.clientHeight;
-      canvas.style.top = '0px';
-      canvas.style.left = '0px';
-      cxFrac = 0.76; cyFrac = 0.42;
-      scale = 1;
-    }
-
+    W = hero.clientWidth; H = hero.clientHeight;
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * DPR; canvas.height = H * DPR;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -55,7 +20,7 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const cx = () => W * cxFrac, cy = () => H * cyFrac;
+  const cx = () => W * 0.76, cy = () => H * 0.42;
   const NODE_COUNT = 13;
   const nodes = Array.from({ length: NODE_COUNT }, () => {
     const angle = Math.random() * Math.PI * 2;
@@ -93,9 +58,8 @@
 
     nodes.forEach((n) => {
       n.angle += n.speed * 0.02;
-      const radius = n.radius * scale;
-      const x = CX + Math.cos(n.angle) * radius;
-      const y = CY + Math.sin(n.angle) * radius * 0.62;
+      const x = CX + Math.cos(n.angle) * n.radius;
+      const y = CY + Math.sin(n.angle) * n.radius * 0.62;
 
       const connectVal = (Math.sin(n.connectPhase + t * n.connectSpeed) + 1) / 2;
       if (connectVal > 0.68) {
@@ -111,7 +75,7 @@
 
       const nodePulse = 1 + Math.sin(t * 0.04 + n.pulsePhase) * 0.35;
       ctx.fillStyle = 'rgba(240,255,244,0.55)';
-      ctx.beginPath(); ctx.arc(x, y, n.r * nodePulse * scale, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, n.r * nodePulse, 0, Math.PI * 2); ctx.fill();
     });
 
     if (!reduceMotion) requestAnimationFrame(frame);
