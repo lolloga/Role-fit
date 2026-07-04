@@ -211,11 +211,6 @@ p { color: var(--text-secondary); line-height: 1.75; }
 }
 .hero > .container { position: relative; z-index: 2; }
 
-/* Slot per il grafico animato SOLO da mobile (vedi @media sotto): su
-   desktop resta a display:none e non tocca il layout, il canvas continua
-   a coprire l'intera hero come sempre. */
-.hero-signal-slot { display: none; }
-
 .hero__eyebrow {
   font-family: var(--font-mono);
   font-size: 0.74rem;
@@ -656,11 +651,6 @@ p { color: var(--text-secondary); line-height: 1.75; }
 
 @media (max-width: 760px) {
   .site-nav-links { display: none; }
-  /* Spazio per il grafico animato tra il titolo e la descrizione
-     dell'hero: da mobile non deve più stare dietro al testo, ma la
-     distanza tra le due frasi deve restare quella originale (il grafico
-     si adatta a uno spazio piccolo, non lo allarga). */
-  .hero-signal-slot { display: block; height: 60px; margin: 0; }
 }
 
 /* Il body di ogni pagina deve avere respiro sotto la nav fissa (68px). */
