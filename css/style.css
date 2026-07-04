@@ -649,8 +649,23 @@ p { color: var(--text-secondary); line-height: 1.75; }
 }
 .site-nav-avatar:hover { border-color: var(--rose-light); box-shadow: 0 0 20px var(--rose-glow); }
 
+/* Etichette brevi per la nav mobile (vedi @media sotto): nascoste su
+   desktop, dove restano le etichette complete. */
+.nav-txt-short { display: none; }
+
 @media (max-width: 760px) {
-  .site-nav-links { display: none; }
+  /* Tra logo e icona profilo restano "Dizionario dei ruoli" e "Come
+     funziona" (versione breve): "Chi siamo" si nasconde per fare spazio,
+     resta comunque raggiungibile dal footer. Tutto su una riga sola,
+     senza andare a capo: font/padding più piccoli e nessun wrap. */
+  .site-nav .container--wide { gap: 6px; }
+  .site-nav-links a:last-child { display: none; }
+  .site-nav-links { gap: 5px; flex-wrap: nowrap; }
+  .site-nav-links a { font-size: 0.62rem; padding: 5px 9px; white-space: nowrap; }
+  .nav-txt-full { display: none; }
+  .nav-txt-short { display: inline; }
+  .site-nav-logo { font-size: 0.95rem; }
+  .site-nav-cta { font-size: 0.7rem; padding: 6px 12px; white-space: nowrap; }
 }
 
 /* Il body di ogni pagina deve avere respiro sotto la nav fissa (68px). */
