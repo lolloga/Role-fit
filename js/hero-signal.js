@@ -13,7 +13,8 @@
   // un elemento unico: qui lo ridimensioniamo/riposizioniamo su quello slot
   // invece che sull'intera hero, senza toccare nulla del comportamento desktop.
   const mobileSlot = document.querySelector('.hero-signal-slot');
-  let W, H, DPR, scale = 1;
+  const MAX_NODE_RADIUS = 240; // 90 + 150, il raggio massimo generato sotto
+  let W, H, DPR, scale = 1, cxFrac = 0.76, cyFrac = 0.42;
 
   function resize() {
     const hero = canvas.parentElement;
@@ -25,14 +26,21 @@
       W = slotRect.width; H = slotRect.height;
       canvas.style.top = (slotRect.top - heroRect.top) + 'px';
       canvas.style.left = (slotRect.left - heroRect.left) + 'px';
-      // L'animazione è pensata per l'ampio spazio della hero desktop: in uno
-      // slot piccolo scaliamo il raggio delle orbite, altrimenti i nodi
-      // uscirebbero quasi subito dal riquadro.
-      scale = Math.max(0.25, Math.min(1, H / 420));
+      // Nel riquadro dello slot il nucleo sta al centro (non allo 0.76 usato
+      // in hero desktop): così ha margine uguale su entrambi i lati per far
+      // vedere i raggi per intero invece di tagliarli sul bordo.
+      cxFrac = 0.5; cyFrac = 0.5;
+      // Scala il raggio massimo delle orbite in base allo spazio realmente
+      // disponibile intorno al centro (con un piccolo margine di sicurezza),
+      // così i raggi si vedono bene ma non escono mai dal riquadro.
+      const availX = (W / 2) * 0.92;
+      const availY = ((H / 2) * 0.92) / 0.62;
+      scale = Math.max(0.3, Math.min(1, availX / MAX_NODE_RADIUS, availY / MAX_NODE_RADIUS));
     } else {
       W = hero.clientWidth; H = hero.clientHeight;
       canvas.style.top = '0px';
       canvas.style.left = '0px';
+      cxFrac = 0.76; cyFrac = 0.42;
       scale = 1;
     }
 
@@ -44,7 +52,7 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const cx = () => W * 0.76, cy = () => H * 0.42;
+  const cx = () => W * cxFrac, cy = () => H * cyFrac;
   const NODE_COUNT = 13;
   const nodes = Array.from({ length: NODE_COUNT }, () => {
     const angle = Math.random() * Math.PI * 2;
