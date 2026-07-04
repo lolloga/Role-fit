@@ -7,11 +7,35 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let W, H, DPR;
+  // Da mobile il grafico non deve più coprire l'intera hero (finiva dietro al
+  // testo): questo slot vuoto, visibile solo sotto i 760px (vedi style.css),
+  // riserva lo spazio esatto tra il titolo e la descrizione. Il canvas resta
+  // un elemento unico: qui lo ridimensioniamo/riposizioniamo su quello slot
+  // invece che sull'intera hero, senza toccare nulla del comportamento desktop.
+  const mobileSlot = document.querySelector('.hero-signal-slot');
+  let W, H, DPR, scale = 1;
 
   function resize() {
     const hero = canvas.parentElement;
-    W = hero.clientWidth; H = hero.clientHeight;
+    const isMobileLayout = mobileSlot && getComputedStyle(mobileSlot).display !== 'none';
+
+    if (isMobileLayout) {
+      const heroRect = hero.getBoundingClientRect();
+      const slotRect = mobileSlot.getBoundingClientRect();
+      W = slotRect.width; H = slotRect.height;
+      canvas.style.top = (slotRect.top - heroRect.top) + 'px';
+      canvas.style.left = (slotRect.left - heroRect.left) + 'px';
+      // L'animazione è pensata per l'ampio spazio della hero desktop: in uno
+      // slot piccolo scaliamo il raggio delle orbite, altrimenti i nodi
+      // uscirebbero quasi subito dal riquadro.
+      scale = Math.max(0.25, Math.min(1, H / 420));
+    } else {
+      W = hero.clientWidth; H = hero.clientHeight;
+      canvas.style.top = '0px';
+      canvas.style.left = '0px';
+      scale = 1;
+    }
+
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * DPR; canvas.height = H * DPR;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -58,8 +82,9 @@
 
     nodes.forEach((n) => {
       n.angle += n.speed * 0.02;
-      const x = CX + Math.cos(n.angle) * n.radius;
-      const y = CY + Math.sin(n.angle) * n.radius * 0.62;
+      const radius = n.radius * scale;
+      const x = CX + Math.cos(n.angle) * radius;
+      const y = CY + Math.sin(n.angle) * radius * 0.62;
 
       const connectVal = (Math.sin(n.connectPhase + t * n.connectSpeed) + 1) / 2;
       if (connectVal > 0.68) {
@@ -75,7 +100,7 @@
 
       const nodePulse = 1 + Math.sin(t * 0.04 + n.pulsePhase) * 0.35;
       ctx.fillStyle = 'rgba(240,255,244,0.55)';
-      ctx.beginPath(); ctx.arc(x, y, n.r * nodePulse, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, n.r * nodePulse * scale, 0, Math.PI * 2); ctx.fill();
     });
 
     if (!reduceMotion) requestAnimationFrame(frame);
