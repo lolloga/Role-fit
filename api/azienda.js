@@ -260,6 +260,25 @@ async function calcolaMatch(body, res) {
   return res.status(200).json({ job, candidates: result });
 }
 
+// URL firmato a scadenza per il CV del candidato (bucket privato "cv").
+// Generato sempre lato server con la service role key: le aziende non hanno
+// mai accesso diretto allo storage, solo a questo link temporaneo.
+async function getCvSignedUrl(cv_path) {
+  if (!cv_path) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/cv/${cv_path}`, {
+      method: 'POST',
+      headers: supabaseHeaders(),
+      body: JSON.stringify({ expiresIn: 3600 }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.signedURL ? `${SUPABASE_URL}/storage/v1${data.signedURL}` : null;
+  } catch {
+    return null;
+  }
+}
+
 async function dettaglioCandidato(body, res) {
   const { user_id } = body;
   if (!user_id) return res.status(400).json({ error: 'user_id obbligatorio' });
@@ -273,10 +292,11 @@ async function dettaglioCandidato(body, res) {
   if (!report) return res.status(404).json({ error: 'Candidato non trovato' });
 
   const profileRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user_id}&select=email`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user_id}&select=email,cv_path`,
     { headers: supabaseHeaders() }
   );
   const [profile] = profileRes.ok ? await profileRes.json() : [];
+  const cvUrl = await getCvSignedUrl(profile?.cv_path);
 
   // Log domande/risposte per l'azienda: SOLO le domande esplicitamente
   // marcate come non personali (indiretta: false). Se il test è stato
@@ -294,6 +314,7 @@ async function dettaglioCandidato(body, res) {
     report: report.report_json,
     qa_log: qaLog,
     qa_disponibile: qaDisponibile,
+    cv_url: cvUrl,
   });
 }
 

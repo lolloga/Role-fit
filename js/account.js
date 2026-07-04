@@ -1,5 +1,5 @@
 // ─── PROFILO LAYOUT D (magic link) ───────────────────────────
-import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken } from './supabase.js';
+import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile, uploadCv, saveCvPath } from './supabase.js';
 
 // ─── Gate magic link (redirect al profilo) ───
 function showGate() {
@@ -207,6 +207,104 @@ function setupBanco() {
 
   btn.addEventListener('click', run);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+}
+
+// ─── CV ─────────────────────────────────────────────────────────
+async function renderCvCurrent() {
+  const box = document.getElementById('cv-current');
+  const status = document.getElementById('cv-status');
+  if (!box || !status) return;
+  try {
+    const profile = await getProfile();
+    if (!profile?.cv_path) {
+      box.classList.add('hidden');
+      return;
+    }
+    status.textContent = profile.cv_updated_at
+      ? 'Il tuo profilo è stato rigenerato con il CV il ' + formatDate(profile.cv_updated_at) + '.'
+      : 'CV caricato, in attesa di elaborazione.';
+    box.classList.remove('hidden');
+  } catch (e) {
+    console.error('Errore nel leggere lo stato del CV:', e);
+  }
+}
+
+function setupCv() {
+  const btn = document.getElementById('cv-upload-btn');
+  const input = document.getElementById('cv-file-input');
+  const errEl = document.getElementById('cv-error');
+  const progress = document.getElementById('cv-progress');
+  const progressText = document.getElementById('cv-progress-text');
+  const done = document.getElementById('cv-done');
+  const doneLink = document.getElementById('cv-done-link');
+  if (!btn || !input) return;
+
+  renderCvCurrent();
+
+  btn.addEventListener('click', () => input.click());
+
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    errEl.classList.add('hidden');
+    done.classList.add('hidden');
+
+    if (file.type !== 'application/pdf') {
+      errEl.textContent = 'Il file deve essere un PDF.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      errEl.textContent = 'Il file supera i 10 MB.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    progress.classList.remove('hidden');
+    progressText.textContent = 'Sto caricando il CV...';
+
+    try {
+      const path = await uploadCv(file);
+      await saveCvPath(path);
+
+      progressText.textContent = 'Sto rileggendo il tuo profilo alla luce del CV...';
+
+      const token = await getAccessToken();
+      const response = await fetch('/api/cv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.error || 'Errore rigenerazione');
+
+      progress.classList.add('hidden');
+      done.classList.remove('hidden');
+      doneLink.href = 'report.html?id=' + data.report_id;
+
+      renderCvCurrent();
+
+      try {
+        const reports = await listReports();
+        REPORTS = reports;
+        const session = await getSession();
+        renderProfile(session, reports);
+      } catch { /* la card CV è già aggiornata, il resto si aggiornerà al prossimo giro */ }
+
+    } catch (e) {
+      console.error('Errore caricamento CV:', e);
+      progress.classList.add('hidden');
+      errEl.textContent = 'Qualcosa è andato storto. Riprova tra poco.';
+      errEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 // ─── Navigazione tra sezioni (sidebar + bottom bar) ───
@@ -427,6 +525,7 @@ async function init() {
     REPORTS = reports;
     renderProfile(session, reports);
     setupBanco();
+    setupCv();
   } catch (e) {
     console.error('Errore nel caricare i report:', e);
   }

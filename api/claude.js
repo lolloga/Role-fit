@@ -145,7 +145,9 @@ REGOLE ASSOLUTE
 14. Ogni domanda adattiva deve avere il campo "indiretta": true se è una domanda di scenario di vita fuori dal lavoro, false per tutte le altre (comprese quelle di lavoro). Non dimenticarlo mai, viene usato per decidere cosa è mostrabile a terzi.
 `;
 
-const PROMPT_REPORT = `
+// Esportato per api/cv.js: la rigenerazione del report dopo il caricamento
+// del CV riusa lo stesso identico prompt, così i due percorsi restano coerenti.
+export const PROMPT_REPORT = `
 Sei la voce di RoleFit. Hai appena finito di ascoltare qualcuno raccontarsi attraverso un test adattivo. Ora devi restituirgli quello che hai capito.
 
 IL TUO VANTAGGIO SLEALE — LEGGILO PRIMA DI TUTTO IL RESTO

@@ -230,14 +230,36 @@
       </div>
     </section>
 
-    <!-- CV (placeholder) -->
+    <!-- CV -->
     <section class="app-sec hidden" data-sec="cv">
       <h1 class="sec-title">Il mio CV</h1>
-      <div class="pcard soon">
-        <span class="soon-badge">In arrivo</span>
-        <div class="soon-ico">📄</div>
-        <p class="soon-title">Carica il tuo CV</p>
-        <p class="soon-text">Presto potrai caricare il tuo curriculum per arricchire il profilo. Stiamo ancora lavorando a come usarlo nel modo giusto.</p>
+
+      <div class="pcard">
+        <p class="pcard-label">Perché caricarlo</p>
+        <p class="pcard-sub">Carica il tuo CV in PDF: lo useremo insieme alle risposte del tuo ultimo test per rigenerare un profilo più preciso e concreto. Se un'azienda ti trova tra i candidati compatibili per una ricerca, potrà visionare il file originale.</p>
+      </div>
+
+      <div class="pcard hidden" id="cv-current">
+        <p class="pcard-label" style="color:#5DCAA5;">CV caricato</p>
+        <p class="pcard-sub" id="cv-status">—</p>
+      </div>
+
+      <div class="pcard">
+        <p class="pcard-label">Carica un nuovo CV</p>
+        <p class="pcard-sub" style="margin-bottom:14px;">Solo file PDF, massimo 10&nbsp;MB. Caricandolo, rigeneriamo il tuo report tenendo conto anche del CV.</p>
+        <input type="file" id="cv-file-input" accept="application/pdf" class="hidden" />
+        <button id="cv-upload-btn" class="pf-btn" style="width:100%; justify-content:center;">Scegli file PDF</button>
+        <p id="cv-error" class="hidden" style="color:#FF6496; font-size:12px; margin-top:10px;"></p>
+      </div>
+
+      <div class="pcard hidden" id="cv-progress">
+        <p class="pcard-sub" id="cv-progress-text" style="font-style:italic;">Sto caricando il CV...</p>
+      </div>
+
+      <div class="pcard hidden" id="cv-done">
+        <p class="pcard-label" style="color:#5DCAA5;">Fatto</p>
+        <p class="pcard-sub" style="margin-bottom:12px;">Il tuo profilo è stato rigenerato tenendo conto del CV.</p>
+        <a href="#" id="cv-done-link" class="pf-btn">Vedi il profilo aggiornato →</a>
       </div>
     </section>
 

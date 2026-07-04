@@ -108,6 +108,11 @@ function renderQa(qaLog, qaDisponibile) {
     document.getElementById('candidato-email').textContent = data.email || 'Candidato';
     renderRadar(data.report?.assi);
 
+    if (data.cv_url) {
+      document.getElementById('cv-link').href = data.cv_url;
+      document.getElementById('section-cv').classList.remove('hidden');
+    }
+
     const perche = document.getElementById('perche-testo');
     const percheSection = document.getElementById('section-perche');
     // Il "perché" specifico per la ricerca arriva solo passando dalla lista

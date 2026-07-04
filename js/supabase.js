@@ -91,6 +91,43 @@ export async function getReport(id) {
   return data;
 }
 
+// ─── CV ────────────────────────────────────────────────────────
+// Stato del CV (path nello storage + data dell'ultima rigenerazione).
+export async function getProfile() {
+  const session = await getSession();
+  if (!session) return null;
+  const { data, error } = await sb
+    .from('profiles')
+    .select('cv_path, cv_updated_at')
+    .eq('id', session.user.id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Carica il PDF nel bucket privato "cv", dentro la cartella dell'utente
+// (RLS lo consente solo per il proprio user id). Ritorna il path salvato.
+export async function uploadCv(file) {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const path = `${session.user.id}/cv.pdf`;
+  const { error } = await sb.storage.from('cv').upload(path, file, {
+    upsert: true,
+    contentType: 'application/pdf',
+  });
+  if (error) throw error;
+  return path;
+}
+
+// Registra il path del CV appena caricato sul profilo (own-row update,
+// già permesso dalla policy RLS esistente su profiles).
+export async function saveCvPath(path) {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const { error } = await sb.from('profiles').update({ cv_path: path }).eq('id', session.user.id);
+  if (error) throw error;
+}
+
 // ─── BOZZE (input del test, prima del login) ──────────────────
 // Salva gli input del test come bozza anonima e restituisce { id }. L'id finisce
 // nel magic link, così il report sopravvive anche se il link si apre altrove.
