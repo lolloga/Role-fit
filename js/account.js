@@ -1,6 +1,19 @@
 // ─── PROFILO LAYOUT D (magic link) ───────────────────────────
 import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile, uploadCv, saveCvPath } from './supabase.js';
 
+// Il banco di prova mostra sia testo scritto dall'utente (il ruolo cercato)
+// sia testo generato dall'AI: senza escaping, un payload HTML/script
+// finirebbe nel DOM.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── Gate magic link (redirect al profilo) ───
 function showGate() {
   document.getElementById('account-loading').classList.add('hidden');
@@ -136,7 +149,7 @@ function setupBanco() {
 
     btn.disabled = true;
     btn.textContent = 'Valuto…';
-    out.innerHTML = '<p class="pcard-sub" style="font-style:italic;">Sto confrontando "' + ruolo + '" con il tuo profilo…</p>';
+    out.innerHTML = '<p class="pcard-sub" style="font-style:italic;">Sto confrontando "' + esc(ruolo) + '" con il tuo profilo…</p>';
 
     try {
       // Valuta sull'ultimo report (il più attuale) — risultato principale
@@ -151,13 +164,13 @@ function setupBanco() {
         '<div class="pcard" style="margin-bottom:12px;">' +
           '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
             '<div><p class="pcard-label">Ruolo valutato</p>' +
-            '<p class="pcard-title" style="font-size:19px;">' + ruolo + '</p>' +
-            '<p class="pcard-sub" style="color:#5DCAA5;">' + (valLast.titolo || '') + '</p></div>' +
+            '<p class="pcard-title" style="font-size:19px;">' + esc(ruolo) + '</p>' +
+            '<p class="pcard-sub" style="color:#5DCAA5;">' + esc(valLast.titolo) + '</p></div>' +
             '<div style="text-align:right; flex-shrink:0;">' +
-            '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + valLast.match + '%</p>' +
+            '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + esc(valLast.match) + '%</p>' +
             '<p style="font-size:10px; color:rgba(240,255,244,0.35); text-transform:uppercase; letter-spacing:0.06em; margin:2px 0 0;">sull\'ultimo test</p></div>' +
           '</div>' +
-          '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + (valLast.descrizione || '') + '</p>' +
+          '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + esc(valLast.descrizione) + '</p>' +
         '</div>';
 
       out.innerHTML = html;
@@ -181,8 +194,8 @@ function setupBanco() {
         let trendHtml = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
         righe.forEach((r) => {
           trendHtml += '<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
-            '<span class="pcard-sub">' + formatDate(r.data) + '</span>' +
-            '<span style="font-weight:bold; color:#5DCAA5;">' + r.match + '%</span></div>';
+            '<span class="pcard-sub">' + esc(formatDate(r.data)) + '</span>' +
+            '<span style="font-weight:bold; color:#5DCAA5;">' + esc(r.match) + '%</span></div>';
         });
         // Lettura della tendenza (primo = più recente, ultimo = più vecchio)
         if (righe.length >= 2) {
@@ -481,9 +494,9 @@ function renderChart(reports) {
     const bar = document.createElement('div'); bar.className = 'pf-bar' + (isLast ? ' last' : '');
     bar.style.height = Math.max(8, pct) + '%'; col.appendChild(bar); bars.appendChild(col);
     const cell = document.createElement('div'); cell.className = 'pf-xcell' + (isLast ? ' last' : '');
-    cell.innerHTML = '<p class="pf-xdate">' + formatShort(r.created_at) + '</p>' +
-      '<p class="pf-xrole">' + (t.nome || '') + '</p>' +
-      '<p class="pf-xpct">' + (t.match != null ? t.match + '%' : '—') + '</p>';
+    cell.innerHTML = '<p class="pf-xdate">' + esc(formatShort(r.created_at)) + '</p>' +
+      '<p class="pf-xrole">' + esc(t.nome) + '</p>' +
+      '<p class="pf-xpct">' + (t.match != null ? esc(t.match) + '%' : '—') + '</p>';
     axis.appendChild(cell);
   });
 }
@@ -500,8 +513,8 @@ function renderStorico(reports) {
     a.href = 'report.html?id=' + r.id; a.className = 'st-card';
     const badge = (i === 0) ? '<span class="st-badge">Più recente</span>' : '';
     a.innerHTML =
-      '<div class="st-card-top"><p class="st-date">' + formatDate(r.created_at) + '</p>' + badge + '</div>' +
-      '<p class="st-roles">' + rolesLine(r.report_json) + '</p>' +
+      '<div class="st-card-top"><p class="st-date">' + esc(formatDate(r.created_at)) + '</p>' + badge + '</div>' +
+      '<p class="st-roles">' + esc(rolesLine(r.report_json)) + '</p>' +
       '<span class="st-open">Apri il report completo →</span>';
     list.appendChild(a);
   });

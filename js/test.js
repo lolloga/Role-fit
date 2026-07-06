@@ -34,6 +34,19 @@ function stopThinking() {
   }
 }
 
+// Le opzioni delle domande adattive sono generate dall'AI: senza escaping,
+// un payload HTML/script infilato dal modello (o da una risposta aperta
+// precedente riusata come contesto) finirebbe nel DOM.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── STATO GLOBALE ───────────────────────────────────────────
 const state = {
   conversationHistory: [],
@@ -392,7 +405,7 @@ function renderMultipleChoice(container, questionData) {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
     const lettera = letters[i] || String(i + 1);
-    btn.innerHTML = `<span class="option-letter">${lettera}</span><span>${opt}</span>`;
+    btn.innerHTML = `<span class="option-letter">${esc(lettera)}</span><span>${esc(opt)}</span>`;
     btn.addEventListener('click', () => selectOption(btn, opt, questionData));
     grid.appendChild(btn);
   });
@@ -498,7 +511,7 @@ function renderMultiSelect(container, questionData) {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
     const lettera = letters[i] || String(i + 1);
-    btn.innerHTML = `<span class="option-letter">${lettera}</span><span>${opt}</span>`;
+    btn.innerHTML = `<span class="option-letter">${esc(lettera)}</span><span>${esc(opt)}</span>`;
     btn.addEventListener('click', () => {
       if (selected.has(i)) {
         selected.delete(i);
@@ -528,8 +541,14 @@ function renderMultiSelect(container, questionData) {
 
 
 function selectOption(btn, value, questionData) {
-  btn.closest('.options-grid').querySelectorAll('.option-btn')
-    .forEach(b => b.classList.remove('selected'));
+  const grid = btn.closest('.options-grid');
+  // Disabilita subito tutte le opzioni: senza questo, un doppio tocco veloce
+  // su due opzioni diverse (facile su mobile) invia due risposte alla stessa
+  // domanda, con due chiamate a getNextStep() in corsa tra loro.
+  if (grid.dataset.locked === '1') return;
+  grid.dataset.locked = '1';
+  grid.querySelectorAll('.option-btn').forEach((b) => { b.disabled = true; });
+  grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   setTimeout(() => submitAnswer(value, questionData), 280);
 }
@@ -613,6 +632,11 @@ async function getNextStep() {
   if (!result) {
     console.error('Risposta Claude non valida');
     stopThinking();
+    // Senza questo, l'utente restava a guardare l'animazione di pensiero
+    // all'infinito, senza nessun errore né modo di riprovare: la risposta
+    // dell'utente era già salvata in conversationHistory, quindi un retry
+    // pulito è semplicemente rifare la stessa chiamata.
+    showTestError();
     return;
   }
 
@@ -680,6 +704,29 @@ async function getNextStep() {
     stopThinking();
     renderQuestion(q);
   }
+}
+
+// Errore recuperabile durante la generazione della domanda successiva: mostra
+// un messaggio chiaro al posto della frase di pensiero e un pulsante che
+// riprova la stessa chiamata, senza perdere la risposta già data.
+function showTestError() {
+  const phraseEl = document.getElementById('thinking-phrase');
+  phraseEl.textContent = 'Qualcosa è andato storto.';
+  phraseEl.style.color = 'var(--rose)';
+
+  const thinkingState = document.getElementById('thinking-state');
+  if (document.getElementById('test-retry-btn')) return;
+
+  const retryBtn = document.createElement('button');
+  retryBtn.id = 'test-retry-btn';
+  retryBtn.className = 'btn btn--primary mt-16';
+  retryBtn.textContent = 'Riprova';
+  retryBtn.addEventListener('click', () => {
+    retryBtn.remove();
+    phraseEl.style.color = '';
+    getNextStep();
+  });
+  thinkingState.appendChild(retryBtn);
 }
 
 // ─── THINKING ─────────────────────────────────────────────────

@@ -178,7 +178,7 @@ async function calcolaMatch(body, res) {
   if (!job_id) return res.status(400).json({ error: 'job_id obbligatorio' });
 
   const jobRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${job_id}&select=*`,
+    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${encodeURIComponent(job_id)}&select=*`,
     { headers: supabaseHeaders() }
   );
   if (!jobRes.ok) return res.status(500).json({ error: 'Impossibile leggere la ricerca' });
@@ -241,7 +241,7 @@ async function calcolaMatch(body, res) {
 
   const userIds = candidates.map((c) => c.user_id);
   const profilesRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=in.(${userIds.join(',')})&select=id,email`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=in.(${userIds.map(encodeURIComponent).join(',')})&select=id,email`,
     { headers: supabaseHeaders() }
   );
   const profiles = profilesRes.ok ? await profilesRes.json() : [];
@@ -263,10 +263,15 @@ async function calcolaMatch(body, res) {
 // URL firmato a scadenza per il CV del candidato (bucket privato "cv").
 // Generato sempre lato server con la service role key: le aziende non hanno
 // mai accesso diretto allo storage, solo a questo link temporaneo.
-async function getCvSignedUrl(cv_path) {
-  if (!cv_path) return null;
+// Il valore di profiles.cv_path è aggiornabile dal client (RLS "own profile
+// update" copre qualunque colonna della propria riga): lo usiamo solo come
+// flag "CV presente" e ricostruiamo il percorso reale dallo user_id, così un
+// utente non può farsi generare un link firmato per il file di qualcun altro.
+async function getCvSignedUrl(user_id, hasCv) {
+  if (!hasCv) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/cv/${cv_path}`, {
+    const cvPath = `${user_id}/cv.pdf`;
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/cv/${cvPath}`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ expiresIn: 3600 }),
@@ -284,7 +289,7 @@ async function dettaglioCandidato(body, res) {
   if (!user_id) return res.status(400).json({ error: 'user_id obbligatorio' });
 
   const reportsRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/reports?user_id=eq.${user_id}&select=report_json,test_history,created_at&order=created_at.desc&limit=1`,
+    `${SUPABASE_URL}/rest/v1/reports?user_id=eq.${encodeURIComponent(user_id)}&select=report_json,test_history,created_at&order=created_at.desc&limit=1`,
     { headers: supabaseHeaders() }
   );
   if (!reportsRes.ok) return res.status(500).json({ error: 'Impossibile leggere il candidato' });
@@ -292,11 +297,11 @@ async function dettaglioCandidato(body, res) {
   if (!report) return res.status(404).json({ error: 'Candidato non trovato' });
 
   const profileRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user_id}&select=email,cv_path`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user_id)}&select=email,cv_path`,
     { headers: supabaseHeaders() }
   );
   const [profile] = profileRes.ok ? await profileRes.json() : [];
-  const cvUrl = await getCvSignedUrl(profile?.cv_path);
+  const cvUrl = await getCvSignedUrl(user_id, !!profile?.cv_path);
 
   // Log domande/risposte per l'azienda: SOLO le domande esplicitamente
   // marcate come non personali (indiretta: false). Se il test è stato

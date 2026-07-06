@@ -1,3 +1,15 @@
+// Le opzioni delle domande adattive sono generate dall'AI: senza escaping,
+// un payload HTML/script infilato dal modello finirebbe nel DOM.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── FRASI AI THINKING ───────────────────────────────────────
 const THINKING_PHRASES = [
   "Sto leggendo il contesto...",
@@ -142,7 +154,7 @@ function renderOptionsGrid(container, questionData) {
   questionData.options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
-    btn.innerHTML = `<span class="option-letter">${letters[i] || i + 1}</span><span>${opt}</span>`;
+    btn.innerHTML = `<span class="option-letter">${esc(letters[i] || i + 1)}</span><span>${esc(opt)}</span>`;
     btn.addEventListener('click', () => handleAnswer(opt));
     grid.appendChild(btn);
   });

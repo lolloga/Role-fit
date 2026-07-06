@@ -1,5 +1,18 @@
 const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
 
+// Il contenuto qui sotto include testo generato dall'AI e, nel Q&A, le
+// risposte scritte a mano dal candidato: senza escaping, un payload HTML/script
+// finirebbe nel DOM del browser dell'azienda che guarda questo profilo.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   return { jobId: p.get('job_id'), userId: p.get('user_id') };
@@ -42,7 +55,7 @@ function renderChiSei(chiSei) {
   const el = document.getElementById('chi-sei-text');
   if (!chiSei) { el.innerHTML = '<p>Non disponibile.</p>'; return; }
   const parti = [chiSei.come_funziona, chiSei.cosa_ti_alimenta, chiSei.di_cosa_hai_bisogno].filter(Boolean);
-  el.innerHTML = parti.map((p) => `<p>${p}</p>`).join('');
+  el.innerHTML = parti.map((p) => `<p>${esc(p)}</p>`).join('');
 }
 
 function renderRuoli(ruoli) {
@@ -51,15 +64,15 @@ function renderRuoli(ruoli) {
   el.innerHTML = ruoli.map((r) => `
     <div class="ruolo-card">
       <div class="ruolo-header">
-        <div class="ruolo-nome">${r.nome}</div>
+        <div class="ruolo-nome">${esc(r.nome)}</div>
         <div class="ruolo-match">
-          <span class="ruolo-match-number">${r.match}%</span>
+          <span class="ruolo-match-number">${esc(r.match)}%</span>
           <span class="ruolo-match-label">dal suo report</span>
         </div>
       </div>
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Cosa fa davvero</div>
-        <div class="ruolo-detail-text">${r.cosa_fa || ''}</div>
+        <div class="ruolo-detail-text">${esc(r.cosa_fa) || ''}</div>
       </div>
     </div>
   `).join('');
@@ -77,8 +90,8 @@ function renderQa(qaLog, qaDisponibile) {
   }
   el.innerHTML = qaLog.map((qa) => `
     <div class="card" style="margin-bottom:10px;">
-      <div style="font-size:0.86rem;color:var(--text-primary);margin-bottom:6px;">${qa.domanda}</div>
-      <div style="font-size:0.86rem;color:var(--emerald-light);">${qa.risposta}</div>
+      <div style="font-size:0.86rem;color:var(--text-primary);margin-bottom:6px;">${esc(qa.domanda)}</div>
+      <div style="font-size:0.86rem;color:var(--emerald-light);">${esc(qa.risposta)}</div>
     </div>
   `).join('');
 }
