@@ -1,9 +1,15 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
 // Serve per ri-persistere le valutazioni ruolo attuale/aspirato calcolate dopo.
 let currentReportId = null;
+
+// Tempo massimo di attesa della chiamata di generazione: senza questo, una
+// richiesta che si blocca lato server (o una rete che non risponde più)
+// lascia l'utente a guardare l'animazione di caricamento all'infinito, senza
+// mai vedere un errore né la possibilità di riprovare.
+const GENERATE_TIMEOUT_MS = 55000;
 
 // ─── GENERA REPORT ───────────────────────────────────────────
 async function generateReport() {
@@ -23,14 +29,27 @@ async function generateReport() {
   ];
 
   const token = await getAccessToken();
-  const response = await fetch('/api/claude', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ messages, fase: 'report' })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch('/api/claude', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ messages, fase: 'report' }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('La generazione sta impiegando troppo tempo. Ricarica la pagina per riprovare.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const data = await response.json();
 
@@ -580,9 +599,17 @@ function renderSavedReport(row) {
 
 // ─── INIT ─────────────────────────────────────────────────────
 
+function showSaveErrorBanner() {
+  const banner = document.getElementById('save-error-banner');
+  if (banner) banner.classList.remove('hidden');
+}
+
 // Genera il report dagli input in localStorage, lo mostra e lo salva su Supabase.
 // Marca l'handoff come consumato per evitare doppi salvataggi al reload. NON
 // cancella rf_history: la valutazione asincrona del ruolo aspirato lo legge dopo.
+// Restituisce true SOLO se il report è stato generato E salvato con successo:
+// chi chiama usa questo per decidere se è sicuro cancellare la bozza del test
+// (vedi init()) — se il salvataggio fallisce, la bozza resta per poter riprovare.
 async function generateAndSave() {
   try {
     const data = await generateReport();
@@ -606,12 +633,22 @@ async function generateAndSave() {
       localStorage.setItem('rf_report_saved', '1');
       // [feedback] report appena generato e salvato: attiva la sezione feedback per questo report
       window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: saved.id } }));
+      return true;
     } catch (e) {
       console.error('Salvataggio report fallito:', e);
+      // Il report è visibile ma NON è stato salvato sul profilo: se lasciassimo
+      // questo errore silenzioso, l'utente vedrebbe il report una volta sola e
+      // lo ritroverebbe sparito nello storico, senza nessuna spiegazione.
+      showSaveErrorBanner();
+      return false;
     }
   } catch (err) {
     console.error('Errore generazione report:', err);
-    document.querySelector('#loading-state p').textContent = 'Qualcosa è andato storto. Riprova.';
+    document.querySelector('#loading-state p').textContent =
+      err?.message && err.message.includes('Ricarica la pagina')
+        ? err.message
+        : 'Qualcosa è andato storto. Ricarica la pagina per riprovare.';
+    return false;
   }
 }
 
@@ -652,14 +689,19 @@ async function init() {
       showLoadingError('Non riesco a recuperare il tuo test. Riprova.');
       return;
     }
-    // Bozza già consumata (es. link cliccato due volte): il report è già salvato.
-    if (!draft) { window.location.href = 'account.html'; return; }
+    // Bozza non trovata: link scaduto, mai creato, o già ripulito dalla manutenzione.
+    if (!draft) { showLoadingError('Link non valido o scaduto. Torna al test e richiedi di nuovo l\'accesso.'); return; }
 
     localStorage.setItem('rf_history', JSON.stringify(draft.history));
     localStorage.setItem('rf_activities', JSON.stringify(draft.activities || {}));
     localStorage.setItem('rf_aspiration', draft.aspiration || '');
     localStorage.removeItem('rf_report_saved');
-    await generateAndSave();
+    const ok = await generateAndSave();
+    // La bozza si cancella SOLO ora, a salvataggio confermato: se qualcosa è
+    // andato storto (timeout, errore di rete, salvataggio fallito), il link
+    // resta valido e ricaricare la pagina recupera di nuovo la stessa bozza,
+    // invece di perdere per sempre le risposte del test.
+    if (ok) deleteDraft(draftId).catch((e) => console.error('Pulizia bozza fallita (non bloccante):', e));
     return;
   }
 
