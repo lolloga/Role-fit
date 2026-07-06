@@ -5,6 +5,20 @@ import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via 
 // Serve per ri-persistere le valutazioni ruolo attuale/aspirato calcolate dopo.
 let currentReportId = null;
 
+// Il testo dei report è generato dall'AI a partire anche da risposte libere
+// dell'utente: senza escaping, un payload HTML/script infilato in una
+// risposta aperta potrebbe finire nel DOM via innerHTML. Usata ovunque un
+// campo del report entri in un template string invece che via textContent.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Tempo massimo di attesa della chiamata di generazione: senza questo, una
 // richiesta che si blocca lato server (o una rete che non risponde più)
 // lascia l'utente a guardare l'animazione di caricamento all'infinito, senza
@@ -214,15 +228,15 @@ function renderRuoloAspirato(ruoloInput, data) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
       <div>
         <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Il ruolo a cui aspiri</div>
-        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${ruoloInput}</div>
-        <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${data.titolo || ''}</div>
+        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${esc(ruoloInput)}</div>
+        <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${esc(data.titolo) || ''}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${data.match}%</div>
+        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${esc(data.match)}%</div>
         <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">compatibilità</div>
       </div>
     </div>
-    <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${data.descrizione || ''}</div>
+    <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${esc(data.descrizione) || ''}</div>
     ${altaPrecisione ? `<div style="font-size:0.82rem;color:var(--emerald-light);line-height:1.6;margin-top:14px;font-style:italic;">Avevi già in mente la direzione giusta: il profilo emerso dal test e il ruolo a cui aspiri combaciano in modo netto. È la conferma che ti conosci bene.</div>` : ''}
   `;
 
@@ -256,7 +270,7 @@ function renderReport(data, { savedView = false } = {}) {
           if (Array.isArray(s.aziende) && s.aziende.length > 0) {
             const tags = s.aziende
               .filter(a => a && a.trim())
-              .map(a => `<span style="display:inline-block;font-size:0.74rem;color:var(--text-secondary);background:var(--deep);border:1px solid var(--card-border);border-radius:6px;padding:2px 9px;margin:3px 4px 0 0;">${a}</span>`)
+              .map(a => `<span style="display:inline-block;font-size:0.74rem;color:var(--text-secondary);background:var(--deep);border:1px solid var(--card-border);border-radius:6px;padding:2px 9px;margin:3px 4px 0 0;">${esc(a)}</span>`)
               .join('');
             if (tags) {
               aziendeHtml = `<div style="margin-top:6px;"><span style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Esempi di realtà</span><div style="margin-top:3px;">${tags}</div></div>`;
@@ -264,8 +278,8 @@ function renderReport(data, { savedView = false } = {}) {
           }
           return `
           <div style="margin-bottom:12px;">
-            <span style="display:inline-block;font-size:0.78rem;font-weight:600;color:var(--emerald-light);background:rgba(29,158,117,0.12);border:1px solid rgba(29,158,117,0.3);border-radius:999px;padding:3px 12px;margin-bottom:6px;">${s.nome}</span>
-            <div class="ruolo-detail-text" style="margin-top:2px;">${s.declinazione || ''}</div>
+            <span style="display:inline-block;font-size:0.78rem;font-weight:600;color:var(--emerald-light);background:rgba(29,158,117,0.12);border:1px solid rgba(29,158,117,0.3);border-radius:999px;padding:3px 12px;margin-bottom:6px;">${esc(s.nome)}</span>
+            <div class="ruolo-detail-text" style="margin-top:2px;">${esc(s.declinazione) || ''}</div>
             ${aziendeHtml}
           </div>`;
         })
@@ -282,27 +296,27 @@ function renderReport(data, { savedView = false } = {}) {
 
     card.innerHTML = `
       <div class="ruolo-header">
-        <div class="ruolo-nome">${ruolo.nome}</div>
+        <div class="ruolo-nome">${esc(ruolo.nome)}</div>
         <div class="ruolo-match">
-          <span class="ruolo-match-number">${ruolo.match}%</span>
+          <span class="ruolo-match-number">${esc(ruolo.match)}%</span>
           <span class="ruolo-match-label">compatibilità</span>
         </div>
       </div>
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Perché ti si addice</div>
-        <div class="ruolo-detail-text">${ruolo.perche}</div>
+        <div class="ruolo-detail-text">${esc(ruolo.perche)}</div>
       </div>
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Cosa fa davvero</div>
-        <div class="ruolo-detail-text">${ruolo.cosa_fa}</div>
+        <div class="ruolo-detail-text">${esc(ruolo.cosa_fa)}</div>
       </div>${settoriHtml}
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Come si entra</div>
-        <div class="ruolo-detail-text">${ruolo.come_si_entra}</div>
+        <div class="ruolo-detail-text">${esc(ruolo.come_si_entra)}</div>
       </div>
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Una cosa che non ti aspetti</div>
-        <div class="ruolo-detail-text">${ruolo.sorpresa}</div>
+        <div class="ruolo-detail-text">${esc(ruolo.sorpresa)}</div>
       </div>
     `;
     ruoliEl.appendChild(card);
@@ -311,8 +325,8 @@ function renderReport(data, { savedView = false } = {}) {
   const bonusEl = document.getElementById('bonus-card');
   bonusEl.innerHTML = `
     <div class="bonus-eyebrow">Il ruolo che non ti aspetti</div>
-    <div class="bonus-nome">${report.bonus.nome}</div>
-    <div class="bonus-testo">${report.bonus.testo}</div>
+    <div class="bonus-nome">${esc(report.bonus.nome)}</div>
+    <div class="bonus-testo">${esc(report.bonus.testo)}</div>
   `;
 
   if (report.ruoli_mismatch && report.ruoli_mismatch.length > 0) {
@@ -325,15 +339,15 @@ function renderReport(data, { savedView = false } = {}) {
         card.className = 'ruolo-card';
         card.innerHTML = `
           <div class="ruolo-header">
-            <div class="ruolo-nome">${ruolo.nome}</div>
+            <div class="ruolo-nome">${esc(ruolo.nome)}</div>
             <div class="ruolo-match">
-              <span class="ruolo-match-number" style="color:var(--text-muted);">${ruolo.match}%</span>
+              <span class="ruolo-match-number" style="color:var(--text-muted);">${esc(ruolo.match)}%</span>
               <span class="ruolo-match-label">compatibilità</span>
             </div>
           </div>
           <div class="ruolo-detail">
             <div class="ruolo-detail-label" style="color:var(--rose);opacity:1;">Perché non fa per te</div>
-            <div class="ruolo-detail-text">${ruolo.perche_no}</div>
+            <div class="ruolo-detail-text">${esc(ruolo.perche_no)}</div>
           </div>
         `;
         mismatchList.appendChild(card);
@@ -386,7 +400,7 @@ async function mostraRuoloAspirato(ruoloInput) {
   loader.id = 'aspirato-loader';
   loader.innerHTML = `
     <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Il ruolo a cui aspiri</div>
-    <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${ruoloInput}</div>
+    <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${esc(ruoloInput)}</div>
     <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:10px;font-style:italic;">Sto confrontando questo ruolo con il tuo profilo...</div>
   `;
   container.appendChild(loader);
@@ -433,15 +447,15 @@ function renderRuoloAttualeResult(val, data) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
       <div>
         <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Il tuo ruolo attuale</div>
-        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${val}</div>
-        <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${data.titolo || ''}</div>
+        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--text-primary);">${esc(val)}</div>
+        <div style="font-size:0.9rem;color:var(--text-secondary);margin-top:4px;">${esc(data.titolo) || ''}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${data.match}%</div>
+        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:${matchColor};line-height:1;">${esc(data.match)}%</div>
         <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">compatibilità</div>
       </div>
     </div>
-    <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${data.descrizione || ''}</div>
+    <div style="font-size:0.92rem;color:var(--text-secondary);line-height:1.75;border-top:1px solid var(--card-border);padding-top:14px;">${esc(data.descrizione) || ''}</div>
   `;
   risultato.classList.remove('hidden');
 }

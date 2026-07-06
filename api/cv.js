@@ -80,7 +80,13 @@ export default async function handler(req, res) {
     const [profile] = await profileRes.json();
     if (!profile?.cv_path) return res.status(400).json({ error: 'Nessun CV caricato' });
 
-    const fileRes = await fetch(`${SUPABASE_URL}/storage/v1/object/cv/${profile.cv_path}`, {
+    // cv_path in tabella è aggiornabile dal client (RLS "own profile update"
+    // consente di modificare qualunque colonna della propria riga): trattiamo
+    // il valore salvato solo come flag "CV presente", ma il percorso reale sul
+    // bucket lo ricostruiamo sempre dall'id utente verificato dal token, così
+    // nessuno può farsi leggere un file che non è il proprio.
+    const cvPath = `${user.id}/cv.pdf`;
+    const fileRes = await fetch(`${SUPABASE_URL}/storage/v1/object/cv/${cvPath}`, {
       headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
     });
     if (!fileRes.ok) return res.status(500).json({ error: 'Impossibile leggere il file CV' });

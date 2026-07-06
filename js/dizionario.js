@@ -1,3 +1,16 @@
+// Il dizionario mostra testo generato dall'AI a partire dal termine cercato
+// dall'utente: senza escaping, un payload HTML/script infilato nella ricerca
+// (o restituito dal modello) finirebbe nel DOM.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function searchRole() {
   const input = document.getElementById('search-input').value.trim();
   if (!input) return;
@@ -16,14 +29,16 @@ async function searchRole() {
     });
 
     const data = await response.json();
-  const raw = data.content[0].text;
-const text = raw
-  .replace(/```json\s*/gi, '')
-  .replace(/```\s*/gi, '')
-  .replace(/^\s+/, '')
-  .trim();
-    console.log('TEXT:', JSON.stringify(text.substring(0, 300)));
-    console.log('PARSE TEST:', !!JSON.parse(text));
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error('Errore API Claude (fase dizionario):', data.error || data);
+      throw new Error('Risposta API vuota o non valida');
+    }
+    const raw = data.content[0].text;
+    const text = raw
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/gi, '')
+      .replace(/^\s+/, '')
+      .trim();
     let result = null;
 
     try {
@@ -75,25 +90,29 @@ function renderResult(ruolo) {
                      trendClass === 'declino'  ? '↓' : '→';
 
   const aliasHtml = (ruolo.titoli_alternativi || [])
-    .map(t => `<span class="alias-pill">${t}</span>`).join('');
+    .map(t => `<span class="alias-pill">${esc(t)}</span>`).join('');
 
   const conChiHtml = (ruolo.con_chi_lavora || [])
-    .map(c => `<span class="alias-pill">${c}</span>`).join('');
+    .map(c => `<span class="alias-pill">${esc(c)}</span>`).join('');
 
+  // Niente onclick inline con stringa interpolata: un titolo con un apice
+  // dentro spezzerebbe la stringa JS ed eseguirebbe codice arbitrario. Il
+  // titolo va invece in un data-attribute (sempre escapato) e il click si
+  // aggancia dopo, via addEventListener.
   const adiacentiHtml = (ruolo.titoli_adiacenti || [])
-    .map(t => `<span class="alias-pill" style="cursor:pointer;" onclick="searchFromTag('${t}')">${t}</span>`).join('');
+    .map(t => `<span class="alias-pill diz-tag" style="cursor:pointer;" data-role="${esc(t)}">${esc(t)}</span>`).join('');
 
   el.innerHTML = `
-    <h1 class="dizionario-nome">${ruolo.nome}</h1>
+    <h1 class="dizionario-nome">${esc(ruolo.nome)}</h1>
     <div class="dizionario-aliases">${aliasHtml}</div>
     <div class="dizionario-grid">
       <div class="diz-block" style="grid-column: 1 / -1;">
         <div class="diz-block-label">Cosa fa davvero</div>
-        <div class="diz-block-text">${ruolo.descrizione}</div>
+        <div class="diz-block-text">${esc(ruolo.descrizione)}</div>
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Giornata tipo</div>
-        <div class="diz-block-text">${ruolo.giornata_tipo}</div>
+        <div class="diz-block-text">${esc(ruolo.giornata_tipo)}</div>
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Con chi lavora</div>
@@ -101,22 +120,22 @@ function renderResult(ruolo) {
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Come si entra</div>
-        <div class="diz-block-text">${ruolo.come_si_entra}</div>
+        <div class="diz-block-text">${esc(ruolo.come_si_entra)}</div>
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Stipendio in Italia</div>
-        <div class="diz-block-text"><strong>Junior:</strong> ${ruolo.stipendio_junior}<br><strong>Senior:</strong> ${ruolo.stipendio_senior}</div>
+        <div class="diz-block-text"><strong>Junior:</strong> ${esc(ruolo.stipendio_junior)}<br><strong>Senior:</strong> ${esc(ruolo.stipendio_senior)}</div>
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Trend</div>
         <div>
-          <span class="trend-badge ${trendClass}">${trendEmoji} ${ruolo.trend}</span>
-          <div class="diz-block-text" style="margin-top:6px;">${ruolo.trend_descrizione || ''}</div>
+          <span class="trend-badge ${trendClass}">${trendEmoji} ${esc(ruolo.trend)}</span>
+          <div class="diz-block-text" style="margin-top:6px;">${esc(ruolo.trend_descrizione) || ''}</div>
         </div>
       </div>
       <div class="diz-block">
         <div class="diz-block-label">Una cosa che non sai</div>
-        <div class="diz-block-text">${ruolo.cosa_non_sai}</div>
+        <div class="diz-block-text">${esc(ruolo.cosa_non_sai)}</div>
       </div>
     </div>
     <div style="margin-top:16px;">
@@ -128,6 +147,10 @@ function renderResult(ruolo) {
       <a href="test.html" class="btn btn--primary">Fai il test →</a>
     </div>
   `;
+
+  el.querySelectorAll('.diz-tag').forEach((tag) => {
+    tag.addEventListener('click', () => searchFromTag(tag.dataset.role));
+  });
 
   el.classList.remove('hidden');
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });

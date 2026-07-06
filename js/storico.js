@@ -3,6 +3,18 @@
 // e apre il report completo (report.html?id=...).
 import { getSession, listReports } from './supabase.js';
 
+// I nomi dei ruoli vengono dal report generato dall'AI: senza escaping, un
+// payload HTML/script infilato in un ruolo finirebbe nel DOM.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatDate(iso) {
   try {
     return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -41,10 +53,10 @@ function renderList(reports) {
     const badge = (i === 0) ? '<span class="st-badge">Più recente</span>' : '';
     a.innerHTML =
       '<div class="st-card-top">' +
-        '<p class="st-date">' + formatDate(r.created_at) + '</p>' +
+        '<p class="st-date">' + esc(formatDate(r.created_at)) + '</p>' +
         badge +
       '</div>' +
-      '<p class="st-roles">' + rolesLine(r.report_json) + '</p>' +
+      '<p class="st-roles">' + esc(rolesLine(r.report_json)) + '</p>' +
       '<div class="st-foot"><span class="st-open">Apri il report completo →</span></div>';
     list.appendChild(a);
   });

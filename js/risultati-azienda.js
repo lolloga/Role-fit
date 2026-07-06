@@ -1,5 +1,18 @@
 const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
 
+// Il testo qui sotto è generato dall'AI a partire dai profili dei candidati:
+// senza escaping, un payload HTML/script infilato in un profilo finirebbe nel
+// DOM del browser dell'azienda che guarda questi risultati.
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getJobId() {
   return new URLSearchParams(window.location.search).get('id');
 }
@@ -11,7 +24,7 @@ function renderAssi(assi) {
     return `
       <div style="margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px;">
-          <span>${key}</span><span>${value}</span>
+          <span>${esc(key)}</span><span>${esc(value)}</span>
         </div>
         <div style="height:6px;background:var(--deep);border-radius:99px;overflow:hidden;">
           <div style="height:100%;width:${value}%;background:var(--emerald-light);border-radius:99px;"></div>
@@ -32,21 +45,21 @@ function renderCandidati(candidates, jobId) {
     return `
     <a class="ruolo-card" href="${href}" style="display:block;text-decoration:none;color:inherit;cursor:pointer;">
       <div class="ruolo-header">
-        <div class="ruolo-nome">${c.email || 'Candidato'}</div>
+        <div class="ruolo-nome">${esc(c.email) || 'Candidato'}</div>
         <div class="ruolo-match">
-          <span class="ruolo-match-number">${c.match}%</span>
+          <span class="ruolo-match-number">${esc(c.match)}%</span>
           <span class="ruolo-match-label">compatibilità</span>
         </div>
       </div>
       ${c.perche_azienda ? `
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">Perché può fare al caso vostro</div>
-        <div class="ruolo-detail-text">${c.perche_azienda}</div>
+        <div class="ruolo-detail-text">${esc(c.perche_azienda)}</div>
       </div>` : ''}
       ${c.ruoli && c.ruoli.length > 0 ? `
       <div class="ruolo-detail">
         <div class="ruolo-detail-label">I suoi ruoli compatibili su RoleFit</div>
-        <div class="ruolo-detail-text">${c.ruoli.join(', ')}</div>
+        <div class="ruolo-detail-text">${esc(c.ruoli.join(', '))}</div>
       </div>` : ''}
       <div class="ruolo-detail-label" style="margin-top:10px;color:var(--emerald-light);">Vedi profilo completo →</div>
     </a>
@@ -74,8 +87,8 @@ function renderCandidati(candidates, jobId) {
       throw new Error(data.error || 'Errore sconosciuto');
     }
 
-    document.getElementById('ruolo-titolo').innerHTML = `${data.job.role_title},<br><em>tradotto in numeri.</em>`;
-    document.getElementById('target-sintesi').innerHTML = `<p>${data.job.target_profile.sintesi}</p>`;
+    document.getElementById('ruolo-titolo').innerHTML = `${esc(data.job.role_title)},<br><em>tradotto in numeri.</em>`;
+    document.getElementById('target-sintesi').innerHTML = `<p>${esc(data.job.target_profile.sintesi)}</p>`;
     renderAssi(data.job.target_profile.assi);
     renderCandidati(data.candidates, jobId);
 
