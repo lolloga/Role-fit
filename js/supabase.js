@@ -143,10 +143,22 @@ export async function createDraft({ history, activities = null, aspiration = nul
   return { id };
 }
 
-// Reclama la bozza dopo il login: la legge, la elimina e restituisce i dati
-// ({ history, activities, aspiration }) oppure null se già usata/scaduta.
+// Legge la bozza dopo il login SENZA cancellarla (vedi migration-5-draft-fix.sql):
+// se la generazione del report fallisce subito dopo, il link resta valido e
+// ricaricare la pagina recupera di nuovo la stessa bozza, invece di perderla.
+// Restituisce { history, activities, aspiration } oppure null se non esiste
+// (link scaduto o mai creato).
 export async function claimDraft(id) {
   const { data, error } = await sb.rpc('claim_report_draft', { p_id: id });
   if (error) throw error;
   return data || null;
+}
+
+// Cancella la bozza: va chiamata SOLO dopo che il report è stato generato e
+// salvato con successo su "reports". Best-effort: un fallimento qui non deve
+// mai bloccare l'utente, la bozza verrà ripulita comunque dalla manutenzione
+// periodica (vedi fondo di migration-2-report-drafts.sql).
+export async function deleteDraft(id) {
+  const { error } = await sb.rpc('delete_report_draft', { p_id: id });
+  if (error) throw error;
 }
