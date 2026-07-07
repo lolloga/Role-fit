@@ -617,6 +617,28 @@ function renderSavedReport(row) {
 
 // ─── INIT ─────────────────────────────────────────────────────
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Il salvataggio del report può fallire per un intoppo momentaneo (rete che
+// va e viene, sessione non ancora del tutto assestata subito dopo il magic
+// link): invece di arrendersi al primo tentativo, ritenta un paio di volte
+// con una breve pausa prima di considerarlo davvero fallito.
+async function saveReportWithRetry(payload, attempts = 3) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await saveReport(payload);
+    } catch (e) {
+      lastError = e;
+      console.error(`Salvataggio report fallito (tentativo ${i + 1}/${attempts}):`, e);
+      if (i < attempts - 1) await sleep(1000 * (i + 1)); // 1s, poi 2s
+    }
+  }
+  throw lastError;
+}
+
 function showSaveErrorBanner() {
   const banner = document.getElementById('save-error-banner');
   if (banner) banner.classList.remove('hidden');
@@ -646,7 +668,7 @@ async function generateAndSave() {
         answers: JSON.parse(localStorage.getItem('rf_answers') || '[]'),
         savedAt: new Date().toISOString(),
       };
-      const saved = await saveReport({ report_json: data.report, aspiration, test_history });
+      const saved = await saveReportWithRetry({ report_json: data.report, aspiration, test_history });
       currentReportId = saved.id;
       localStorage.setItem('rf_report_saved', '1');
       // [feedback] report appena generato e salvato: attiva la sezione feedback per questo report
