@@ -1,4 +1,7 @@
-export const maxDuration = 30;
+// La generazione del report (fase 'report', max_tokens 8000) può impiegare
+// più di un minuto quando il modello è più lento del solito: 30s era troppo
+// stretto e rischiava di far interrompere a Vercel la funzione a metà.
+export const maxDuration = 60;
 
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
