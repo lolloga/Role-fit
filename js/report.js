@@ -602,9 +602,10 @@ function showAuthGate() {
 }
 
 function showLoadingError(msg) {
+  stopLoadingTimer();
   document.getElementById('auth-gate').classList.add('hidden');
   document.getElementById('loading-state').classList.remove('hidden');
-  const p = document.querySelector('#loading-state p');
+  const p = document.getElementById('loading-text');
   if (p) p.textContent = msg;
 }
 
@@ -668,6 +669,43 @@ function showSaveErrorBanner() {
   if (banner) banner.classList.remove('hidden');
 }
 
+// Un contatore reale + frasi che cambiano in base a quanto tempo è passato,
+// invece di una rotazione vaga senza riferimenti: l'utente sa sempre se
+// l'attesa è nella norma o se sta durando più del solito, senza dover
+// indovinare se qualcosa si è bloccato.
+let loadingTimerInterval = null;
+
+function startLoadingTimer() {
+  const elapsedEl = document.getElementById('loading-elapsed');
+  const textEl = document.getElementById('loading-text');
+  if (!elapsedEl || !textEl) return;
+  stopLoadingTimer();
+  let seconds = 0;
+  elapsedEl.textContent = '';
+  textEl.textContent = 'Sto leggendo le tue risposte...';
+
+  loadingTimerInterval = setInterval(() => {
+    seconds += 1;
+    elapsedEl.textContent = seconds + 's';
+    if (seconds === 10) {
+      textEl.textContent = 'Sto costruendo il tuo profilo...';
+    } else if (seconds === 30) {
+      textEl.textContent = 'Ci vuole di solito tra 30 e 90 secondi.';
+    } else if (seconds === 60) {
+      textEl.textContent = 'Ancora un po\' — il tuo profilo ha diversi segnali da mettere insieme.';
+    } else if (seconds === 100) {
+      textEl.textContent = 'Sta impiegando più del solito, ma sta ancora lavorando: capita con i profili più ricchi.';
+    }
+  }, 1000);
+}
+
+function stopLoadingTimer() {
+  if (loadingTimerInterval) {
+    clearInterval(loadingTimerInterval);
+    loadingTimerInterval = null;
+  }
+}
+
 // Genera il report dagli input in localStorage, lo mostra e lo salva su Supabase.
 // Marca l'handoff come consumato per evitare doppi salvataggi al reload. NON
 // cancella rf_history: la valutazione asincrona del ruolo aspirato lo legge dopo.
@@ -676,8 +714,10 @@ function showSaveErrorBanner() {
 // (vedi init()) — se il salvataggio fallisce, la bozza resta per poter riprovare.
 async function generateAndSave() {
   try {
+    startLoadingTimer();
     const priorProfile = await fetchPriorProfileContext();
     const data = await generateReport(priorProfile);
+    stopLoadingTimer();
     if (!data) throw new Error('Report non valido');
     renderReport(data);
 
@@ -708,8 +748,9 @@ async function generateAndSave() {
       return false;
     }
   } catch (err) {
+    stopLoadingTimer();
     console.error('Errore generazione report:', err);
-    document.querySelector('#loading-state p').textContent =
+    document.getElementById('loading-text').textContent =
       err?.message && err.message.includes('Ricarica la pagina')
         ? err.message
         : 'Qualcosa è andato storto. Ricarica la pagina per riprovare.';
