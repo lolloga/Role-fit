@@ -52,6 +52,10 @@ const state = {
   conversationHistory: [],
   answers: [],
   activityResults: {},
+  // Attività saltate perché il segnale era già chiaro su tutte e 3 le
+  // dimensioni quando si è raggiunta la soglia: test più corto per chi è
+  // "leggibile", invariato per chi resta ambiguo (vedi isSignalChiaro).
+  activitySkipped: {},
   questionCount: 0,
   fixedCount: 0,
   adaptiveCount: 0,
@@ -71,6 +75,7 @@ function saveState() {
     conversationHistory: state.conversationHistory,
     answers: state.answers,
     activityResults: state.activityResults,
+    activitySkipped: state.activitySkipped,
     questionCount: state.questionCount,
     fixedCount: state.fixedCount,
     adaptiveCount: state.adaptiveCount,
@@ -625,6 +630,13 @@ async function submitAnswer(value, questionData) {
   await getNextStep();
 }
 
+// Vero solo se il modello segna tutte e 3 le dimensioni come CHIARO nel suo
+// ultimo giudizio interno — non basta "PROBABILE", il test resta lungo in
+// quel caso.
+function isSignalChiaro(internal) {
+  return !!internal && internal.dim1 === 'CHIARO' && internal.dim2 === 'CHIARO' && internal.dim3 === 'CHIARO';
+}
+
 // ─── PROSSIMO STEP ────────────────────────────────────────────
 async function getNextStep() {
   showThinking();
@@ -667,15 +679,33 @@ async function getNextStep() {
     }
     goToReport();
   } else if (result.action === 'ask' && result.question) {
+    // Segnale già chiaro su tutte e 3 le dimensioni: le attività sotto
+    // servono a raccogliere segnale extra, non ha senso infliggerle a chi
+    // il modello ha già "letto" bene. Il test resta lungo per chi è ambiguo,
+    // si accorcia per chi è leggibile — non è un taglio arbitrario.
+    const segnaliChiari = isSignalChiaro(result.internal);
+
     // Attività Dilemma dopo 7 domande totali
-    if (state.questionCount >= 7 && !state.activityResults['dilemma']) {
-      showActivity('dilemma');
-      return;
+    if (state.questionCount >= 7 && !state.activityResults['dilemma'] && !state.activitySkipped['dilemma']) {
+      if (segnaliChiari) {
+        state.activitySkipped['dilemma'] = true;
+        saveState();
+      } else {
+        showActivity('dilemma');
+        return;
+      }
     }
-    // Attività Costruisci a metà adattive
-    if (state.adaptiveCount >= 4 && !state.activityResults['costruisci']) {
-      showActivity('costruisci');
-      return;
+    // Attività Costruisci a metà adattive (Smonta l'Annuncio segue sempre
+    // Costruisci: se si salta la prima si salta anche la seconda).
+    if (state.adaptiveCount >= 4 && !state.activityResults['costruisci'] && !state.activitySkipped['costruisci']) {
+      if (segnaliChiari) {
+        state.activitySkipped['costruisci'] = true;
+        state.activitySkipped['smonta'] = true;
+        saveState();
+      } else {
+        showActivity('costruisci');
+        return;
+      }
     }
 
     // VALIDAZIONE DOMANDA — una domanda valida deve avere 4 opzioni concrete
