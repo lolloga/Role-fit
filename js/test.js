@@ -329,11 +329,19 @@ async function callClaude(fase = 'test') {
 }
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────
+// Il test ha una lunghezza variabile (tra le standard, le adattive e le
+// attività il totale cambia da persona a persona): una percentuale precisa
+// sul numero di domande sarebbe disonesta e rischierebbe di sembrare
+// "bloccata" vicino alla fine dei test più lunghi. Mostriamo invece
+// l'avanzamento reale per fase — "Passo X di 4" — che è sempre vero.
+const PHASE_ORDER = ['building', 'deepening', 'almost', 'done'];
+
 function updateProgress() {
-  const total = 22;
-  const done = state.questionCount;
-  const pct = Math.min(95, Math.round((done / total) * 100));
-  document.getElementById('progress-bar').style.width = pct + '%';
+  const idx = PHASE_ORDER.indexOf(state.currentPhase);
+  const step = idx === -1 ? 1 : idx + 1;
+  document.getElementById('progress-bar').style.width = (step / PHASE_ORDER.length * 100) + '%';
+  const stepEl = document.getElementById('phase-step');
+  if (stepEl) stepEl.textContent = `Passo ${step} di ${PHASE_ORDER.length}`;
 }
 
 // ─── FASE ─────────────────────────────────────────────────────
@@ -348,6 +356,7 @@ function updatePhase(phase) {
 
   const p = phases[phase] || phases.building;
   document.getElementById('phase-label').textContent = p.label;
+  updateProgress();
 
   p.dots.forEach((active, i) => {
     const dot = document.getElementById(`dot-${i + 1}`);
