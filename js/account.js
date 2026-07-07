@@ -438,17 +438,44 @@ function renderRadar(reports) {
 
   const datasets = conAssi.map((r, i) => {
     const a = r.report_json.assi;
+    const conf = r.report_json.assi_confidenza || {};
     const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
+    // Un asse a "bassa" confidenza diventa un punto vuoto invece che pieno:
+    // il modello distingue già internamente quanto è sicuro di ogni valore,
+    // qui lo rendiamo visibile invece di lasciarlo perdere.
     return {
       data: ASSI_FISSI.map(k => (typeof a[k] === 'number' ? a[k] : 0)),
       borderColor: c.border,
       backgroundColor: c.bg,
-      pointBackgroundColor: c.border,
+      pointBackgroundColor: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 'transparent' : c.border),
+      pointBorderColor: c.border,
+      pointBorderWidth: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 2 : 1),
       borderWidth: 2,
       borderDash: c.dash,
-      pointRadius: 2
+      pointRadius: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 4 : 2)
     };
   });
+
+  // Dopo 3 test, aggiungiamo anche una sintesi consolidata (media semplice
+  // degli ultimi 3) come punto di arrivo, invece di lasciare all'utente il
+  // compito di interpretare da solo 3 linee sovrapposte.
+  let consolidato = null;
+  if (conAssi.length >= 3) {
+    const media = ASSI_FISSI.map((k) => {
+      const valori = conAssi.map(r => r.report_json.assi[k]).filter(v => typeof v === 'number');
+      return valori.length ? Math.round(valori.reduce((s, v) => s + v, 0) / valori.length) : 0;
+    });
+    consolidato = {
+      data: media,
+      borderColor: '#F0FFF4',
+      backgroundColor: 'rgba(240,255,244,0.05)',
+      pointBackgroundColor: '#F0FFF4',
+      borderWidth: 2.5,
+      borderDash: [],
+      pointRadius: 3
+    };
+    datasets.push(consolidato);
+  }
 
   new Chart(canvas, {
     type: 'radar',
@@ -471,14 +498,28 @@ function renderRadar(reports) {
 
   const legend = document.getElementById('pf-radar-legend');
   if (legend) {
-    legend.innerHTML = conAssi.map((r, i) => {
+    let html = conAssi.map((r, i) => {
       const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
       const stile = c.dash.length ? 'dashed' : 'solid';
       const etichetta = (i === conAssi.length - 1) ? formatShort(r.created_at) + ' (attuale)' : formatShort(r.created_at);
       return '<span style="display:flex; align-items:center; gap:5px;">' +
         '<span style="width:14px; height:0; border-top:2px ' + stile + ' ' + c.border + ';"></span>' + etichetta + '</span>';
     }).join('');
+
+    if (consolidato) {
+      html += '<span style="display:flex; align-items:center; gap:5px;">' +
+        '<span style="width:14px; height:0; border-top:2.5px solid #F0FFF4;"></span>Profilo consolidato (media ultimi 3)</span>';
+    }
+
+    legend.innerHTML = html;
   }
+
+  const haBassaConfidenza = conAssi.some((r) => {
+    const conf = r.report_json.assi_confidenza || {};
+    return ASSI_FISSI.some((k) => conf[k] === 'bassa');
+  });
+  const nota = document.getElementById('pf-radar-nota');
+  if (nota) nota.classList.toggle('hidden', !haBassaConfidenza);
 }
 
 function renderChart(reports) {
