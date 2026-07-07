@@ -18,9 +18,10 @@ function getParams() {
   return { jobId: p.get('job_id'), userId: p.get('user_id') };
 }
 
-function renderRadar(assi) {
+function renderRadar(assi, confidenza) {
   const canvas = document.getElementById('candidato-radar');
   if (!canvas || typeof Chart === 'undefined' || !assi) return;
+  const conf = confidenza || {};
   new Chart(canvas, {
     type: 'radar',
     data: {
@@ -29,9 +30,12 @@ function renderRadar(assi) {
         data: ASSI_FISSI.map((k) => (typeof assi[k] === 'number' ? assi[k] : 0)),
         borderColor: '#5DCAA5',
         backgroundColor: 'rgba(93,202,165,0.18)',
-        pointBackgroundColor: '#5DCAA5',
+        // Punto vuoto = il test ha ancora pochi segnali su quella dimensione.
+        pointBackgroundColor: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 'transparent' : '#5DCAA5'),
+        pointBorderColor: '#5DCAA5',
+        pointBorderWidth: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 2 : 1),
         borderWidth: 2,
-        pointRadius: 3,
+        pointRadius: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 5 : 3),
       }],
     },
     options: {
@@ -119,7 +123,7 @@ function renderQa(qaLog, qaDisponibile) {
     if (!res.ok || data.error) throw new Error(data.error || 'Errore sconosciuto');
 
     document.getElementById('candidato-email').textContent = data.email || 'Candidato';
-    renderRadar(data.report?.assi);
+    renderRadar(data.report?.assi, data.report?.assi_confidenza);
 
     if (data.cv_url) {
       document.getElementById('cv-link').href = data.cv_url;

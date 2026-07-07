@@ -244,6 +244,11 @@ Regole per gli assi:
 - I valori NON devono sommare a 100: sono indipendenti l'uno dall'altro. Una persona può essere alta o bassa su tutti.
 - Usa l'intero range: se qualcuno è chiaramente analitico, "Analisi" può essere 85-90; se è chiaramente poco strutturato, "Metodo" può essere 25-30. Evita di appiattire tutto su valori medi se i segnali sono netti.
 
+Per ciascuno dei 6 assi, valuta ANCHE quanto sei sicuro del valore assegnato — quanti segnali distinti e concordanti lo sostengono — e restituiscilo in "assi_confidenza" con lo stesso identico set di chiavi. Usa "alta" se almeno 2-3 segnali diversi puntano nella stessa direzione, "media" se il segnale è presente ma isolato o parzialmente ambiguo, "bassa" se il valore è più una stima di default (es. intorno a 50 per mancanza di segnali) che una lettura reale. Sii onesto: non tutto può essere "alta", e un profilo con qualche asse a bassa confidenza è normale, specialmente al primo test.
+
+SE HAI A DISPOSIZIONE IL PROFILO DI UN TEST PRECEDENTE DELLA STESSA PERSONA (te lo indichiamo esplicitamente nel messaggio, con data e assi):
+Nel paragrafo "Come funzioni" del blocco CHI SEI, aggiungi un confronto esplicito ma breve con quel profilo precedente — cosa è rimasto stabile, cosa è cambiato, e se possibile una lettura onesta del perché (es. un nuovo lavoro, più esperienza, una fase diversa). Deve suonare come "ti ritrovo, e noto anche questo di nuovo", mai come un giudizio su quale dei due profili sia "giusto". Se il profilo è sostanzialmente identico, dillo: è un segnale di coerenza, non un problema. Se non hai un test precedente, ignora questa istruzione e scrivi il paragrafo come sempre.
+
 REGOLE DI SCRITTURA
 - Usa "tu" sempre, mai terza persona
 - La prova del nove di ogni frase del blocco CHI SEI: "L'utente poteva scrivere questa frase da solo dopo aver fatto il test?" Se sì, è parafrasi: riscrivila come sintesi o tensione tra più segnali.
@@ -297,6 +302,14 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (il primo carattere deve essere
       "Curiosità": 75,
       "Leadership": 55,
       "Metodo": 65
+    },
+    "assi_confidenza": {
+      "Analisi": "alta",
+      "Relazione": "alta",
+      "Creatività": "media",
+      "Curiosità": "media",
+      "Leadership": "bassa",
+      "Metodo": "alta"
     }
   }
 }

@@ -1,4 +1,4 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, listReports } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
@@ -29,8 +29,28 @@ function esc(str) {
 // altrimenti sarebbero riuscite.
 const GENERATE_TIMEOUT_MS = 120000;
 
+// Recupera un condensato dell'ultimo report salvato (se esiste) per il
+// confronto longitudinale nel prossimo report: solo data e assi, non serve
+// altro al modello per notare cosa è cambiato. Nessun errore qui deve mai
+// bloccare la generazione del nuovo report — in caso di dubbio, niente
+// confronto, il report si genera comunque come sempre.
+async function fetchPriorProfileContext() {
+  try {
+    const session = await getSession();
+    if (!session) return null;
+    const reports = await listReports();
+    const prev = reports?.[0];
+    const assi = prev?.report_json?.assi;
+    if (!prev || !assi) return null;
+    const data = new Date(prev.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    return { data, assi };
+  } catch {
+    return null;
+  }
+}
+
 // ─── GENERA REPORT ───────────────────────────────────────────
-async function generateReport() {
+async function generateReport(priorProfile) {
   const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
   const activities = JSON.parse(localStorage.getItem('rf_activities') || '{}');
 
@@ -38,11 +58,15 @@ async function generateReport() {
     .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
     .join('\n');
 
+  const priorBlock = priorProfile
+    ? `\n\nProfilo del test precedente di questa persona (${priorProfile.data}), sulle stesse 6 dimensioni: ${JSON.stringify(priorProfile.assi)}. Usalo per il confronto longitudinale richiesto nelle istruzioni.`
+    : '';
+
   const messages = [
     ...history,
     {
       role: 'user',
-      content: `Il test è completato. Genera il report finale.\n\nRiepilogo attività interattive:\n${activitiesSummary}\n\nGenera il report completo in JSON.`
+      content: `Il test è completato. Genera il report finale.\n\nRiepilogo attività interattive:\n${activitiesSummary}${priorBlock}\n\nGenera il report completo in JSON.`
     }
   ];
 
@@ -652,7 +676,8 @@ function showSaveErrorBanner() {
 // (vedi init()) — se il salvataggio fallisce, la bozza resta per poter riprovare.
 async function generateAndSave() {
   try {
-    const data = await generateReport();
+    const priorProfile = await fetchPriorProfileContext();
+    const data = await generateReport(priorProfile);
     if (!data) throw new Error('Report non valido');
     renderReport(data);
 
