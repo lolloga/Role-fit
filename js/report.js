@@ -22,8 +22,12 @@ function esc(str) {
 // Tempo massimo di attesa della chiamata di generazione: senza questo, una
 // richiesta che si blocca lato server (o una rete che non risponde più)
 // lascia l'utente a guardare l'animazione di caricamento all'infinito, senza
-// mai vedere un errore né la possibilità di riprovare.
-const GENERATE_TIMEOUT_MS = 55000;
+// mai vedere un errore né la possibilità di riprovare. Il valore è alto
+// apposta: la generazione del report può impiegare più di un minuto quando
+// il modello è più lento del solito, e in quei casi va comunque a buon
+// fine — un limite troppo stretto interromperebbe generazioni che
+// altrimenti sarebbero riuscite.
+const GENERATE_TIMEOUT_MS = 120000;
 
 // ─── GENERA REPORT ───────────────────────────────────────────
 async function generateReport() {
