@@ -91,6 +91,23 @@ export async function getReport(id) {
   return data;
 }
 
+// Risposte grezze dell'ultimo test (per chi rifà il test da loggato): usate
+// da test.js per non richiedere di nuovo domande puramente anagrafiche di cui
+// la risposta non cambia (es. età, formazione). null se non c'è nessun test
+// precedente o se è troppo vecchio per avere questo campo.
+export async function getLastTestAnswers() {
+  const session = await getSession();
+  if (!session) return null;
+  const { data, error } = await sb
+    .from('reports')
+    .select('test_history')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.test_history?.answers || null;
+}
+
 // ─── CV ────────────────────────────────────────────────────────
 // Stato del CV (path nello storage + data dell'ultima rigenerazione).
 export async function getProfile() {
