@@ -1,4 +1,4 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, listReports } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, listReports, getProfile, uploadCv, saveCvPath } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
@@ -388,6 +388,9 @@ function renderReport(data, { savedView = false } = {}) {
 
   sessionStorage.setItem('rf_report', JSON.stringify(report));
 
+  if (report.assi) renderNextSky(report.assi);
+  setupNextCv();
+
   if (savedView) return;
 
   const worksCurrently = checkWorksCurrently();
@@ -415,6 +418,156 @@ function renderReport(data, { savedView = false } = {}) {
   if (aspirato) {
     mostraRuoloAspirato(aspirato);
   }
+}
+
+// ─── PROSSIMI PASSI: mini costellazione + upload CV rapido ───────
+// Stessa idea grafica della costellazione di account.js, in scala ridotta:
+// qui l'obiettivo non è esplorare, solo far intuire che il profilo esiste
+// ed è vivo, nel punto della pagina dove l'attenzione è già.
+const ASSI_FISSI_MINI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const ASSI_COLORI_MINI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
+
+function renderNextSky(assi) {
+  const canvas = document.getElementById('next-sky');
+  if (!canvas || !assi || canvas.dataset.started) return;
+  canvas.dataset.started = '1';
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+    canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  let t = 0;
+  function frame() {
+    const W = canvas.width / dpr, H = canvas.height / dpr;
+    const CX = W / 2, CY = H / 2;
+    ctx.clearRect(0, 0, W, H);
+    t += 1;
+
+    const coreR = 4 * (1 + Math.sin(t * 0.03) * 0.08);
+    const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR * 6);
+    g.addColorStop(0, 'rgba(93,202,165,0.5)'); g.addColorStop(1, 'rgba(93,202,165,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, coreR * 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#F0FFF4'; ctx.beginPath(); ctx.arc(CX, CY, coreR, 0, Math.PI * 2); ctx.fill();
+
+    const R = Math.min(W, H) * 0.36;
+    const pts = ASSI_FISSI_MINI.map((k, i) => {
+      const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      const val = (typeof assi[k] === 'number') ? assi[k] : 0;
+      const r = 8 + (val / 100) * R;
+      return { x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r };
+    });
+    ctx.strokeStyle = 'rgba(93,202,165,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = 'rgba(93,202,165,0.05)'; ctx.fill();
+
+    pts.forEach((p, i) => {
+      const pulse = reduceMotion ? 0 : Math.sin(t * 0.05 + i) * 0.5 + 0.5;
+      const haloR = 4 + pulse * 2.5;
+      const hg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
+      hg.addColorStop(0, ASSI_COLORI_MINI[i] + 'CC'); hg.addColorStop(1, ASSI_COLORI_MINI[i] + '00');
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(p.x, p.y, haloR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = ASSI_COLORI_MINI[i]; ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+    });
+
+    if (!reduceMotion) requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// Upload del CV direttamente dal report, così chi legge il report può
+// caricarlo senza prima dover scoprire che esiste una sezione profilo.
+// Stessa logica di setupCv() in account.js (carica + rigenera il report
+// alla luce del CV), ma senza portare via l'utente dalla pagina: il report
+// aggiornato resta un link cliccabile quando vuole, non una redirezione forzata.
+async function setupNextCv() {
+  const btn = document.getElementById('next-cv-btn');
+  const input = document.getElementById('next-cv-input');
+  const errEl = document.getElementById('next-cv-error');
+  const doneEl = document.getElementById('next-cv-done');
+  const doneLink = document.getElementById('next-cv-done-link');
+  const statusEl = document.getElementById('next-cv-status');
+  const heading = document.getElementById('next-cv-heading');
+  const body = document.getElementById('next-cv-body');
+  if (!btn || !input || btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+
+  try {
+    const profile = await getProfile();
+    if (profile?.cv_path) {
+      btn.textContent = 'Aggiorna il CV';
+      if (heading) heading.textContent = 'Hai già un CV su RoleFit.';
+      if (body) body.textContent = 'Puoi caricarne uno nuovo in qualsiasi momento: rigeneriamo il report tenendo conto anche di quello.';
+      if (statusEl) statusEl.textContent = '';
+    }
+  } catch (e) {
+    console.error('Errore nel leggere lo stato del CV:', e);
+  }
+
+  btn.addEventListener('click', () => input.click());
+
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    errEl.classList.add('hidden');
+    doneEl.classList.add('hidden');
+
+    if (file.type !== 'application/pdf') {
+      errEl.textContent = 'Il file deve essere un PDF.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      errEl.textContent = 'Il file supera i 10 MB.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Sto caricando il CV...';
+
+    try {
+      const path = await uploadCv(file);
+      await saveCvPath(path);
+
+      if (statusEl) statusEl.textContent = 'Sto rileggendo il tuo profilo alla luce del CV...';
+
+      const token = await getAccessToken();
+      const response = await fetch('/api/cv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.error || 'Errore rigenerazione');
+
+      if (statusEl) statusEl.textContent = '';
+      doneLink.href = 'report.html?id=' + data.report_id;
+      doneEl.classList.remove('hidden');
+      btn.textContent = 'Aggiorna il CV';
+    } catch (e) {
+      console.error('Errore caricamento CV:', e);
+      if (statusEl) statusEl.textContent = '';
+      errEl.textContent = 'Qualcosa è andato storto. Riprova tra poco.';
+      errEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 // ─── ORCHESTRA IL BLOCCO ASPIRATO (async, non blocca il report) ──
