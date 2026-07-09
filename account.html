@@ -105,6 +105,51 @@
     .pf-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #1D9E75;
       background: var(--deep, #071A10); color: #F0FFF4; margin-bottom: 10px; box-sizing: border-box; font-size: 0.95rem; outline: none; }
 
+    /* — COSTELLAZIONE (Panoramica) — */
+    .cnst-sub { color: var(--text-secondary, rgba(240,255,244,0.65)); font-size: 0.85rem; max-width: 52ch; margin: -8px 0 18px; }
+
+    .sky-wrap { position: relative; width: 100%; height: min(60vh, 520px); min-height: 380px; margin-bottom: 6px; }
+    .sky-wrap canvas { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+
+    .sky-hint {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      font-size: 0.7rem; color: var(--text-muted, rgba(240,255,244,0.4)); font-family: var(--font-mono, monospace);
+      pointer-events: none; opacity: 0.8; white-space: nowrap; transition: opacity 0.2s ease;
+    }
+
+    .role-panel {
+      position: absolute; z-index: 5; max-width: 320px;
+      background: rgba(7,26,16,0.95); border: 1px solid #FF6496; border-radius: 16px;
+      padding: 18px 20px; backdrop-filter: blur(14px);
+      opacity: 0; transform: translateY(8px) scale(0.98); pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+    }
+    .role-panel.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+    /* Su mobile diventa un foglio fisso in basso, non un riquadro vicino al
+       punto toccato: la posizione "vicino al nodo" non ha senso su schermi
+       stretti e rischierebbe di uscire dai bordi. */
+    .role-panel.mobile-sheet { position: fixed; left: 14px; right: 14px; bottom: 14px; top: auto; max-width: none; width: auto; z-index: 60; }
+    .role-panel-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .role-panel-name { font-family: var(--font-display, Georgia), serif; font-size: 1.05rem; color: #F0FFF4; }
+    .role-panel-pct { font-family: var(--font-display, Georgia), serif; font-size: 1.4rem; font-weight: 300; color: #FFB8C6; line-height: 1; }
+    .role-panel-close { background: none; border: none; color: rgba(240,255,244,0.4); font-size: 1.1rem; cursor: pointer; padding: 4px 6px; line-height: 1; }
+    .role-panel-text { font-size: 0.82rem; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: 0 0 8px; line-height: 1.55; }
+    .role-panel-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(240,255,244,0.4); margin: 10px 0 4px; }
+
+    .timeline { display: flex; align-items: center; justify-content: center; max-width: 420px; margin: 6px auto 0; }
+    .timeline-track { position: relative; height: 2px; background: rgba(255,255,255,0.09); flex: 1; margin: 0 2px; }
+    .timeline-point { position: relative; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; background: none; border: none; cursor: pointer; padding: 6px 8px; }
+    .timeline-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.09); border: 2px solid rgba(255,255,255,0.09); transition: all 0.3s ease; }
+    .timeline-point.active .timeline-dot { background: #5DCAA5; border-color: #5DCAA5; box-shadow: 0 0 10px rgba(29,158,117,0.4); }
+    .timeline-label { font-family: var(--font-mono, monospace); font-size: 0.64rem; color: rgba(240,255,244,0.4); white-space: nowrap; }
+    .timeline-point.active .timeline-label { color: #5DCAA5; }
+
+    .legend-axes { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 20px auto 0; max-width: 640px; font-size: 0.74rem; color: var(--text-secondary, rgba(240,255,244,0.65)); }
+    .legend-axes span { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .legend-note { text-align: center; font-size: 0.72rem; color: rgba(240,255,244,0.4); margin: 10px auto 0; max-width: 50ch; font-style: italic; }
+
     /* — BOTTOM BAR (mobile) — */
     .app-bottombar { display: none; }
 
@@ -114,6 +159,8 @@
       .app-sidebar { display: none; }
       .app-main { margin-left: 0; padding: 28px 18px 90px; max-width: 100%; }
       .sec-title { font-size: 20px; }
+      .sky-wrap { height: min(52vh, 420px); min-height: 320px; }
+      .legend-axes { gap: 10px 14px; font-size: 0.7rem; }
       .app-bottombar {
         display: flex; position: fixed; bottom: 0; left: 0; right: 0;
         background: rgba(7,26,16,0.95); border-top: 1px solid rgba(29,158,117,0.3);
@@ -188,37 +235,41 @@
     <!-- PANORAMICA -->
     <section class="app-sec" data-sec="panoramica">
       <h1 class="sec-title">Panoramica</h1>
-      <div class="pcard" id="pf-last-card">
-        <p class="pcard-label">Il tuo ultimo risultato</p>
-        <p class="pcard-title"><span id="pf-last-role">—</span> <span class="pct" id="pf-last-pct"></span></p>
-        <p class="pcard-sub" id="pf-last-sub">—</p>
-      </div>
-      <div class="pcard hidden" id="pf-time-chart">
-        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Come si è confermato nel tempo</p>
-        <div class="pf-chart" id="pf-chart-bars"></div>
-        <div class="pf-xaxis" id="pf-chart-axis"></div>
-      </div>
-      <div class="pcard hidden" id="pf-time-invite">
-        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:6px;">↻ Il tuo profilo nel tempo</p>
-        <p class="pcard-sub">Questo è il tuo profilo oggi. Torna a fare il test e qui vedrai l'evoluzione o la conferma dei tuoi risultati.</p>
+
+      <div class="pcard" id="pf-empty">
+        <p class="pcard-label">Il tuo profilo</p>
+        <p class="pcard-sub">Non hai ancora fatto il test. Fallo per scoprire i ruoli più adatti a te.</p>
       </div>
 
-      <!-- [precisione-radar] invito a fare 3 test, sparisce al raggiungimento -->
-      <div class="pcard pcard-invite hidden" id="pf-radar-invite">
-        <p class="pcard-label">Rendi il grafico più preciso</p>
-        <p class="pcard-sub">Fai il test almeno 3 volte per avere il grafico delle competenze più preciso.</p>
-      </div>
+      <div id="pf-constellation" class="hidden">
+        <p class="cnst-sub" id="cnst-sub">Ogni punto è una dimensione di come funzioni. Tocca un ruolo, o viaggia nel tempo.</p>
 
-      <div class="pcard hidden" id="pf-radar-card">
-        <p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:4px;">Il tuo profilo in 6 dimensioni</p>
-        <p class="pcard-sub" id="pf-radar-sub" style="margin-bottom:12px;">Come il tuo profilo si è mosso nei tuoi test.</p>
-        <div style="position:relative; width:100%; height:300px;">
-          <canvas id="pf-radar" role="img" aria-label="Grafico radar del profilo su 6 dimensioni attraverso i test"></canvas>
+        <div class="sky-wrap">
+          <canvas id="sky" role="img" aria-label="La tua costellazione: profilo su 6 dimensioni e ruoli compatibili"></canvas>
+          <div class="sky-hint" id="skyHint">✦ tocca un ruolo per aprirlo</div>
+
+          <div class="role-panel" id="rolePanel">
+            <div class="role-panel-top">
+              <div class="role-panel-name" id="rpName">—</div>
+              <div style="display:flex; align-items:flex-start; gap:10px;">
+                <div class="role-panel-pct" id="rpPct">—</div>
+                <button class="role-panel-close" id="rpClose" aria-label="Chiudi">✕</button>
+              </div>
+            </div>
+            <div class="role-panel-label">Perché ti si addice</div>
+            <p class="role-panel-text" id="rpPerche">—</p>
+            <div class="role-panel-label">Una cosa che non ti aspetti</div>
+            <p class="role-panel-text" id="rpSorpresa">—</p>
+          </div>
         </div>
-        <div id="pf-radar-legend" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:11.5px; color:rgba(240,255,244,0.65);"></div>
-        <p id="pf-radar-nota" class="hidden" style="font-size:11px; color:rgba(240,255,244,0.4); margin-top:10px; font-style:italic;">○ I punti vuoti indicano dimensioni su cui il test ha ancora pochi segnali — non sono meno importanti, solo meno certe.</p>
+
+        <div class="timeline" id="cnst-timeline"></div>
+
+        <div class="legend-axes" id="cnst-legend"></div>
+        <p class="legend-note hidden" id="cnst-nota">○ L'alone che pulsa piano indica dimensioni su cui il test ha ancora pochi segnali — non un giudizio più basso, solo meno certezza per ora.</p>
       </div>
-      <div style="margin-top:8px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
+
+      <div style="margin-top:20px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
     </section>
 
     <!-- STORICO -->
@@ -287,7 +338,6 @@
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script type="module" src="js/account.js"></script>
 <script type="module" src="js/site-nav.js"></script>
 </body>

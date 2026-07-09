@@ -59,10 +59,6 @@ function formatShort(iso) {
   try { return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }); }
   catch { return ''; }
 }
-function topRole(report_json) {
-  const r = report_json?.ruoli?.[0];
-  return { nome: r?.nome || 'Report RoleFit', match: (typeof r?.match === 'number') ? r.match : null };
-}
 function rolesLine(report_json) {
   const ruoli = Array.isArray(report_json?.ruoli) ? report_json.ruoli.slice(0, 3) : [];
   if (!ruoli.length) return 'Report RoleFit';
@@ -73,13 +69,6 @@ function initials(email) {
   const parts = base.split(/[.\-_]/).filter(Boolean);
   const txt = (parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '');
   return (txt || '··').toUpperCase().slice(0, 2);
-}
-function mostRecurringRole(reports) {
-  const counts = {};
-  reports.forEach((r) => { const n = topRole(r.report_json).nome; counts[n] = (counts[n] || 0) + 1; });
-  let best = null, bestN = 0;
-  for (const k in counts) { if (counts[k] > bestN) { best = k; bestN = counts[k]; } }
-  return best;
 }
 
 // Tiene i report caricati, per il banco di prova ruoli.
@@ -347,199 +336,358 @@ function renderProfile(session, reports) {
   document.getElementById('sb-since').textContent =
     since ? 'da ' + new Date(since).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '';
 
-  // Panoramica
-  if (!reports.length) {
-    document.getElementById('pf-last-role').textContent = 'Nessun test ancora';
-    document.getElementById('pf-last-pct').textContent = '';
-    document.getElementById('pf-last-sub').textContent = 'Fai il test per scoprire i ruoli più adatti a te.';
-    document.getElementById('pf-time-invite').classList.remove('hidden');
-  } else {
-    const last = reports[0];
-    const lastTop = topRole(last.report_json);
-    document.getElementById('pf-last-role').textContent = lastTop.nome;
-    document.getElementById('pf-last-pct').textContent = (lastTop.match != null) ? '· ' + lastTop.match + '%' : '';
-
-    if (reports.length === 1) {
-      document.getElementById('pf-last-sub').textContent = 'Hai fatto il test il ' + formatDate(last.created_at) + '.';
-    } else {
-      const ric = mostRecurringRole(reports);
-      document.getElementById('pf-last-sub').textContent =
-        'Hai fatto il test ' + reports.length + ' volte. ' + (ric ? 'Il ruolo che torna più spesso è ' + ric + '.' : '');
-    }
-
-    if (reports.length >= 2) {
-      renderChart(reports);
-      document.getElementById('pf-time-chart').classList.remove('hidden');
-    } else {
-      document.getElementById('pf-time-invite').classList.remove('hidden');
-    }
-  }
-
   // Storico (dentro la sezione)
   renderStorico(reports);
 
-  // Radar 6 dimensioni (visibile da 1 test con assi) + invito a fare 3 test
-  renderRadar(reports);
+  // Panoramica: la costellazione sostituisce ultimo risultato + grafico nel
+  // tempo + radar, tutto in un'unica visualizzazione.
+  renderConstellation(reports);
 }
 
 const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-const RADAR_COLORS = [
-  { border: '#b4b2a9', bg: 'rgba(180,178,169,0.06)', dash: [4, 3] },
-  { border: '#85b7eb', bg: 'rgba(133,183,235,0.06)', dash: [6, 3] },
-  { border: '#e87ba4', bg: 'rgba(232,123,164,0.14)', dash: [] }
-];
+const ASSI_COLORI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
+const RUOLO_ANGOLI = [30, 150, 270];
 
-// [precisione-radar] Invito a fare più test, finché non se ne hanno 3 con assi.
-// Sparisce automaticamente al raggiungimento dei 3 test (richiesta esplicita).
-function renderRadarInvite(conAssiCount) {
-  const box = document.getElementById('pf-radar-invite');
-  if (!box) return;
-
-  if (conAssiCount >= 3) {
-    box.classList.add('hidden');
-    return;
-  }
-
-  const mancanti = 3 - conAssiCount;
-  const testo = (mancanti === 1)
-    ? 'Ti manca solo 1 test per avere il grafico delle competenze più preciso.'
-    : 'Fai il test almeno 3 volte per avere il grafico delle competenze più preciso: te ne mancano ancora ' + mancanti + '.';
-
-  box.querySelector('.pcard-sub').textContent = testo;
-  box.classList.remove('hidden');
+// "bassa" pulsa/si affievolisce, "media" resta ferma ma più tenue, "alta" (o
+// assente, per i report più vecchi salvati prima di questo campo) resta piena.
+function confAmount(c) {
+  return c === 'alta' ? 1 : c === 'media' ? 0.6 : c === 'bassa' ? 0.28 : 1;
 }
 
-function renderRadar(reports) {
-  const card = document.getElementById('pf-radar-card');
-  if (!card) return;
+// ─── COSTELLAZIONE (Panoramica) ────────────────────────────────
+// Sostituisce il vecchio radar Chart.js + il grafico a barre "nel tempo":
+// un unico cielo generativo, disegnato dai dati reali del profilo. Lo stato
+// del canvas vive qui a livello di modulo perché renderConstellation() può
+// essere richiamata più volte nella stessa sessione (es. dopo la
+// rigenerazione via CV) — l'animazione e gli ascoltatori si avviano una
+// sola volta, solo i dati si aggiornano.
+const sky = {
+  canvas: null, ctx: null,
+  W: 0, H: 0, CX: 0, CY: 0,
+  current: {}, currentConf: {}, target: {}, targetConf: {},
+  morphFrom: {}, morphStart: 0,
+  snapshots: [], activeSnapshot: -1,
+  roles: [],
+  hoveredRole: -1, openRole: -1,
+  t: 0,
+  started: false,
+  reduceMotion: false,
+};
+
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 700px)').matches;
+}
+
+function skyResize() {
+  const wrap = sky.canvas.parentElement;
+  sky.W = wrap.clientWidth; sky.H = wrap.clientHeight;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  sky.canvas.width = sky.W * DPR; sky.canvas.height = sky.H * DPR;
+  sky.canvas.style.width = sky.W + 'px'; sky.canvas.style.height = sky.H + 'px';
+  sky.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  sky.CX = sky.W / 2; sky.CY = sky.H / 2;
+}
+
+function skyRadiusScale() { return Math.min(sky.W, sky.H) * 0.28; }
+function skyRoleRadius() { return Math.min(sky.W, sky.H) * 0.44; }
+
+function starPos(i, value) {
+  const angle = (Math.PI * 2 * i) / ASSI_FISSI.length - Math.PI / 2;
+  const r = 26 + (value / 100) * skyRadiusScale();
+  return { x: sky.CX + Math.cos(angle) * r, y: sky.CY + Math.sin(angle) * r, angle };
+}
+
+function rolePos(angleDeg) {
+  const angle = (angleDeg * Math.PI) / 180 - Math.PI / 2;
+  const r = skyRoleRadius();
+  return { x: sky.CX + Math.cos(angle) * r, y: sky.CY + Math.sin(angle) * r };
+}
+
+function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+function goToSnapshot(i) {
+  if (i === sky.activeSnapshot || !sky.snapshots[i]) return;
+  sky.activeSnapshot = i;
+  sky.morphFrom = { ...sky.current };
+  sky.target = { ...sky.snapshots[i].assi };
+  sky.targetConf = { ...sky.snapshots[i].conf };
+  sky.morphStart = performance.now();
+  document.querySelectorAll('.timeline-point').forEach((el, idx) => el.classList.toggle('active', idx === i));
+}
+
+function skyFrame(now) {
+  const { ctx, W, H, CX, CY } = sky;
+  sky.t += 1;
+  ctx.clearRect(0, 0, W, H);
+
+  const p = sky.morphStart ? Math.min(1, (now - sky.morphStart) / 700) : 1;
+  const e = easeOutCubic(p);
+  ASSI_FISSI.forEach((k) => {
+    sky.current[k] = (sky.morphFrom[k] ?? 0) + ((sky.target[k] ?? 0) - (sky.morphFrom[k] ?? 0)) * e;
+    sky.currentConf[k] = sky.targetConf[k];
+  });
+
+  const corePulse = 1 + Math.sin(sky.t * 0.03) * 0.06;
+  const coreR = 7 * corePulse;
+  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR * 6);
+  grad.addColorStop(0, 'rgba(93,202,165,0.5)');
+  grad.addColorStop(1, 'rgba(93,202,165,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(CX, CY, coreR * 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#F0FFF4';
+  ctx.beginPath(); ctx.arc(CX, CY, coreR, 0, Math.PI * 2); ctx.fill();
+
+  const starPositions = ASSI_FISSI.map((k, i) => starPos(i, sky.current[k] ?? 0));
+  ctx.strokeStyle = 'rgba(93,202,165,0.16)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  starPositions.forEach((pos, i) => { i === 0 ? ctx.moveTo(pos.x, pos.y) : ctx.lineTo(pos.x, pos.y); });
+  ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = 'rgba(93,202,165,0.04)';
+  ctx.fill();
+
+  starPositions.forEach((pos) => {
+    ctx.strokeStyle = 'rgba(93,202,165,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(CX, CY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+  });
+
+  const small = W < 420;
+  ASSI_FISSI.forEach((k, i) => {
+    const pos = starPositions[i];
+    const conf = confAmount(sky.currentConf[k]);
+    const flicker = conf < 1 ? Math.sin(sky.t * 0.06 + i) * (1 - conf) * 0.4 : 0;
+    const haloR = 11 + conf * 9 + flicker * 5;
+
+    const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, haloR);
+    g.addColorStop(0, ASSI_COLORI[i] + 'CC');
+    g.addColorStop(1, ASSI_COLORI[i] + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, haloR, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = ASSI_COLORI[i];
+    ctx.globalAlpha = 0.55 + conf * 0.45 - flicker * 0.3;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const labelDist = small ? 20 : 25;
+    const lx = pos.x + Math.cos(pos.angle) * labelDist;
+    const ly = pos.y + Math.sin(pos.angle) * labelDist;
+    ctx.font = (small ? '600 10px ' : '600 12px ') + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = 'rgba(240,255,244,0.75)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(k, lx, ly);
+    ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
+    ctx.fillStyle = 'rgba(240,255,244,0.35)';
+    ctx.fillText(Math.round(sky.current[k] ?? 0) + '', lx, ly + (small ? 12 : 14));
+  });
+
+  sky.roles.forEach((r, i) => {
+    const pos = rolePos(r.angle);
+    const isHover = sky.hoveredRole === i || sky.openRole === i;
+    const pulse = (Math.sin(sky.t * 0.025 + i * 2) + 1) / 2;
+    const lineAlpha = (0.14 + pulse * 0.22) * (r.match / 100) + (isHover ? 0.35 : 0);
+
+    ctx.strokeStyle = `rgba(255,100,150,${lineAlpha})`;
+    ctx.lineWidth = isHover ? 2 : 1.2;
+    ctx.beginPath(); ctx.moveTo(CX, CY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+
+    const rr = isHover ? 8 : 5.5;
+    const g2 = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, rr * 3);
+    g2.addColorStop(0, `rgba(255,100,150,${isHover ? 0.55 : 0.35})`);
+    g2.addColorStop(1, 'rgba(255,100,150,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, rr * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFB8C6';
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, rr * 0.4, 0, Math.PI * 2); ctx.fill();
+
+    ctx.font = (isHover ? '600 ' : '') + (small ? '10px ' : '12px ') + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = isHover ? '#FFB8C6' : 'rgba(240,255,244,0.55)';
+    ctx.textAlign = 'center';
+    const below = Math.sin((r.angle * Math.PI) / 180) >= 0;
+    const labelY = pos.y + (below ? (small ? 18 : 22) : (small ? -13 : -16));
+    ctx.fillText(r.nome, pos.x, labelY);
+    ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
+    ctx.fillStyle = 'rgba(255,100,150,0.7)';
+    ctx.fillText(r.match + '%', pos.x, labelY + (below ? (small ? 12 : 15) : (small ? -12 : -15)));
+  });
+
+  sky.canvas._roleHitboxes = sky.roles.map((r, i) => ({ ...rolePos(r.angle), i }));
+
+  if (!sky.reduceMotion) requestAnimationFrame(skyFrame);
+}
+
+function skyPointFromEvent(e) {
+  const rect = sky.canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function skyNearestRole(pt) {
+  const boxes = sky.canvas._roleHitboxes || [];
+  // Su touch il bersaglio deve essere più grande: un dito è molto meno
+  // preciso di un cursore, senza questo toccare un ruolo su mobile sarebbe frustrante.
+  const threshold = isMobileLayout() ? 40 : 24;
+  let best = -1, bestD = threshold;
+  boxes.forEach((b) => {
+    const d = Math.hypot(b.x - pt.x, b.y - pt.y);
+    if (d < bestD) { bestD = d; best = b.i; }
+  });
+  return best;
+}
+
+function openRolePanel(i) {
+  sky.openRole = i;
+  const r = sky.roles[i];
+  if (!r) return;
+  const panel = document.getElementById('rolePanel');
+  const hint = document.getElementById('skyHint');
+
+  document.getElementById('rpName').textContent = r.nome;
+  document.getElementById('rpPct').textContent = (typeof r.match === 'number') ? r.match + '%' : '—';
+  document.getElementById('rpPerche').textContent = r.perche || '—';
+  document.getElementById('rpSorpresa').textContent = r.sorpresa || '—';
+
+  if (isMobileLayout()) {
+    panel.classList.add('mobile-sheet');
+    panel.style.left = ''; panel.style.top = ''; panel.style.right = ''; panel.style.bottom = '';
+  } else {
+    panel.classList.remove('mobile-sheet');
+    const pos = rolePos(r.angle);
+    let left = pos.x + 24, top = pos.y - 20;
+    if (left + 320 > sky.W) left = pos.x - 344;
+    if (left < 0) left = 8;
+    if (top + 190 > sky.H) top = sky.H - 200;
+    if (top < 0) top = 10;
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+  }
+  panel.classList.add('show');
+  if (hint) hint.style.opacity = '0';
+}
+
+function closeRolePanel() {
+  sky.openRole = -1;
+  const panel = document.getElementById('rolePanel');
+  const hint = document.getElementById('skyHint');
+  if (panel) panel.classList.remove('show');
+  if (hint) hint.style.opacity = '0.8';
+}
+
+// Ascoltatori e animazione si avviano una sola volta per pagina.
+function startSkyOnce() {
+  if (sky.started) return;
+  sky.canvas = document.getElementById('sky');
+  if (!sky.canvas) return;
+  sky.ctx = sky.canvas.getContext('2d');
+  sky.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  sky.started = true;
+
+  window.addEventListener('resize', skyResize);
+  skyResize();
+
+  sky.canvas.addEventListener('mousemove', (e) => {
+    const pt = skyPointFromEvent(e);
+    sky.hoveredRole = skyNearestRole(pt);
+    sky.canvas.style.cursor = sky.hoveredRole >= 0 ? 'pointer' : 'default';
+  });
+  sky.canvas.addEventListener('click', (e) => {
+    const pt = skyPointFromEvent(e);
+    const hit = skyNearestRole(pt);
+    if (hit >= 0) openRolePanel(hit); else closeRolePanel();
+  });
+
+  const closeBtn = document.getElementById('rpClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeRolePanel);
+
+  requestAnimationFrame(skyFrame);
+  if (sky.reduceMotion) setTimeout(() => skyFrame(performance.now()), 30);
+}
+
+function renderConstellation(reports) {
+  const emptyEl = document.getElementById('pf-empty');
+  const wrapEl = document.getElementById('pf-constellation');
+  if (!emptyEl || !wrapEl) return;
 
   const conAssi = reports
     .filter(r => r.report_json && r.report_json.assi && typeof r.report_json.assi === 'object')
     .slice(0, 3)
-    .reverse();
+    .reverse(); // dal più vecchio al più recente
 
-  // [precisione-radar] invito a fare più test, indipendente dalla soglia del radar sotto
-  renderRadarInvite(conAssi.length);
+  if (conAssi.length < 1) {
+    emptyEl.classList.remove('hidden');
+    wrapEl.classList.add('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  wrapEl.classList.remove('hidden');
 
-  // Mostriamo il radar già da 1 test con assi (1 linea = fotografia, poi evoluzione)
-  if (conAssi.length < 1) return;
-  card.classList.remove('hidden');
+  startSkyOnce();
+  if (!sky.canvas) return;
 
-  const sub = document.getElementById('pf-radar-sub');
-  if (sub) {
-    sub.textContent =
-      (conAssi.length === 1) ? 'Questa è la tua prima fotografia. Rifai il test per vedere come evolvi nel tempo.' :
-      (conAssi.length === 2) ? 'Confronto tra i tuoi ultimi 2 test. Con un altro test vedrai la traiettoria completa.' :
-      'Come il tuo profilo si è mosso nei tuoi ultimi 3 test.';
+  sky.snapshots = conAssi.map((r) => ({
+    data: formatShort(r.created_at),
+    assi: r.report_json.assi,
+    conf: r.report_json.assi_confidenza || {},
+  }));
+
+  const latest = conAssi[conAssi.length - 1].report_json;
+  sky.roles = (Array.isArray(latest.ruoli) ? latest.ruoli.slice(0, 3) : []).map((r, i) => ({
+    nome: r?.nome || 'Ruolo', match: (typeof r?.match === 'number') ? r.match : 0,
+    perche: r?.perche || '', sorpresa: r?.sorpresa || '',
+    angle: RUOLO_ANGOLI[i] ?? (i * 40),
+  }));
+
+  const subEl = document.getElementById('cnst-sub');
+  if (subEl) {
+    subEl.textContent = conAssi.length === 1
+      ? 'Questa è la tua prima fotografia. Rifai il test per iniziare a viaggiare nel tempo.'
+      : 'Ogni punto è una dimensione di come funzioni. Tocca un ruolo, o viaggia nel tempo.';
   }
 
-  const canvas = document.getElementById('pf-radar');
-  if (!canvas || typeof Chart === 'undefined') return;
+  const haBassa = sky.snapshots.some((s) => ASSI_FISSI.some((k) => s.conf[k] === 'bassa'));
+  const nota = document.getElementById('cnst-nota');
+  if (nota) nota.classList.toggle('hidden', !haBassa);
 
-  const datasets = conAssi.map((r, i) => {
-    const a = r.report_json.assi;
-    const conf = r.report_json.assi_confidenza || {};
-    const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
-    // Un asse a "bassa" confidenza diventa un punto vuoto invece che pieno:
-    // il modello distingue già internamente quanto è sicuro di ogni valore,
-    // qui lo rendiamo visibile invece di lasciarlo perdere.
-    return {
-      data: ASSI_FISSI.map(k => (typeof a[k] === 'number' ? a[k] : 0)),
-      borderColor: c.border,
-      backgroundColor: c.bg,
-      pointBackgroundColor: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 'transparent' : c.border),
-      pointBorderColor: c.border,
-      pointBorderWidth: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 2 : 1),
-      borderWidth: 2,
-      borderDash: c.dash,
-      pointRadius: ASSI_FISSI.map(k => conf[k] === 'bassa' ? 4 : 2)
-    };
-  });
-
-  // Dopo 3 test, aggiungiamo anche una sintesi consolidata (media semplice
-  // degli ultimi 3) come punto di arrivo, invece di lasciare all'utente il
-  // compito di interpretare da solo 3 linee sovrapposte.
-  let consolidato = null;
-  if (conAssi.length >= 3) {
-    const media = ASSI_FISSI.map((k) => {
-      const valori = conAssi.map(r => r.report_json.assi[k]).filter(v => typeof v === 'number');
-      return valori.length ? Math.round(valori.reduce((s, v) => s + v, 0) / valori.length) : 0;
-    });
-    consolidato = {
-      data: media,
-      borderColor: '#F0FFF4',
-      backgroundColor: 'rgba(240,255,244,0.05)',
-      pointBackgroundColor: '#F0FFF4',
-      borderWidth: 2.5,
-      borderDash: [],
-      pointRadius: 3
-    };
-    datasets.push(consolidato);
-  }
-
-  new Chart(canvas, {
-    type: 'radar',
-    data: { labels: ASSI_FISSI, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        r: {
-          suggestedMin: 0, suggestedMax: 100,
-          ticks: { display: false, stepSize: 25 },
-          grid: { color: '#2c2c2a' },
-          angleLines: { color: '#2c2c2a' },
-          pointLabels: { color: '#A9C6B8', font: { size: 12 } }
-        }
-      },
-      plugins: { legend: { display: false } }
-    }
-  });
-
-  const legend = document.getElementById('pf-radar-legend');
+  const legend = document.getElementById('cnst-legend');
   if (legend) {
-    let html = conAssi.map((r, i) => {
-      const c = RADAR_COLORS[i] || RADAR_COLORS[RADAR_COLORS.length - 1];
-      const stile = c.dash.length ? 'dashed' : 'solid';
-      const etichetta = (i === conAssi.length - 1) ? formatShort(r.created_at) + ' (attuale)' : formatShort(r.created_at);
-      return '<span style="display:flex; align-items:center; gap:5px;">' +
-        '<span style="width:14px; height:0; border-top:2px ' + stile + ' ' + c.border + ';"></span>' + etichetta + '</span>';
-    }).join('');
-
-    if (consolidato) {
-      html += '<span style="display:flex; align-items:center; gap:5px;">' +
-        '<span style="width:14px; height:0; border-top:2.5px solid #F0FFF4;"></span>Profilo consolidato (media ultimi 3)</span>';
-    }
-
-    legend.innerHTML = html;
+    legend.innerHTML = ASSI_FISSI.map((k, i) =>
+      `<span><span class="legend-dot" style="background:${ASSI_COLORI[i]};"></span>${k}</span>`
+    ).join('');
   }
 
-  const haBassaConfidenza = conAssi.some((r) => {
-    const conf = r.report_json.assi_confidenza || {};
-    return ASSI_FISSI.some((k) => conf[k] === 'bassa');
-  });
-  const nota = document.getElementById('pf-radar-nota');
-  if (nota) nota.classList.toggle('hidden', !haBassaConfidenza);
-}
+  const timelineEl = document.getElementById('cnst-timeline');
+  if (timelineEl) {
+    timelineEl.innerHTML = '';
+    sky.activeSnapshot = -1;
+    sky.snapshots.forEach((s, i) => {
+      if (i > 0) {
+        const track = document.createElement('div');
+        track.className = 'timeline-track';
+        timelineEl.appendChild(track);
+      }
+      const btn = document.createElement('button');
+      btn.className = 'timeline-point';
+      btn.innerHTML = `<span class="timeline-dot"></span><span class="timeline-label">${esc(s.data)}${i === sky.snapshots.length - 1 ? ' (oggi)' : ''}</span>`;
+      btn.addEventListener('click', () => goToSnapshot(i));
+      timelineEl.appendChild(btn);
+    });
+  }
 
-function renderChart(reports) {
-  const recent = reports.slice(0, 3).reverse();
-  const bars = document.getElementById('pf-chart-bars');
-  const axis = document.getElementById('pf-chart-axis');
-  bars.innerHTML = ''; axis.innerHTML = '';
-  recent.forEach((r, i) => {
-    const t = topRole(r.report_json);
-    const pct = (t.match != null) ? t.match : 0;
-    const isLast = (i === recent.length - 1);
-    const col = document.createElement('div'); col.className = 'pf-bar-col';
-    const bar = document.createElement('div'); bar.className = 'pf-bar' + (isLast ? ' last' : '');
-    bar.style.height = Math.max(8, pct) + '%'; col.appendChild(bar); bars.appendChild(col);
-    const cell = document.createElement('div'); cell.className = 'pf-xcell' + (isLast ? ' last' : '');
-    cell.innerHTML = '<p class="pf-xdate">' + esc(formatShort(r.created_at)) + '</p>' +
-      '<p class="pf-xrole">' + esc(t.nome) + '</p>' +
-      '<p class="pf-xpct">' + (t.match != null ? esc(t.match) + '%' : '—') + '</p>';
-    axis.appendChild(cell);
-  });
+  // Parte già "posizionata" sull'ultimo snapshot, senza animazione di morph
+  // al primo caricamento (il morph si vede solo quando l'utente naviga nel
+  // tempo, non quando la pagina si apre).
+  const lastIdx = sky.snapshots.length - 1;
+  sky.current = { ...sky.snapshots[lastIdx].assi };
+  sky.currentConf = { ...sky.snapshots[lastIdx].conf };
+  sky.target = { ...sky.current };
+  sky.targetConf = { ...sky.currentConf };
+  sky.morphFrom = { ...sky.current };
+  sky.morphStart = 0;
+  sky.activeSnapshot = lastIdx;
+  document.querySelectorAll('.timeline-point').forEach((el, idx) => el.classList.toggle('active', idx === lastIdx));
+  closeRolePanel();
 }
 
 function renderStorico(reports) {
