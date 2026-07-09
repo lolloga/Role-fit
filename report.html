@@ -9,6 +9,34 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ─── PROSSIMI PASSI (fine report) ─────────────────────────
+       Stessa idea della costellazione di account.html, in scala ridotta:
+       riportare l'attenzione già sul report verso profilo e CV, invece di
+       contare su un link generico nel menu che nessuno nota. */
+    .next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .next-grid { grid-template-columns: 1fr; } }
+
+    .next-card {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius-lg);
+      padding: 24px; display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden;
+    }
+    .next-card.profile { border-color: rgba(93,202,165,0.28); }
+    .next-card.cv { border-color: rgba(255,100,150,0.22); }
+
+    .next-eyebrow { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .next-card.profile .next-eyebrow { color: var(--emerald-light); }
+    .next-card.cv .next-eyebrow { color: var(--rose-light); }
+
+    .next-heading { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.35; color: var(--text-primary); margin: 0; }
+    .next-heading em { font-style: italic; color: var(--emerald-light); }
+    .next-body { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin: 0; }
+    .next-foot { margin-top: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .next-meta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
+    .sky-mini-wrap { align-self: center; width: 120px; height: 120px; }
+    .sky-mini { width: 100%; height: 100%; display: block; }
+  </style>
 </head>
 <body>
 
@@ -138,6 +166,34 @@
         </div>
         <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:20px;">Non è una critica — è una mappa. Sapere cosa evitare è liberatorio quanto sapere dove andare.</p>
         <div id="mismatch-list"></div>
+      </div>
+
+      <div class="report-section" id="section-next">
+        <div class="report-section-label">
+          <span class="label">Prossimi passi</span>
+        </div>
+        <div class="next-grid">
+          <div class="next-card profile">
+            <div class="next-eyebrow">Il tuo profilo</div>
+            <div class="sky-mini-wrap"><canvas id="next-sky" class="sky-mini"></canvas></div>
+            <h3 class="next-heading">La tua costellazione si aggiorna <em>a ogni test.</em></h3>
+            <p class="next-body">Le 6 dimensioni che ti compongono, il confronto nel tempo, i ruoli compatibili — tutto in un unico posto.</p>
+            <div class="next-foot"><a href="account.html" class="btn btn--primary">Guarda il tuo profilo →</a></div>
+          </div>
+
+          <div class="next-card cv" id="next-cv-card">
+            <div class="next-eyebrow">Visibilità · facoltativa</div>
+            <h3 class="next-heading" id="next-cv-heading">Le aziende su RoleFit cercano profili come il tuo.</h3>
+            <p class="next-body" id="next-cv-body">Carica il CV e diventi visibile alle aziende in base al tuo profilo. Resta una scelta tua: puoi rimuoverlo quando vuoi.</p>
+            <input type="file" id="next-cv-input" accept="application/pdf" class="hidden" />
+            <p id="next-cv-error" class="hidden next-meta" style="color:var(--rose-light);"></p>
+            <p id="next-cv-done" class="hidden next-meta" style="color:var(--emerald-light);">✓ CV caricato — <a id="next-cv-done-link" href="#" style="color:var(--emerald-light);">vedi il report aggiornato →</a></p>
+            <div class="next-foot" id="next-cv-foot">
+              <button class="btn btn--ghost" id="next-cv-btn">Carica il CV</button>
+              <span class="next-meta" id="next-cv-status">meno di un minuto</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="report-actions">
