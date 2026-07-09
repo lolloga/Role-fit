@@ -109,6 +109,12 @@
     .cnst-sub { color: var(--text-secondary, rgba(240,255,244,0.65)); font-size: 0.85rem; max-width: 52ch; margin: -8px 0 18px; }
 
     .sky-wrap { position: relative; width: 100%; height: min(60vh, 520px); min-height: 380px; margin-bottom: 6px; }
+    /* dvh esclude la barra degli indirizzi del browser mobile dal calcolo:
+       con vh il riquadro può risultare più alto dello spazio davvero visibile
+       al primo caricamento. */
+    @supports (height: 1dvh) {
+      .sky-wrap { height: min(60dvh, 520px); }
+    }
     .sky-wrap canvas { width: 100%; height: 100%; display: block; touch-action: manipulation; }
 
     .sky-hint {
@@ -124,12 +130,19 @@
       opacity: 0; transform: translateY(8px) scale(0.98); pointer-events: none;
       transition: opacity 0.2s ease, transform 0.2s ease;
       box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+      max-height: min(60vh, 420px); overflow-y: auto;
     }
     .role-panel.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
     /* Su mobile diventa un foglio fisso in basso, non un riquadro vicino al
        punto toccato: la posizione "vicino al nodo" non ha senso su schermi
-       stretti e rischierebbe di uscire dai bordi. */
-    .role-panel.mobile-sheet { position: fixed; left: 14px; right: 14px; bottom: 14px; top: auto; max-width: none; width: auto; z-index: 60; }
+       stretti e rischierebbe di uscire dai bordi. Un testo generato lungo
+       potrebbe comunque essere più alto dello schermo: max-height + scroll
+       interno evita che il pannello venga tagliato in cima, fuori vista. */
+    .role-panel.mobile-sheet {
+      position: fixed; left: 14px; right: 14px; bottom: 14px; top: auto;
+      max-width: none; width: auto; z-index: 60;
+      max-height: min(70vh, 460px); overflow-y: auto;
+    }
     .role-panel-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
     .role-panel-name { font-family: var(--font-display, Georgia), serif; font-size: 1.05rem; color: #F0FFF4; }
     .role-panel-pct { font-family: var(--font-display, Georgia), serif; font-size: 1.4rem; font-weight: 300; color: #FFB8C6; line-height: 1; }
@@ -160,6 +173,9 @@
       .app-main { margin-left: 0; padding: 28px 18px 90px; max-width: 100%; }
       .sec-title { font-size: 20px; }
       .sky-wrap { height: min(52vh, 420px); min-height: 320px; }
+      @supports (height: 1dvh) {
+        .sky-wrap { height: min(52dvh, 420px); }
+      }
       .legend-axes { gap: 10px 14px; font-size: 0.7rem; }
       .app-bottombar {
         display: flex; position: fixed; bottom: 0; left: 0; right: 0;
