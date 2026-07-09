@@ -405,6 +405,18 @@ function rolePos(angleDeg) {
 
 function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
 
+// Il testo è centrato sul nodo, ma su schermi stretti i nodi vicini al bordo
+// spingerebbero metà etichetta fuori dal canvas (il canvas taglia tutto ciò
+// che è fuori dai suoi confini). Spostiamo l'ancora orizzontale quel tanto
+// che basta perché l'etichetta resti sempre interamente visibile.
+function fillClampedText(ctx, text, x, y, W, pad = 4) {
+  const half = ctx.measureText(text).width / 2;
+  let cx = x;
+  if (cx - half < pad) cx = pad + half;
+  if (cx + half > W - pad) cx = W - pad - half;
+  ctx.fillText(text, cx, y);
+}
+
 function goToSnapshot(i) {
   if (i === sky.activeSnapshot || !sky.snapshots[i]) return;
   sky.activeSnapshot = i;
@@ -476,10 +488,10 @@ function skyFrame(now) {
     ctx.font = (small ? '600 10px ' : '600 12px ') + getComputedStyle(document.body).fontFamily;
     ctx.fillStyle = 'rgba(240,255,244,0.75)';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(k, lx, ly);
+    fillClampedText(ctx, k, lx, ly, W);
     ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
     ctx.fillStyle = 'rgba(240,255,244,0.35)';
-    ctx.fillText(Math.round(sky.current[k] ?? 0) + '', lx, ly + (small ? 12 : 14));
+    fillClampedText(ctx, Math.round(sky.current[k] ?? 0) + '', lx, ly + (small ? 12 : 14), W);
   });
 
   sky.roles.forEach((r, i) => {
@@ -506,10 +518,10 @@ function skyFrame(now) {
     ctx.textAlign = 'center';
     const below = Math.sin((r.angle * Math.PI) / 180) >= 0;
     const labelY = pos.y + (below ? (small ? 18 : 22) : (small ? -13 : -16));
-    ctx.fillText(r.nome, pos.x, labelY);
+    fillClampedText(ctx, r.nome, pos.x, labelY, W);
     ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
     ctx.fillStyle = 'rgba(255,100,150,0.7)';
-    ctx.fillText(r.match + '%', pos.x, labelY + (below ? (small ? 12 : 15) : (small ? -12 : -15)));
+    fillClampedText(ctx, r.match + '%', pos.x, labelY + (below ? (small ? 12 : 15) : (small ? -12 : -15)), W);
   });
 
   sky.canvas._roleHitboxes = sky.roles.map((r, i) => ({ ...rolePos(r.angle), i }));
