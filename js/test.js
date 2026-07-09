@@ -1,3 +1,5 @@
+import { getSession, getAccessToken, getProfile, getLastTestAnswers } from './supabase.js';
+
 // ─── FRASI AI THINKING ───────────────────────────────────────
 const THINKING_PHRASES = [
   "Sto leggendo tra le righe...",
@@ -67,6 +69,15 @@ const state = {
   _retryCount: 0,
   _aspirationAsked: false,
   aspirationRole: null,
+  // Domande standard ancora da fare: di norma è una copia di STANDARD_QUESTIONS,
+  // ma per chi rifà il test da loggato può avere alcune voci già rimosse (vedi
+  // buildStandardQueue) perché la risposta è nota dal test precedente.
+  standardQueue: [],
+  // Estratto testuale del CV (se già caricato sul profilo), per agganciare
+  // 1-2 domande adattive a un'esperienza reale (vedi getNextStep).
+  cvContext: null,
+  _cvContextInjected: false,
+  _skippedLabels: [],
 };
 
 // ─── PERSISTENZA ─────────────────────────────────────────────
@@ -85,6 +96,9 @@ function saveState() {
     worksCurrently: state.worksCurrently,
     _aspirationAsked: state._aspirationAsked,
     aspirationRole: state.aspirationRole,
+    standardQueue: state.standardQueue,
+    cvContext: state.cvContext,
+    _cvContextInjected: state._cvContextInjected,
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
@@ -95,6 +109,13 @@ function loadState() {
   try {
     const parsed = JSON.parse(saved);
     Object.assign(state, parsed);
+    // Compatibilità con un test lasciato a metà prima di questa funzionalità
+    // (stato salvato senza "standardQueue"): la ricostruiamo dalla vecchia
+    // convenzione posizionale, altrimenti un test già in corso al momento
+    // del rilascio si romperebbe passando all'AI troppo presto.
+    if (!Array.isArray(parsed.standardQueue)) {
+      state.standardQueue = STANDARD_QUESTIONS.slice(state.fixedCount);
+    }
     return true;
   } catch {
     return false;
@@ -177,6 +198,92 @@ const STANDARD_QUESTIONS = [
     ]
   }
 ];
+
+// ─── DOMANDE RIUSABILI DA UN TEST PRECEDENTE ─────────────────
+// Solo per chi rifà il test da loggato. Età e formazione sono fatti
+// sostanzialmente immutabili tra un test e l'altro — non ha senso
+// richiederli di nuovo. Momento professionale, attrazione naturale e
+// settore d'interesse invece possono cambiare (o contano come segnale
+// fresco da ricontrollare), quindi si richiedono sempre.
+const SKIPPABLE_STANDARD_IDS = ['eta', 'background'];
+const SKIP_LABELS = { eta: 'età', background: 'formazione' };
+
+// Costruisce la coda delle domande standard ancora da fare: quelle il cui id
+// è "saltabile" e di cui esiste già una risposta nel test precedente vengono
+// riusate silenziosamente (stesso identico effetto di una risposta data ora,
+// così tutta la logica a valle — conteggi, attività, worksCurrently — resta
+// invariata), le altre finiscono nella coda da mostrare davvero.
+function buildStandardQueue(knownAnswers) {
+  const known = new Map((Array.isArray(knownAnswers) ? knownAnswers : []).map(a => [a.id, a]));
+  const queue = [];
+  const skippedLabels = [];
+
+  STANDARD_QUESTIONS.forEach((q) => {
+    const prev = SKIPPABLE_STANDARD_IDS.includes(q.id) ? known.get(q.id) : null;
+    if (prev && prev.answer) {
+      state.history.push({
+        type: 'question',
+        questionData: q,
+        conversationLength: state.conversationHistory.length,
+        questionCount: state.questionCount,
+        fixedCount: state.fixedCount,
+        adaptiveCount: state.adaptiveCount,
+      });
+      state.conversationHistory.push({
+        role: 'user',
+        content: `Risposta: "${prev.answer}" (già nota dal test precedente, non richiesta di nuovo)`,
+      });
+      state.answers.push({ id: q.id, question: q.text, answer: prev.answer, time: 0, isOpen: false, indiretta: false });
+      state.questionCount++;
+      state.fixedCount++;
+      skippedLabels.push(SKIP_LABELS[q.id] || q.id);
+    } else {
+      queue.push(q);
+    }
+  });
+
+  state.standardQueue = queue;
+  state._skippedLabels = skippedLabels;
+}
+
+// Chi rifà il test da loggato non deve ripartire da zero: recupera le
+// risposte "stabili" del test precedente (per saltarle, vedi sopra) e, se ha
+// già un CV caricato sul profilo, un estratto testuale per rendere 1-2
+// domande adattive più mirate. Ogni fallimento qui è silenzioso e non
+// bloccante: nel dubbio si procede come un test normale.
+async function prepareReturningUserContext() {
+  let knownAnswers = null;
+  let cvText = null;
+  try {
+    const session = await getSession();
+    if (session) {
+      try {
+        knownAnswers = await getLastTestAnswers();
+      } catch (e) {
+        console.error('Recupero risposte del test precedente fallito:', e);
+      }
+      try {
+        const profile = await getProfile();
+        if (profile?.cv_path) {
+          const token = await getAccessToken();
+          const res = await fetch('/api/cv-context', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            cvText = data?.text || null;
+          }
+        }
+      } catch (e) {
+        console.error('Recupero contesto CV fallito:', e);
+      }
+    }
+  } catch (e) {
+    console.error('Controllo utente di ritorno fallito:', e);
+  }
+  return { knownAnswers, cvText };
+}
 
 // ─── VARIANTI ATTIVITÀ ────────────────────────────────────────
 const ACTIVITY_VARIANTS = {
@@ -591,7 +698,7 @@ async function submitAnswer(value, questionData) {
     content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
 
-  const isStandard = state.fixedCount < STANDARD_QUESTIONS.length;
+  const isStandard = STANDARD_QUESTIONS.some(q => q.id === questionData.id);
   // Le domande standard non sono mai personali. Per le adattive, ci fidiamo
   // solo di un "indiretta: false" esplicito dell'AI — qualunque altra cosa
   // (true, o il campo mancante) viene trattata come domanda da non esporre
@@ -609,6 +716,7 @@ async function submitAnswer(value, questionData) {
 
   if (isStandard) {
     state.fixedCount++;
+    state.standardQueue.shift();
   } else {
     state.adaptiveCount++;
   }
@@ -641,11 +749,23 @@ function isSignalChiaro(internal) {
 async function getNextStep() {
   showThinking();
 
-  // Ancora nelle domande standard
-  if (state.fixedCount < STANDARD_QUESTIONS.length) {
+  // Ancora nelle domande standard rimaste (alcune possono essere già state
+  // saltate all'avvio, vedi buildStandardQueue).
+  if (state.standardQueue.length > 0) {
     stopThinking();
-    renderQuestion(STANDARD_QUESTIONS[state.fixedCount]);
+    renderQuestion(state.standardQueue[0]);
     return;
+  }
+
+  // Prima domanda adattiva: se il candidato ha già un CV caricato lo
+  // agganciamo qui alla conversazione. Resta poi disponibile a ogni
+  // chiamata successiva, dato che la history viene sempre reinviata per intero.
+  if (state.cvContext && !state._cvContextInjected) {
+    state._cvContextInjected = true;
+    state.conversationHistory.push({
+      role: 'user',
+      content: `Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${state.cvContext}\n"""\n\nUsalo per rendere 1, al massimo 2, delle tue domande adattive più mirate e concrete: agganciale esplicitamente a un'esperienza reale già emersa dal CV (un progetto, un ruolo, un settore, uno strumento), nominandola nella domanda stessa, invece di restare generiche. Resta comunque nel formato a scelta multipla con 4 opzioni concrete richiesto da tutte le regole già ricevute. NON usare il CV per dedurre le 3 dimensioni al posto delle risposte del test: il CV racconta cosa questa persona ha fatto, non necessariamente cosa la energizza per natura.`,
+    });
   }
 
   const result = await callClaude('test');
@@ -1504,8 +1624,37 @@ function goToReport() {
   }, 600);
 }
 
+// Mostra una volta sola, prima della prima domanda vera, un avviso di cosa
+// non verrà richiesto perché già noto dal test precedente (vedi
+// buildStandardQueue). Stessa vetrina del "restore-notice": persiste finché
+// non si arriva alla domanda sull'aspirazione, che ripulisce entrambi.
+function showSkipNotice() {
+  const notice = document.createElement('div');
+  notice.className = 'restore-notice';
+  notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
+  notice.textContent = `✓ Abbiamo già la tua ${state._skippedLabels.join(' e ')} dal test precedente — non te le richiediamo di nuovo.`;
+  document.getElementById('active-question').prepend(notice);
+}
+
+// Avvio di un test da zero (primo test, oppure ripristino di uno stato
+// non recuperabile): per chi rifà il test da loggato, recupera prima le
+// risposte riusabili e il contesto CV, così la prima domanda mostrata è già
+// quella giusta invece di dover sempre partire da "Quanti anni hai?".
+async function startFreshTest() {
+  clearState();
+  state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
+  state.standardQueue = [...STANDARD_QUESTIONS];
+
+  const ctx = await prepareReturningUserContext();
+  buildStandardQueue(ctx.knownAnswers);
+  state.cvContext = ctx.cvText;
+  if (state._skippedLabels.length) showSkipNotice();
+
+  await getNextStep();
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
-function init() {
+async function init() {
   const restored = loadState();
 
   if (restored && state.currentQuestion && state.questionCount > 0) {
@@ -1513,9 +1662,7 @@ function init() {
     const isWorkQuestion = state.currentQuestion.id === 'ruolo_attuale';
 
     if (!isStandardQuestion && !isWorkQuestion) {
-      clearState();
-      state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
-      renderQuestion(STANDARD_QUESTIONS[0]);
+      await startFreshTest();
       return;
     }
 
@@ -1534,9 +1681,11 @@ function init() {
     return;
   }
 
-  clearState();
-  state.conversationHistory = [{ role: 'user', content: 'Inizia il test. Sono pronto.' }];
-  renderQuestion(STANDARD_QUESTIONS[0]);
+  await startFreshTest();
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Esposizione per l'handler inline in test.html (onclick="goBack()") — ora
+// che il file è un modulo ES, le funzioni top-level non sono più globali.
+window.goBack = goBack;

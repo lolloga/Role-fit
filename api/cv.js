@@ -1,7 +1,7 @@
 export const maxDuration = 60;
 
-import pdfParse from 'pdf-parse';
 import { PROMPT_REPORT } from './claude.js';
+import { envReady, serviceHeaders, getUserFromToken, extractCvText } from './_cv-shared.js';
 
 // Endpoint lato server per il CV del candidato: dopo l'upload (fatto dal
 // browser direttamente su Supabase Storage, protetto da RLS scoped alla
@@ -12,34 +12,11 @@ import { PROMPT_REPORT } from './claude.js';
 // lo storico dei test resta intatto.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.supabase_url;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.supabase_anon_key;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.supabase_service_role_key;
 
 // Limite di caratteri del testo estratto dal PDF passato al modello: un CV
 // normale sta ampiamente sotto questa soglia, serve solo a evitare che un
 // PDF anomalo (es. scansione con OCR rumoroso) esploda il budget di token.
 const MAX_CV_CHARS = 12000;
-
-function serviceHeaders() {
-  return {
-    apikey: SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function getUserFromToken(token) {
-  if (!token) return null;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
-    });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
 
 function parseReportJson(text) {
   const start = text.indexOf('{');
@@ -62,7 +39,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+  if (!envReady()) {
     return res.status(500).json({ error: 'Configurazione server incompleta' });
   }
 
@@ -80,28 +57,16 @@ export default async function handler(req, res) {
     const [profile] = await profileRes.json();
     if (!profile?.cv_path) return res.status(400).json({ error: 'Nessun CV caricato' });
 
-    // cv_path in tabella è aggiornabile dal client (RLS "own profile update"
-    // consente di modificare qualunque colonna della propria riga): trattiamo
-    // il valore salvato solo come flag "CV presente", ma il percorso reale sul
-    // bucket lo ricostruiamo sempre dall'id utente verificato dal token, così
-    // nessuno può farsi leggere un file che non è il proprio.
-    const cvPath = `${user.id}/cv.pdf`;
-    const fileRes = await fetch(`${SUPABASE_URL}/storage/v1/object/cv/${cvPath}`, {
-      headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-    });
-    if (!fileRes.ok) return res.status(500).json({ error: 'Impossibile leggere il file CV' });
-    const arrayBuffer = await fileRes.arrayBuffer();
-
+    // Il percorso reale sul bucket si ricostruisce sempre dall'id utente
+    // verificato dal token (mai da profiles.cv_path, scrivibile dal client),
+    // così nessuno può farsi leggere un file che non è il proprio.
     let cvText;
     try {
-      const parsed = await pdfParse(Buffer.from(arrayBuffer));
-      cvText = (parsed.text || '').trim();
+      cvText = await extractCvText(user.id, MAX_CV_CHARS);
     } catch (e) {
       console.error('Errore estrazione testo PDF:', e);
       return res.status(400).json({ error: 'Non riesco a leggere questo PDF' });
     }
-    if (!cvText) return res.status(400).json({ error: 'Il PDF non contiene testo leggibile' });
-    if (cvText.length > MAX_CV_CHARS) cvText = cvText.slice(0, MAX_CV_CHARS);
 
     const reportsRes = await fetch(
       `${SUPABASE_URL}/rest/v1/reports?user_id=eq.${user.id}&select=*&order=created_at.desc&limit=1`,
