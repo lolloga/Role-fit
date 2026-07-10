@@ -108,6 +108,24 @@ export async function getLastTestAnswers() {
   return data?.test_history?.answers || null;
 }
 
+// Storico dei test più recenti (fino a `limit`), usato per costruire un
+// profilo cumulativo che si affina test dopo test — sia nelle domande
+// adattive (test.js) sia nel report (report.js). Solo i campi derivati
+// (assi, ruoli, ruolo dichiarato) e non le risposte grezze di ogni singolo
+// test passato: restano leggeri da passare al modello anche con molti test
+// alle spalle.
+export async function getHistoricalProfile(limit = 5) {
+  const session = await getSession();
+  if (!session) return null;
+  const { data, error } = await sb
+    .from('reports')
+    .select('created_at, report_json, current_role_eval, aspiration')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
 // ─── CV ────────────────────────────────────────────────────────
 // Stato del CV (path nello storage + data dell'ultima rigenerazione).
 export async function getProfile() {

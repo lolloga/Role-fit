@@ -1,4 +1,4 @@
-import { getSession, getAccessToken, getProfile, getLastTestAnswers } from './supabase.js';
+import { getSession, getAccessToken, getProfile, getLastTestAnswers, getHistoricalProfile } from './supabase.js';
 
 // ─── FRASI AI THINKING ───────────────────────────────────────
 const THINKING_PHRASES = [
@@ -76,7 +76,11 @@ const state = {
   // Estratto testuale del CV (se già caricato sul profilo), per agganciare
   // 1-2 domande adattive a un'esperienza reale (vedi getNextStep).
   cvContext: null,
-  _cvContextInjected: false,
+  // Riassunto dello storico dei test precedenti (assi, ruoli, ruolo attuale
+  // dichiarato) — insieme al CV, dà al motore adattivo di cosa concentrarsi
+  // per sembrare che conosca davvero la persona (vedi getNextStep).
+  historicalSummary: null,
+  _contextInjected: false,
   _skippedLabels: [],
 };
 
@@ -98,7 +102,8 @@ function saveState() {
     aspirationRole: state.aspirationRole,
     standardQueue: state.standardQueue,
     cvContext: state.cvContext,
-    _cvContextInjected: state._cvContextInjected,
+    historicalSummary: state.historicalSummary,
+    _contextInjected: state._contextInjected,
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
@@ -251,9 +256,46 @@ function buildStandardQueue(knownAnswers) {
 // già un CV caricato sul profilo, un estratto testuale per rendere 1-2
 // domande adattive più mirate. Ogni fallimento qui è silenzioso e non
 // bloccante: nel dubbio si procede come un test normale.
+// Riassunto compatto dello storico dei test precedenti (assi, ruoli
+// suggeriti, ultima narrazione "come funzioni", ruolo attuale/aspirato
+// dichiarato) da passare al motore adattivo, così può decidere dove
+// concentrarsi invece di ripartire da zero ogni volta. Solo dati derivati,
+// mai le risposte grezze di ogni singolo test passato: resta leggero anche
+// con molti test alle spalle.
+function buildHistoricalSummary(history) {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  const chrono = [...history].reverse(); // dal più vecchio al più recente
+
+  const righe = chrono.map((r) => {
+    const data = new Date(r.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    const assi = r.report_json?.assi;
+    const ruoli = (r.report_json?.ruoli || []).map((x) => `${x.nome} (${x.match}%)`).join(', ');
+    return `- Test del ${data}: assi ${assi ? JSON.stringify(assi) : 'n/d'}. Ruoli suggeriti: ${ruoli || 'n/d'}.`;
+  }).join('\n');
+
+  const latest = chrono[chrono.length - 1];
+  const comeFunzioni = latest?.report_json?.chi_sei?.come_funzioni || null;
+  const ruoloAttuale = latest?.current_role_eval?._input || null;
+  const aspirazione = latest?.aspiration || null;
+
+  let extra = '';
+  if (comeFunzioni) extra += `\n\nCosa avevamo capito di questa persona l'ultima volta (dal blocco "Come funzioni" del report più recente): "${comeFunzioni}"`;
+  if (ruoloAttuale) extra += `\n\nRuolo attuale dichiarato dalla persona: "${ruoloAttuale}".`;
+  if (aspirazione) extra += `\nRuolo a cui aspira: "${aspirazione}".`;
+
+  return `Storico dei test precedenti di questa persona (dal più vecchio al più recente):\n${righe}${extra}`;
+}
+
+// Chi rifà il test da loggato non deve ripartire da zero: recupera prima le
+// risposte "stabili" dell'ultimo test (per saltarle, vedi buildStandardQueue),
+// un riassunto di tutto lo storico dei test (per rendere le domande adattive
+// più personali) e, se ha già un CV caricato, un estratto testuale. Ogni
+// fallimento qui è silenzioso: nel dubbio si procede come un test normale,
+// non si blocca mai l'utente per questo.
 async function prepareReturningUserContext() {
   let knownAnswers = null;
   let cvText = null;
+  let historicalSummary = null;
   try {
     const session = await getSession();
     if (session) {
@@ -261,6 +303,12 @@ async function prepareReturningUserContext() {
         knownAnswers = await getLastTestAnswers();
       } catch (e) {
         console.error('Recupero risposte del test precedente fallito:', e);
+      }
+      try {
+        const history = await getHistoricalProfile();
+        historicalSummary = buildHistoricalSummary(history);
+      } catch (e) {
+        console.error('Recupero storico dei test precedenti fallito:', e);
       }
       try {
         const profile = await getProfile();
@@ -282,7 +330,7 @@ async function prepareReturningUserContext() {
   } catch (e) {
     console.error('Controllo utente di ritorno fallito:', e);
   }
-  return { knownAnswers, cvText };
+  return { knownAnswers, cvText, historicalSummary };
 }
 
 // ─── VARIANTI ATTIVITÀ ────────────────────────────────────────
@@ -757,15 +805,20 @@ async function getNextStep() {
     return;
   }
 
-  // Prima domanda adattiva: se il candidato ha già un CV caricato lo
-  // agganciamo qui alla conversazione. Resta poi disponibile a ogni
-  // chiamata successiva, dato che la history viene sempre reinviata per intero.
-  if (state.cvContext && !state._cvContextInjected) {
-    state._cvContextInjected = true;
-    state.conversationHistory.push({
-      role: 'user',
-      content: `Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${state.cvContext}\n"""\n\nUsalo per rendere 1, al massimo 2, delle tue domande adattive più mirate e concrete: agganciale esplicitamente a un'esperienza reale già emersa dal CV (un progetto, un ruolo, un settore, uno strumento), nominandola nella domanda stessa, invece di restare generiche. Resta comunque nel formato a scelta multipla con 4 opzioni concrete richiesto da tutte le regole già ricevute. NON usare il CV per dedurre le 3 dimensioni al posto delle risposte del test: il CV racconta cosa questa persona ha fatto, non necessariamente cosa la energizza per natura.`,
-    });
+  // Prima domanda adattiva: se questa persona ha già uno storico (test
+  // precedenti e/o un CV caricato) lo agganciamo qui alla conversazione, una
+  // volta sola. Resta poi disponibile a ogni chiamata successiva, dato che
+  // la history viene sempre reinviata per intero.
+  if ((state.historicalSummary || state.cvContext) && !state._contextInjected) {
+    state._contextInjected = true;
+    const parts = [];
+    if (state.historicalSummary) {
+      parts.push(`${state.historicalSummary}\n\nUsa questo storico secondo le istruzioni già ricevute: per decidere dove concentrare le domande di oggi, non per dare per scontato senza verificarlo di nuovo cosa emergerà.`);
+    }
+    if (state.cvContext) {
+      parts.push(`Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${state.cvContext}\n"""\n\nUsalo per rendere 1, al massimo 2, delle tue domande adattive più mirate e concrete: agganciale esplicitamente a un'esperienza reale già emersa dal CV (un progetto, un ruolo, un settore, uno strumento), nominandola nella domanda stessa, invece di restare generiche. Resta comunque nel formato a scelta multipla con 4 opzioni concrete richiesto da tutte le regole già ricevute. NON usare il CV per dedurre le 3 dimensioni al posto delle risposte del test: il CV racconta cosa questa persona ha fatto, non necessariamente cosa la energizza per natura.`);
+    }
+    state.conversationHistory.push({ role: 'user', content: parts.join('\n\n---\n\n') });
   }
 
   const result = await callClaude('test');
@@ -1648,6 +1701,7 @@ async function startFreshTest() {
   const ctx = await prepareReturningUserContext();
   buildStandardQueue(ctx.knownAnswers);
   state.cvContext = ctx.cvText;
+  state.historicalSummary = ctx.historicalSummary;
   if (state._skippedLabels.length) showSkipNotice();
 
   await getNextStep();
