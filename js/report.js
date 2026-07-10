@@ -1,4 +1,4 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, listReports, getProfile, uploadCv, saveCvPath } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, getProfile, uploadCv, saveCvPath, getHistoricalProfile } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
@@ -29,28 +29,78 @@ function esc(str) {
 // altrimenti sarebbero riuscite.
 const GENERATE_TIMEOUT_MS = 120000;
 
-// Recupera un condensato dell'ultimo report salvato (se esiste) per il
-// confronto longitudinale nel prossimo report: solo data e assi, non serve
-// altro al modello per notare cosa è cambiato. Nessun errore qui deve mai
-// bloccare la generazione del nuovo report — in caso di dubbio, niente
-// confronto, il report si genera comunque come sempre.
-async function fetchPriorProfileContext() {
+// Riassunto compatto dello storico dei test precedenti (assi, ruoli
+// suggeriti, ultima narrazione "come funzioni", ruolo attuale/aspirato
+// dichiarato) da passare al modello per il report — stessa logica usata in
+// test.js per le domande adattive, qui per rendere il report stesso più
+// preciso e personale a partire dal secondo test. Solo dati derivati, mai
+// le risposte grezze di ogni test passato: resta leggero anche con molti
+// test alle spalle.
+function buildHistoricalSummary(history) {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  const chrono = [...history].reverse(); // dal più vecchio al più recente
+
+  const righe = chrono.map((r) => {
+    const data = new Date(r.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    const assi = r.report_json?.assi;
+    const ruoli = (r.report_json?.ruoli || []).map((x) => `${x.nome} (${x.match}%)`).join(', ');
+    return `- Test del ${data}: assi ${assi ? JSON.stringify(assi) : 'n/d'}. Ruoli suggeriti: ${ruoli || 'n/d'}.`;
+  }).join('\n');
+
+  const latest = chrono[chrono.length - 1];
+  const comeFunzioni = latest?.report_json?.chi_sei?.come_funzioni || null;
+  const ruoloAttuale = latest?.current_role_eval?._input || null;
+  const aspirazione = latest?.aspiration || null;
+
+  let extra = '';
+  if (comeFunzioni) extra += `\n\nCosa avevamo capito di questa persona l'ultima volta (dal blocco "Come funzioni" del report più recente): "${comeFunzioni}"`;
+  if (ruoloAttuale) extra += `\n\nRuolo attuale dichiarato dalla persona: "${ruoloAttuale}".`;
+  if (aspirazione) extra += `\nRuolo a cui aspira: "${aspirazione}".`;
+
+  return `Storico dei test precedenti di questa persona (dal più vecchio al più recente):\n${righe}${extra}`;
+}
+
+// Recupera lo storico dei test precedenti (per il confronto longitudinale
+// e la personalizzazione crescente del report) e, se già caricato, un
+// estratto del CV. Nessun errore qui deve mai bloccare la generazione del
+// nuovo report — in caso di dubbio, niente contesto extra, il report si
+// genera comunque come sempre.
+async function fetchCumulativeContext() {
+  let summary = null;
+  let cvText = null;
   try {
     const session = await getSession();
-    if (!session) return null;
-    const reports = await listReports();
-    const prev = reports?.[0];
-    const assi = prev?.report_json?.assi;
-    if (!prev || !assi) return null;
-    const data = new Date(prev.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
-    return { data, assi };
-  } catch {
-    return null;
+    if (!session) return { summary, cvText };
+    try {
+      const history = await getHistoricalProfile();
+      summary = buildHistoricalSummary(history);
+    } catch (e) {
+      console.error('Recupero storico dei test precedenti fallito:', e);
+    }
+    try {
+      const profile = await getProfile();
+      if (profile?.cv_path) {
+        const token = await getAccessToken();
+        const res = await fetch('/api/cv-context', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          cvText = data?.text || null;
+        }
+      }
+    } catch (e) {
+      console.error('Recupero contesto CV fallito:', e);
+    }
+  } catch (e) {
+    console.error('Controllo storico/CV fallito:', e);
   }
+  return { summary, cvText };
 }
 
 // ─── GENERA REPORT ───────────────────────────────────────────
-async function generateReport(priorProfile) {
+async function generateReport(cumulativeContext) {
   const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
   const activities = JSON.parse(localStorage.getItem('rf_activities') || '{}');
 
@@ -58,9 +108,14 @@ async function generateReport(priorProfile) {
     .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
     .join('\n');
 
-  const priorBlock = priorProfile
-    ? `\n\nProfilo del test precedente di questa persona (${priorProfile.data}), sulle stesse 6 dimensioni: ${JSON.stringify(priorProfile.assi)}. Usalo per il confronto longitudinale richiesto nelle istruzioni.`
-    : '';
+  const priorParts = [];
+  if (cumulativeContext?.summary) {
+    priorParts.push(`${cumulativeContext.summary}\n\nUsa questo storico secondo le istruzioni già ricevute sul confronto longitudinale e sulla personalizzazione crescente del report.`);
+  }
+  if (cumulativeContext?.cvText) {
+    priorParts.push(`Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${cumulativeContext.cvText}\n"""\n\nUsalo secondo le istruzioni già ricevute su come trattare il CV nel report.`);
+  }
+  const priorBlock = priorParts.length ? `\n\n${priorParts.join('\n\n---\n\n')}` : '';
 
   const messages = [
     ...history,
@@ -868,8 +923,8 @@ function stopLoadingTimer() {
 async function generateAndSave() {
   try {
     startLoadingTimer();
-    const priorProfile = await fetchPriorProfileContext();
-    const data = await generateReport(priorProfile);
+    const cumulativeContext = await fetchCumulativeContext();
+    const data = await generateReport(cumulativeContext);
     stopLoadingTimer();
     if (!data) throw new Error('Report non valido');
     renderReport(data);
