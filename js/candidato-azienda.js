@@ -1,4 +1,5 @@
 const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const ASSI_COLORI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
 
 // Il contenuto qui sotto include testo generato dall'AI e, nel Q&A, le
 // risposte scritte a mano dal candidato: senza escaping, un payload HTML/script
@@ -18,48 +19,98 @@ function getParams() {
   return { jobId: p.get('job_id'), userId: p.get('user_id') };
 }
 
+function confAmount(c) { return c === 'alta' ? 1 : c === 'media' ? 0.6 : c === 'bassa' ? 0.25 : 0.6; }
+
+// Stessa identità grafica della costellazione che il candidato vede sul
+// proprio profilo (account.js) — qui in versione statica a singolo
+// istantanea, senza ruoli/timeline: l'azienda guarda un solo scatto, non
+// esplora nel tempo. Diverso da un radar Chart.js per restare coerente con
+// il resto del prodotto invece di mostrare due linguaggi grafici diversi.
 function renderRadar(assi, confidenza) {
-  const canvas = document.getElementById('candidato-radar');
-  if (!canvas || typeof Chart === 'undefined' || !assi) return;
+  const canvas = document.getElementById('candidato-sky');
+  if (!canvas || !assi) return;
   const conf = confidenza || {};
-  new Chart(canvas, {
-    type: 'radar',
-    data: {
-      labels: ASSI_FISSI,
-      datasets: [{
-        data: ASSI_FISSI.map((k) => (typeof assi[k] === 'number' ? assi[k] : 0)),
-        borderColor: '#5DCAA5',
-        backgroundColor: 'rgba(93,202,165,0.18)',
-        // Punto vuoto = il test ha ancora pochi segnali su quella dimensione.
-        pointBackgroundColor: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 'transparent' : '#5DCAA5'),
-        pointBorderColor: '#5DCAA5',
-        pointBorderWidth: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 2 : 1),
-        borderWidth: 2,
-        pointRadius: ASSI_FISSI.map((k) => conf[k] === 'bassa' ? 5 : 3),
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        r: {
-          suggestedMin: 0, suggestedMax: 100,
-          ticks: { display: false, stepSize: 25 },
-          grid: { color: 'rgba(240,255,244,0.12)' },
-          angleLines: { color: 'rgba(240,255,244,0.12)' },
-          pointLabels: { color: 'rgba(240,255,244,0.65)', font: { size: 12 } },
-        },
-      },
-      plugins: { legend: { display: false } },
-    },
-  });
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+    canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  let t = 0;
+  function frame() {
+    const W = canvas.width / dpr, H = canvas.height / dpr;
+    const CX = W / 2, CY = H / 2;
+    ctx.clearRect(0, 0, W, H);
+    t += 1;
+
+    const coreR = 6 * (1 + Math.sin(t * 0.03) * 0.06);
+    const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR * 6);
+    g.addColorStop(0, 'rgba(93,202,165,0.5)'); g.addColorStop(1, 'rgba(93,202,165,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, coreR * 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#F0FFF4'; ctx.beginPath(); ctx.arc(CX, CY, coreR, 0, Math.PI * 2); ctx.fill();
+
+    const R = Math.min(W, H) * 0.32;
+    const pts = ASSI_FISSI.map((k, i) => {
+      const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      const val = typeof assi[k] === 'number' ? assi[k] : 0;
+      const r = 22 + (val / 100) * R;
+      return { x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r, angle: a };
+    });
+
+    ctx.strokeStyle = 'rgba(93,202,165,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = 'rgba(93,202,165,0.05)'; ctx.fill();
+
+    const small = W < 420;
+    pts.forEach((p, i) => {
+      const k = ASSI_FISSI[i];
+      const amount = confAmount(conf[k]);
+      const flicker = amount < 1 ? Math.sin(t * 0.06 + i) * (1 - amount) * 0.4 : 0;
+      const haloR = 11 + amount * 9 + flicker * 5;
+
+      const hg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
+      hg.addColorStop(0, ASSI_COLORI[i] + 'CC'); hg.addColorStop(1, ASSI_COLORI[i] + '00');
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(p.x, p.y, haloR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = ASSI_COLORI[i]; ctx.globalAlpha = 0.55 + amount * 0.45 - flicker * 0.3;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      const labelDist = small ? 20 : 25;
+      const lx = p.x + Math.cos(p.angle) * labelDist;
+      const ly = p.y + Math.sin(p.angle) * labelDist;
+      ctx.font = (small ? '600 10px ' : '600 12px ') + getComputedStyle(document.body).fontFamily;
+      ctx.fillStyle = 'rgba(240,255,244,0.75)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(k, lx, ly);
+      ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(240,255,244,0.35)';
+      ctx.fillText(Math.round(assi[k] ?? 0) + '', lx, ly + (small ? 12 : 14));
+    });
+
+    if (!reduceMotion) requestAnimationFrame(frame);
+  }
+  frame();
 }
 
-function renderChiSei(chiSei) {
+// Riepilogo pensato per l'azienda (terza persona, mai "tu" — vedi
+// PROMPT_REPORT lato server): diverso dal blocco "chi sei" che il
+// candidato legge di sé stesso, non va mai riusato qui.
+function renderRiepilogoAziende(riepilogo) {
   const el = document.getElementById('chi-sei-text');
-  if (!chiSei) { el.innerHTML = '<p>Non disponibile.</p>'; return; }
-  const parti = [chiSei.come_funziona, chiSei.cosa_ti_alimenta, chiSei.di_cosa_hai_bisogno].filter(Boolean);
-  el.innerHTML = parti.map((p) => `<p>${esc(p)}</p>`).join('');
+  if (!riepilogo) {
+    el.innerHTML = '<p style="color:var(--text-muted);">Non disponibile per i test svolti prima di questo aggiornamento.</p>';
+    return;
+  }
+  el.innerHTML = `<p>${esc(riepilogo)}</p>`;
 }
 
 function renderRuoli(ruoli) {
@@ -123,7 +174,6 @@ function renderQa(qaLog, qaDisponibile) {
     if (!res.ok || data.error) throw new Error(data.error || 'Errore sconosciuto');
 
     document.getElementById('candidato-email').textContent = data.email || 'Candidato';
-    renderRadar(data.report?.assi, data.report?.assi_confidenza);
 
     if (data.cv_url) {
       document.getElementById('cv-link').href = data.cv_url;
@@ -144,12 +194,15 @@ function renderQa(qaLog, qaDisponibile) {
       percheSection.classList.add('hidden');
     }
 
-    renderChiSei(data.report?.chi_sei);
+    renderRiepilogoAziende(data.report?.riepilogo_aziende);
     renderRuoli(data.report?.ruoli);
     renderQa(data.qa_log, data.qa_disponibile);
 
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('profile-content').classList.remove('hidden');
+    // Il canvas va misurato SOLO dopo che il contenitore è visibile: prima
+    // di questo punto è display:none e restituirebbe un riquadro 0x0.
+    renderRadar(data.report?.assi, data.report?.assi_confidenza);
   } catch (e) {
     console.error('Errore caricamento profilo candidato:', e);
     document.getElementById('loading-state').classList.add('hidden');

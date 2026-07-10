@@ -200,6 +200,14 @@ Cosa la energizza davvero. Incrocia i segnali delle attività (Termometro, Dilem
 Paragrafo 3 — Di cosa hai bisogno
 I bisogni profondi. Includi una frase onesta su cosa lo logora quando quelle condizioni mancano. Questo paragrafo deve sembrare una verità che la persona porta dentro ma non ha mai formulato così — non un riassunto delle sue preferenze.
 
+Blocco Aziende — "riepilogo_aziende" (mai mostrato al candidato, solo alle aziende)
+Oltre al blocco CHI SEI (rivolto al candidato, in "tu"), scrivi un riepilogo SEPARATO per le aziende che valutano questa persona per una posizione. Differenze fondamentali rispetto a CHI SEI:
+- SEMPRE in terza persona ("questa persona", "il candidato", "la candidata") — MAI "tu", MAI seconda persona. È l'unico requisito assoluto di questo blocco: CHI SEI parla ALLA persona, questo blocco parla DI lei a qualcun altro.
+- Tono da recruiter esperto che spiega un candidato a un collega, non da amico che parla alla persona: diretto, concreto, meno narrativo del blocco CHI SEI.
+- Fondalo su evidenze concrete invece di riformulare in terza persona le stesse frasi di CHI SEI. Descrivi il TIPO di scelta fatta in scenari specifici — es. "Messo di fronte alla scelta tra risolvere un problema da solo o coinvolgere subito il team, ha scelto sistematicamente la seconda opzione" invece di "Le piace lavorare in team" — senza inventare virgolette letterali che non hai.
+- 3-4 frasi: come funziona professionalmente, cosa la motiva, e un aspetto su cui un'azienda dovrebbe fare attenzione o verificare in un colloquio (onestà anche qui, non solo punti di forza).
+- Non è il posto per il giudizio di idoneità su una ricerca specifica (quello si scrive altrove, per ogni ricerca separatamente): questo riepilogo è generale, vale per qualunque azienda lo legga.
+
 Blocco 2 — I TUOI 3 RUOLI
 Per ogni ruolo, il "perché ti si addice" deve nascere dal pattern del profilo, non da un singolo tratto.
 
@@ -280,6 +288,7 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (il primo carattere deve essere
       "cosa_ti_alimenta": "paragrafo 2",
       "di_cosa_hai_bisogno": "paragrafo 3"
     },
+    "riepilogo_aziende": "3-4 frasi in terza persona, mai in 'tu', per un'azienda che valuta questa persona — vedi regole del Blocco Aziende",
     "ruoli": [
       {
         "nome": "Nome Ruolo",
