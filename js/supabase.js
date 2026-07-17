@@ -133,11 +133,21 @@ export async function getProfile() {
   if (!session) return null;
   const { data, error } = await sb
     .from('profiles')
-    .select('cv_path, cv_updated_at')
+    .select('cv_path, cv_updated_at, nome')
     .eq('id', session.user.id)
     .single();
   if (error) throw error;
   return data;
+}
+
+// Salva il nome dato dall'utente al test (una sola volta, la prima volta che
+// lo dà): da quel momento in poi test.js non lo richiede più, lo legge da
+// qui invece di indovinarlo o richiederlo di nuovo ogni volta.
+export async function saveUserName(nome) {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const { error } = await sb.from('profiles').update({ nome }).eq('id', session.user.id);
+  if (error) throw error;
 }
 
 // Carica il PDF nel bucket privato "cv", dentro la cartella dell'utente
