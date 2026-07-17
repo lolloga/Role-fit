@@ -1,4 +1,4 @@
-import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, getProfile, uploadCv, saveCvPath, getHistoricalProfile } from './supabase.js';
+import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, getProfile, uploadCv, saveCvPath, getHistoricalProfile, saveUserName } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
@@ -944,6 +944,16 @@ async function generateAndSave() {
       const saved = await saveReportWithRetry({ report_json: data.report, aspiration, test_history });
       currentReportId = saved.id;
       localStorage.setItem('rf_report_saved', '1');
+
+      // Se il test ha appena chiesto il nome (era sconosciuto, e l'utente l'ha
+      // dato), lo salviamo sul profilo una volta per tutte: da qui in poi
+      // test.js lo leggerà da lì invece di richiederlo di nuovo. Se l'utente
+      // l'ha saltato, o se il profilo lo aveva già, questa voce di solito non
+      // c'è nemmeno tra le risposte — nessun danno a provarci comunque.
+      const nomeAnswer = test_history.answers.find((a) => a.id === 'nome');
+      if (nomeAnswer?.answer) {
+        saveUserName(nomeAnswer.answer.trim()).catch((e) => console.error('Salvataggio nome fallito (non bloccante):', e));
+      }
       // [feedback] report appena generato e salvato: attiva la sezione feedback per questo report
       window.dispatchEvent(new CustomEvent('rf-report-shown', { detail: { reportId: saved.id } }));
       return true;

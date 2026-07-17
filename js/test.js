@@ -131,8 +131,18 @@ function clearState() {
   localStorage.removeItem('rf_state');
 }
 
-// ─── 5 DOMANDE STANDARD (no AI) ──────────────────────────────
+// ─── DOMANDE STANDARD (no AI) ──────────────────────────────
+// 'nome' sta apposta per prima e non è una domanda "fissa" come le altre:
+// va chiesta a chiunque non l'abbia ancora data (chi fa il primissimo test,
+// oppure chi torna ma non l'aveva mai detta) e mai più una volta nota — vedi
+// buildStandardQueue e prepareReturningUserContext.
 const STANDARD_QUESTIONS = [
+  {
+    id: 'nome',
+    text: 'Come ti chiamiamo?',
+    context: 'Solo il nome, niente cognome.',
+    type: 'short_text',
+  },
   {
     id: 'eta',
     text: 'Quanti anni hai?',
@@ -210,8 +220,13 @@ const STANDARD_QUESTIONS = [
 // sostanzialmente immutabili tra un test e l'altro — non ha senso
 // richiederli di nuovo. Momento professionale, attrazione naturale e
 // settore d'interesse invece possono cambiare (o contano come segnale
-// fresco da ricontrollare), quindi si richiedono sempre.
-const SKIPPABLE_STANDARD_IDS = ['eta', 'background'];
+// fresco da ricontrollare), quindi si richiedono sempre. Il nome è un
+// caso a parte: non viene mai richiesto una seconda volta una volta noto,
+// ma non compare nell'avviso "abbiamo già la tua..." (SKIP_LABELS) perché
+// grammaticalmente non ci si accorda con età/formazione nella stessa frase
+// ("la tua età e formazione" vs "il tuo nome") — salta comunque, resta solo
+// silenzioso invece che annunciato.
+const SKIPPABLE_STANDARD_IDS = ['nome', 'eta', 'background'];
 const SKIP_LABELS = { eta: 'età', background: 'formazione' };
 
 // Costruisce la coda delle domande standard ancora da fare: quelle il cui id
@@ -242,7 +257,7 @@ function buildStandardQueue(knownAnswers) {
       state.answers.push({ id: q.id, question: q.text, answer: prev.answer, time: 0, isOpen: false, indiretta: false });
       state.questionCount++;
       state.fixedCount++;
-      skippedLabels.push(SKIP_LABELS[q.id] || q.id);
+      if (SKIP_LABELS[q.id]) skippedLabels.push(SKIP_LABELS[q.id]);
     } else {
       queue.push(q);
     }
@@ -252,11 +267,6 @@ function buildStandardQueue(knownAnswers) {
   state._skippedLabels = skippedLabels;
 }
 
-// Chi rifà il test da loggato non deve ripartire da zero: recupera le
-// risposte "stabili" del test precedente (per saltarle, vedi sopra) e, se ha
-// già un CV caricato sul profilo, un estratto testuale per rendere 1-2
-// domande adattive più mirate. Ogni fallimento qui è silenzioso e non
-// bloccante: nel dubbio si procede come un test normale.
 // Riassunto compatto dello storico dei test precedenti (assi, ruoli
 // suggeriti, ultima narrazione "come funzioni", ruolo attuale/aspirato
 // dichiarato) da passare al motore adattivo, così può decidere dove
@@ -313,6 +323,13 @@ async function prepareReturningUserContext() {
       }
       try {
         const profile = await getProfile();
+        // Il nome è un dato di profilo, non di un singolo test: se lo
+        // conosciamo già lo trattiamo come una risposta "nota" esattamente
+        // come età e formazione, così buildStandardQueue lo salta con la
+        // stessa identica logica, senza bisogno di un percorso separato.
+        if (profile?.nome) {
+          knownAnswers = [...(Array.isArray(knownAnswers) ? knownAnswers : []), { id: 'nome', answer: profile.nome }];
+        }
         if (profile?.cv_path) {
           const token = await getAccessToken();
           const res = await fetch('/api/cv-context', {
@@ -559,6 +576,8 @@ function renderQuestion(questionData) {
     renderMultipleChoice(inputEl, questionData);
   } else if (questionData.type === 'multi_select') {
     renderMultiSelect(inputEl, questionData);
+  } else if (questionData.type === 'short_text') {
+    renderNomeInput(inputEl, questionData);
   } else {
     renderOpenInput(inputEl, questionData);
   }
@@ -592,6 +611,48 @@ function renderMultipleChoice(container, questionData) {
     renderOpenInput(container, questionData);
   });
   container.appendChild(openLink);
+}
+
+// Domanda del nome: campo su una riga sola (non la textarea di
+// renderOpenInput, qui sarebbe sproporzionata) con un modo esplicito di non
+// rispondere — se lo salta, il nome resta sconosciuto e verrà richiesto di
+// nuovo al prossimo test, esattamente come se non l'avesse mai dato.
+function renderNomeInput(container, questionData) {
+  const area = document.createElement('div');
+  area.className = 'open-input-area';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'open-input';
+  input.style.minHeight = 'auto';
+  input.placeholder = 'Il tuo nome';
+  input.maxLength = 40;
+
+  const actions = document.createElement('div');
+  actions.className = 'open-input-actions';
+
+  const skip = document.createElement('button');
+  skip.className = 'open-toggle';
+  skip.textContent = 'Preferisco non dirlo';
+  skip.style.marginRight = 'auto';
+  skip.addEventListener('click', () => submitAnswer('', questionData));
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--primary';
+  btn.textContent = 'Continua';
+  const go = () => {
+    const val = input.value.trim();
+    if (val) submitAnswer(val, questionData);
+  };
+  btn.addEventListener('click', go);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+
+  actions.appendChild(skip);
+  actions.appendChild(btn);
+  area.appendChild(input);
+  area.appendChild(actions);
+  container.appendChild(area);
+  setTimeout(() => input.focus(), 50);
 }
 
 function renderOpenInput(container, questionData) {
