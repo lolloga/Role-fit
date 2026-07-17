@@ -89,13 +89,20 @@ function profiloSintesi(report_json) {
 }
 
 // Valuta un ruolo contro UN report salvato (una chiamata a /api/claude, fase compatibilita).
-async function valutaRuoloControReport(ruoloInput, report_json) {
+// settore è facoltativo: se presente, la valutazione deve giudicare il ruolo
+// così come si vive IN QUEL settore (richiede livelli diversi delle stesse
+// dimensioni), non filtrare in base a quali settori l'utente aveva indicato
+// come "di interesse" nel test — sono due cose diverse, vedi PROMPT_COMPATIBILITA.
+async function valutaRuoloControReport(ruoloInput, settore, report_json) {
   const sintesi = profiloSintesi(report_json);
+  const settoreBlock = settore
+    ? `Valuta il ruolo specificamente nel settore "${settore}" — lo stesso ruolo richiede pesi diversi sulle dimensioni a seconda del settore in cui si vive, non è lo stesso lavoro ovunque.`
+    : '';
   const messages = [
     {
       role: 'user',
       content: `Questo è il profilo completo di un utente, emerso dal test RoleFit:\n\n${sintesi}\n\n` +
-        `Valuta un ruolo di tipo ASPIRATO/DESIDERATO. L'utente vuole sapere quanto il ruolo "${ruoloInput}" è compatibile con il suo profilo. ` +
+        `Valuta un ruolo di tipo ASPIRATO/DESIDERATO. L'utente vuole sapere quanto il ruolo "${ruoloInput}" è compatibile con il suo profilo. ${settoreBlock}\n` +
         `Basati esclusivamente sul profilo qui sopra. Rispondi nel formato JSON richiesto.`
     }
   ];
@@ -125,11 +132,13 @@ async function valutaRuoloControReport(ruoloInput, report_json) {
 function setupBanco() {
   const btn = document.getElementById('banco-btn');
   const input = document.getElementById('banco-input');
+  const settoreSel = document.getElementById('banco-settore');
   const out = document.getElementById('banco-result');
   if (!btn || !input) return;
 
   const run = async () => {
     const ruolo = (input.value || '').trim();
+    const settore = (settoreSel?.value || '').trim();
     if (!ruolo) return;
     if (!REPORTS.length) {
       out.innerHTML = '<p class="pcard-sub">Fai prima un test: serve almeno un profilo per valutare un ruolo.</p>';
@@ -143,7 +152,7 @@ function setupBanco() {
     try {
       // Valuta sull'ultimo report (il più attuale) — risultato principale
       const last = REPORTS[0];
-      const valLast = await valutaRuoloControReport(ruolo, last.report_json);
+      const valLast = await valutaRuoloControReport(ruolo, settore, last.report_json);
       if (!valLast) throw new Error('Nessun risultato');
 
       const matchColor = valLast.match >= 80 ? '#5DCAA5' : valLast.match >= 55 ? '#5DCAA5' :
@@ -153,7 +162,7 @@ function setupBanco() {
         '<div class="pcard" style="margin-bottom:12px;">' +
           '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
             '<div><p class="pcard-label">Ruolo valutato</p>' +
-            '<p class="pcard-title" style="font-size:19px;">' + esc(ruolo) + '</p>' +
+            '<p class="pcard-title" style="font-size:19px;">' + esc(ruolo) + (settore ? ' <span style="font-size:13px; font-weight:normal; color:rgba(240,255,244,0.5);">— ' + esc(settore) + '</span>' : '') + '</p>' +
             '<p class="pcard-sub" style="color:#5DCAA5;">' + esc(valLast.titolo) + '</p></div>' +
             '<div style="text-align:right; flex-shrink:0;">' +
             '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + esc(valLast.match) + '%</p>' +
@@ -176,7 +185,7 @@ function setupBanco() {
         // Già calcolato l'ultimo; calcola i precedenti (max altri 2)
         righe.push({ data: last.created_at, match: valLast.match });
         for (let i = 1; i < Math.min(REPORTS.length, 3); i++) {
-          const v = await valutaRuoloControReport(ruolo, REPORTS[i].report_json);
+          const v = await valutaRuoloControReport(ruolo, settore, REPORTS[i].report_json);
           if (v) righe.push({ data: REPORTS[i].created_at, match: v.match });
         }
 
