@@ -335,8 +335,24 @@
     <section class="app-sec hidden" data-sec="banco">
       <h1 class="sec-title">Banco di prova ruoli</h1>
       <div class="pcard">
-        <p class="pcard-sub" style="margin-bottom:14px;">Scrivi un ruolo e scopri quanto combacia con il tuo profilo. Se hai fatto più test, vedrai anche come la compatibilità è cambiata nel tempo.</p>
+        <p class="pcard-sub" style="margin-bottom:14px;">Scrivi un ruolo e scopri quanto combacia con il tuo profilo. Lo stesso ruolo cambia da settore a settore — indicane uno se vuoi un confronto più preciso. Se hai fatto più test, vedrai anche come la compatibilità è cambiata nel tempo.</p>
         <input id="banco-input" type="text" placeholder="Es. Product Manager, Data Analyst, HR Specialist…" class="pf-input" style="margin-bottom:10px;" />
+        <select id="banco-settore" class="pf-input" style="margin-bottom:10px;">
+          <option value="">Nessun settore specifico</option>
+          <option>Tecnologia e digitale</option>
+          <option>Finanza, banche e assicurazioni</option>
+          <option>Sanità e farmaceutico</option>
+          <option>Industria, energia e ambiente</option>
+          <option>Moda, lusso e design</option>
+          <option>Commercio, retail e largo consumo</option>
+          <option>Media, comunicazione e marketing</option>
+          <option>Arte, cultura e intrattenimento</option>
+          <option>Turismo, ristorazione e ospitalità</option>
+          <option>Istruzione, formazione e ricerca</option>
+          <option>Pubblica amministrazione e non profit</option>
+          <option>Edilizia, immobiliare e infrastrutture</option>
+          <option>Difesa</option>
+        </select>
         <button id="banco-btn" class="pf-btn" style="width:100%; justify-content:center;">Valuta ruolo</button>
       </div>
       <div id="banco-result"></div>

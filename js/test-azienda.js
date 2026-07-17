@@ -76,7 +76,8 @@ const STANDARD_STEPS = [
       'Tecnologia e digitale', 'Finanza, banche e assicurazioni', 'Sanità e farmaceutico',
       'Industria, energia e ambiente', 'Moda, lusso e design', 'Commercio, retail e largo consumo',
       'Media, comunicazione e marketing', 'Arte, cultura e intrattenimento', 'Turismo, ristorazione e ospitalità',
-      'Istruzione, formazione e ricerca', 'Pubblica amministrazione e non profit', 'Edilizia, immobiliare e infrastrutture'
+      'Istruzione, formazione e ricerca', 'Pubblica amministrazione e non profit', 'Edilizia, immobiliare e infrastrutture',
+      'Difesa'
     ]
   },
   {

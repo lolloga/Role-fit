@@ -199,7 +199,8 @@ const STANDARD_QUESTIONS = [
       'Turismo, ristorazione e ospitalità',
       'Istruzione, formazione e ricerca',
       'Pubblica amministrazione e non profit',
-      'Edilizia, immobiliare e infrastrutture'
+      'Edilizia, immobiliare e infrastrutture',
+      'Difesa'
     ]
   }
 ];
