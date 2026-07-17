@@ -140,7 +140,7 @@ const STANDARD_QUESTIONS = [
   {
     id: 'nome',
     text: 'Come ti chiamiamo?',
-    context: 'Solo il nome — niente cognome. Ci serve per non essere sempre formali con te.',
+    context: 'Solo il nome, niente cognome.',
     type: 'short_text',
   },
   {
