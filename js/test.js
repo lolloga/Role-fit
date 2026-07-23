@@ -1,4 +1,4 @@
-import { getSession, getAccessToken, getProfile, getLastTestAnswers, getHistoricalProfile } from './supabase.js';
+import { getSession, getAccessToken, getProfile, getLastTestHistory, getHistoricalProfile } from './supabase.js';
 
 // ─── FRASI AI THINKING ───────────────────────────────────────
 const THINKING_PHRASES = [
@@ -82,6 +82,12 @@ const state = {
   historicalSummary: null,
   _contextInjected: false,
   _skippedLabels: [],
+  // Indice di variante (0-2) usato nel test precedente per ciascuna attività
+  // con un pool di varianti (riunione/termometro/dilemma): serve a
+  // escluderlo dalla scelta random di oggi, così chi rifà il test non vede
+  // esattamente lo stesso contenuto due volte di fila (vedi getRandomVariant).
+  lastActivityVariants: {},
+  _variantIndex: {},
 };
 
 // ─── PERSISTENZA ─────────────────────────────────────────────
@@ -104,6 +110,8 @@ function saveState() {
     cvContext: state.cvContext,
     historicalSummary: state.historicalSummary,
     _contextInjected: state._contextInjected,
+    lastActivityVariants: state.lastActivityVariants,
+    _variantIndex: state._variantIndex,
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
@@ -305,18 +313,23 @@ function buildHistoricalSummary(history) {
 // non si blocca mai l'utente per questo.
 async function prepareReturningUserContext() {
   let knownAnswers = null;
+  let lastActivities = null;
   let cvText = null;
   let historicalSummary = null;
+  let history = null;
+  let nome = null;
   try {
     const session = await getSession();
     if (session) {
       try {
-        knownAnswers = await getLastTestAnswers();
+        const lastTest = await getLastTestHistory();
+        knownAnswers = lastTest?.answers || null;
+        lastActivities = lastTest?.activities || null;
       } catch (e) {
         console.error('Recupero risposte del test precedente fallito:', e);
       }
       try {
-        const history = await getHistoricalProfile();
+        history = await getHistoricalProfile();
         historicalSummary = buildHistoricalSummary(history);
       } catch (e) {
         console.error('Recupero storico dei test precedenti fallito:', e);
@@ -328,6 +341,7 @@ async function prepareReturningUserContext() {
         // come età e formazione, così buildStandardQueue lo salta con la
         // stessa identica logica, senza bisogno di un percorso separato.
         if (profile?.nome) {
+          nome = profile.nome;
           knownAnswers = [...(Array.isArray(knownAnswers) ? knownAnswers : []), { id: 'nome', answer: profile.nome }];
         }
         if (profile?.cv_path) {
@@ -348,7 +362,27 @@ async function prepareReturningUserContext() {
   } catch (e) {
     console.error('Controllo utente di ritorno fallito:', e);
   }
-  return { knownAnswers, cvText, historicalSummary };
+  return { knownAnswers, lastActivities, cvText, historicalSummary, history, nome };
+}
+
+// Frase breve, non generata dall'AI, che apre il test per chi è già passato
+// di qui: usa solo dati strutturati già disponibili (ruolo più vicino emerso
+// l'ultima volta, o la narrazione "come funzioni" del report più recente),
+// mai lo storico completo passato al motore adattivo — quello resta interno,
+// questo invece è il momento in cui la persona lo VEDE con i propri occhi.
+function buildWelcomeBackTeaser(history, nome) {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  const latest = history[0]; // getHistoricalProfile ordina già dal più recente
+  const saluto = nome ? `Bentornato, ${nome}.` : 'Bentornato.';
+  const topRuolo = (latest?.report_json?.ruoli || [])[0];
+  if (topRuolo?.nome) {
+    return `${saluto} L'ultima volta il profilo più vicino a te era ${topRuolo.nome} — oggi verifichiamo se regge ancora, o se qualcosa è cambiato.`;
+  }
+  const comeFunzioni = latest?.report_json?.chi_sei?.come_funzioni;
+  if (comeFunzioni) {
+    return `${saluto} L'ultima volta era emerso questo: “${comeFunzioni}” — vediamo cosa resta vero oggi.`;
+  }
+  return `${saluto} Riprendiamo da dove eravamo rimasti.`;
 }
 
 // ─── VARIANTI ATTIVITÀ ────────────────────────────────────────
@@ -455,9 +489,17 @@ const ACTIVITY_VARIANTS = {
   })()
 };
 
-function getRandomVariant(key) {
+// Sceglie una variante random per l'attività `key`, escludendo `avoidIndex`
+// quando presente — è l'indice della variante vista l'ultima volta da questa
+// persona (vedi state.lastActivityVariants), così un'attività ripetuta su un
+// test successivo non mostra mai lo stesso identico contenuto due volte di fila.
+function getRandomVariant(key, avoidIndex) {
   const variants = ACTIVITY_VARIANTS[key];
-  return variants[Math.floor(Math.random() * variants.length)];
+  const pool = (variants.length > 1 && avoidIndex != null)
+    ? variants.map((_, i) => i).filter((i) => i !== avoidIndex)
+    : variants.map((_, i) => i);
+  const index = pool[Math.floor(Math.random() * pool.length)];
+  return { index, variant: variants[index] };
 }
 
 // ─── CHIAMATA API ─────────────────────────────────────────────
@@ -833,14 +875,17 @@ async function submitAnswer(value, questionData) {
 
   saveState();
 
-  // Attività dopo domanda 3
-  if (state.fixedCount === 3 && !state.activityResults['riunione']) {
+  // Attività dopo domanda 3 (>= e non ===: per chi torna e ha già nome/età/
+  // formazione noti, buildStandardQueue porta fixedCount a 3 in un colpo solo,
+  // prima ancora di una vera risposta — con "===" il trigger non scattava mai
+  // e "Riunione o No" spariva silenziosamente per tutti i returning user).
+  if (state.fixedCount >= 3 && !state.activityResults['riunione']) {
     showActivity('riunione');
     return;
   }
 
-  // Attività dopo domanda 5
-  if (state.fixedCount === 5 && !state.activityResults['termometro']) {
+  // Attività dopo domanda 5 (stesso motivo: >= invece di ===)
+  if (state.fixedCount >= 5 && !state.activityResults['termometro']) {
     showActivity('termometro');
     return;
   }
@@ -1024,24 +1069,33 @@ function showActivity(activityId) {
   const card = document.createElement('div');
   card.className = 'activity-card';
 
+  // Sceglie la variante di oggi per `key` evitando quella dell'ultimo test
+  // (vedi getRandomVariant) e ne ricorda l'indice per completeActivity, che lo
+  // allega al risultato salvato — così il prossimo test saprà cosa evitare.
+  const pickVariant = (key) => {
+    const { index, variant } = getRandomVariant(key, state.lastActivityVariants?.[key]);
+    state._variantIndex[key] = index;
+    return variant;
+  };
+
   const activities = {
     riunione: {
       eyebrow: 'Attività 1 di 4',
       title: 'Riunione o No',
       subtitle: 'È lunedì mattina. Quale di queste riunioni apriresti con più piacere?',
-      render: (c) => renderRiunione(c, getRandomVariant('riunione'))
+      render: (c) => renderRiunione(c, pickVariant('riunione'))
     },
     termometro: {
       eyebrow: 'Attività 2 di 4',
       title: 'Il Termometro',
       subtitle: 'Sei scenari lavorativi. Come ti fanno sentire?',
-      render: (c) => renderTermometro(c, getRandomVariant('termometro'))
+      render: (c) => renderTermometro(c, pickVariant('termometro'))
     },
     dilemma: {
       eyebrow: 'Attività 3 di 4',
       title: 'Il Dilemma Impossibile',
       subtitle: 'Scelte difficili. Non esiste la risposta giusta — scegli quella che senti più tua.',
-      render: (c) => renderDilemma(c, getRandomVariant('dilemma'))
+      render: (c) => renderDilemma(c, pickVariant('dilemma'))
     },
     costruisci: {
       eyebrow: 'Attività 4 di 4',
@@ -1281,6 +1335,13 @@ function renderCostruisci(container) {
 async function completeActivity(activityId, result) {
   // Anti doppio-trigger: se l'attività è già stata completata, esci
   if (state.activityResults[activityId]) return;
+
+  // Se questa attività aveva un pool di varianti (riunione/termometro/dilemma),
+  // ricorda quale indice è stato mostrato oggi: verrà salvato nel test_history
+  // e letto dal prossimo test per evitare di ripeterlo (vedi getRandomVariant).
+  if (state._variantIndex[activityId] != null) {
+    result = { ...result, variantIndex: state._variantIndex[activityId] };
+  }
 
   state.activityResults[activityId] = result;
   state.conversationHistory.push({
@@ -1739,15 +1800,24 @@ function goToReport() {
   }, 600);
 }
 
-// Mostra una volta sola, prima della prima domanda vera, un avviso di cosa
-// non verrà richiesto perché già noto dal test precedente (vedi
-// buildStandardQueue). Stessa vetrina del "restore-notice": persiste finché
-// non si arriva alla domanda sull'aspirazione, che ripulisce entrambi.
-function showSkipNotice() {
+// Mostra una volta sola, prima della prima domanda vera, il momento esplicito
+// in cui chi torna sente che il test lo riconosce — un teaser su cosa era
+// emerso l'ultima volta (buildWelcomeBackTeaser) più, se pertinente, cosa non
+// verrà richiesto perché già noto (vedi buildStandardQueue). Prima era un
+// banner tecnico e silenzioso ("saltiamo età e formazione"): ora è il
+// messaggio stesso a fare da prova che "ti conosciamo", non solo un effetto
+// collaterale delle domande saltate.
+function showWelcomeBack(teaser, skippedLabels) {
+  const parts = [];
+  if (teaser) parts.push(teaser);
+  if (skippedLabels && skippedLabels.length) {
+    parts.push(`Non ti richiediamo ${skippedLabels.join(' e ')}: le abbiamo già.`);
+  }
+  if (parts.length === 0) return;
   const notice = document.createElement('div');
   notice.className = 'restore-notice';
-  notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
-  notice.textContent = `✓ Abbiamo già la tua ${state._skippedLabels.join(' e ')} dal test precedente — non te le richiediamo di nuovo.`;
+  notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.9;line-height:1.5;';
+  notice.textContent = parts.join(' ');
   document.getElementById('active-question').prepend(notice);
 }
 
@@ -1764,7 +1834,14 @@ async function startFreshTest() {
   buildStandardQueue(ctx.knownAnswers);
   state.cvContext = ctx.cvText;
   state.historicalSummary = ctx.historicalSummary;
-  if (state._skippedLabels.length) showSkipNotice();
+  state.lastActivityVariants = {
+    riunione: ctx.lastActivities?.riunione?.variantIndex,
+    termometro: ctx.lastActivities?.termometro?.variantIndex,
+    dilemma: ctx.lastActivities?.dilemma?.variantIndex,
+  };
+
+  const teaser = buildWelcomeBackTeaser(ctx.history, ctx.nome);
+  showWelcomeBack(teaser, state._skippedLabels);
 
   await getNextStep();
 }
