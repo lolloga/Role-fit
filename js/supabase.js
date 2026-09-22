@@ -91,11 +91,13 @@ export async function getReport(id) {
   return data;
 }
 
-// Risposte grezze dell'ultimo test (per chi rifà il test da loggato): usate
-// da test.js per non richiedere di nuovo domande puramente anagrafiche di cui
-// la risposta non cambia (es. età, formazione). null se non c'è nessun test
-// precedente o se è troppo vecchio per avere questo campo.
-export async function getLastTestAnswers() {
+// test_history completo dell'ultimo test (per chi rifà il test da loggato):
+// .answers serve a test.js per non richiedere di nuovo domande puramente
+// anagrafiche di cui la risposta non cambia (es. età, formazione); .activities
+// serve a non riproporre la stessa variante di un'attività interattiva vista
+// l'ultima volta (vedi getRandomVariant in test.js). null se non c'è nessun
+// test precedente o se è troppo vecchio per avere questo campo.
+export async function getLastTestHistory() {
   const session = await getSession();
   if (!session) return null;
   const { data, error } = await sb
@@ -105,7 +107,7 @@ export async function getLastTestAnswers() {
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data?.test_history?.answers || null;
+  return data?.test_history || null;
 }
 
 // Storico dei test più recenti (fino a `limit`), usato per costruire un
