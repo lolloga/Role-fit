@@ -69,6 +69,11 @@ const state = {
   _retryCount: 0,
   _aspirationAsked: false,
   aspirationRole: null,
+  // Aspirazione dichiarata nell'ultimo test precedente (null se non c'era o
+  // se è il primo test): usata da showAspirationQuestion per verificare
+  // invece di ripartire da un campo vuoto, stesso principio già applicato
+  // alle domande adattive.
+  previousAspiration: null,
   // Domande standard ancora da fare: di norma è una copia di STANDARD_QUESTIONS,
   // ma per chi rifà il test da loggato può avere alcune voci già rimosse (vedi
   // buildStandardQueue) perché la risposta è nota dal test precedente.
@@ -106,6 +111,7 @@ function saveState() {
     worksCurrently: state.worksCurrently,
     _aspirationAsked: state._aspirationAsked,
     aspirationRole: state.aspirationRole,
+    previousAspiration: state.previousAspiration,
     standardQueue: state.standardQueue,
     cvContext: state.cvContext,
     historicalSummary: state.historicalSummary,
@@ -1660,8 +1666,12 @@ Cosa cerchiamo:
 
 // ─── DOMANDA FINALE: ASPIRAZIONE ──────────────────────────────
 // Ultima domanda per tutti, dopo che Claude ha deciso di chiudere il test.
-// "Sì" apre un campo libero dove l'utente scrive il ruolo a cui aspira.
-// "No" va dritto al report. L'aspirazione viene passata a report.js.
+// Chi non ha un'aspirazione nota dall'ultimo test vede il flusso originale:
+// "Sì" apre un campo libero, "No" va dritto al report. Chi invece l'aveva
+// già data (state.previousAspiration) non riparte da un campo vuoto: le
+// viene chiesto se regge ancora, con "è cambiata" che apre lo stesso campo
+// libero — stesso principio "verifica, non rimappa" già applicato alle
+// domande adattive. L'aspirazione finale viene passata a report.js.
 function showAspirationQuestion() {
   state._aspirationAsked = true;
   saveState();
@@ -1676,42 +1686,84 @@ function showAspirationQuestion() {
   // Rimuove eventuali avvisi di ripristino residui
   qArea.querySelectorAll('.restore-notice').forEach(n => n.remove());
 
-  document.getElementById('question-text').textContent =
-    'Hai un ruolo a cui aspiri con la tua esperienza?';
-
   const ctxEl = document.getElementById('question-context');
-  ctxEl.textContent = 'Ultima domanda. Se ce l\'hai, lo confronteremo col tuo profilo.';
-  ctxEl.classList.remove('hidden');
-
   const inputEl = document.getElementById('question-input');
   inputEl.innerHTML = '';
 
-  // Due scelte iniziali: Sì (apre il campo) / No (va al report)
   const grid = document.createElement('div');
   grid.className = 'options-grid';
+  const prev = state.previousAspiration;
 
-  const siBtn = document.createElement('button');
-  siBtn.className = 'option-btn';
-  siBtn.innerHTML = '<span class="option-letter">A</span><span>Sì, c\'è un ruolo a cui aspiro</span>';
-  siBtn.addEventListener('click', () => {
-    grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-    siBtn.classList.add('selected');
-    setTimeout(renderAspirationInput, 220);
-  });
+  if (prev) {
+    document.getElementById('question-text').textContent =
+      `L'ultima volta puntavi a "${prev}". È ancora così?`;
+    ctxEl.textContent = 'Ultima domanda.';
+    ctxEl.classList.remove('hidden');
 
-  const noBtn = document.createElement('button');
-  noBtn.className = 'option-btn';
-  noBtn.innerHTML = '<span class="option-letter">B</span><span>No, non in particolare</span>';
-  noBtn.addEventListener('click', () => {
-    grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-    noBtn.classList.add('selected');
-    state.aspirationRole = null;
-    saveState();
-    setTimeout(goToReport, 300);
-  });
+    const stessoBtn = document.createElement('button');
+    stessoBtn.className = 'option-btn';
+    stessoBtn.innerHTML = '<span class="option-letter">A</span><span>Sì, è ancora quello</span>';
+    stessoBtn.addEventListener('click', () => {
+      grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      stessoBtn.classList.add('selected');
+      state.aspirationRole = prev;
+      saveState();
+      setTimeout(goToReport, 300);
+    });
 
-  grid.appendChild(siBtn);
-  grid.appendChild(noBtn);
+    const cambiataBtn = document.createElement('button');
+    cambiataBtn.className = 'option-btn';
+    cambiataBtn.innerHTML = '<span class="option-letter">B</span><span>È cambiata, te ne dico un\'altra</span>';
+    cambiataBtn.addEventListener('click', () => {
+      grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      cambiataBtn.classList.add('selected');
+      setTimeout(renderAspirationInput, 220);
+    });
+
+    const nonPiuBtn = document.createElement('button');
+    nonPiuBtn.className = 'option-btn';
+    nonPiuBtn.innerHTML = '<span class="option-letter">C</span><span>Non ho più un\'aspirazione specifica</span>';
+    nonPiuBtn.addEventListener('click', () => {
+      grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      nonPiuBtn.classList.add('selected');
+      state.aspirationRole = null;
+      saveState();
+      setTimeout(goToReport, 300);
+    });
+
+    grid.appendChild(stessoBtn);
+    grid.appendChild(cambiataBtn);
+    grid.appendChild(nonPiuBtn);
+  } else {
+    document.getElementById('question-text').textContent =
+      'Hai un ruolo a cui aspiri con la tua esperienza?';
+    ctxEl.textContent = 'Ultima domanda. Se ce l\'hai, lo confronteremo col tuo profilo.';
+    ctxEl.classList.remove('hidden');
+
+    const siBtn = document.createElement('button');
+    siBtn.className = 'option-btn';
+    siBtn.innerHTML = '<span class="option-letter">A</span><span>Sì, c\'è un ruolo a cui aspiro</span>';
+    siBtn.addEventListener('click', () => {
+      grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      siBtn.classList.add('selected');
+      setTimeout(renderAspirationInput, 220);
+    });
+
+    const noBtn = document.createElement('button');
+    noBtn.className = 'option-btn';
+    noBtn.innerHTML = '<span class="option-letter">B</span><span>No, non in particolare</span>';
+    noBtn.addEventListener('click', () => {
+      grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      noBtn.classList.add('selected');
+      state.aspirationRole = null;
+      saveState();
+      setTimeout(goToReport, 300);
+    });
+
+    grid.appendChild(siBtn);
+    grid.appendChild(noBtn);
+  }
+
   inputEl.appendChild(grid);
 }
 
@@ -1842,6 +1894,7 @@ async function startFreshTest() {
   buildStandardQueue(ctx.knownAnswers);
   state.cvContext = ctx.cvText;
   state.historicalSummary = ctx.historicalSummary;
+  state.previousAspiration = ctx.history?.[0]?.aspiration || null;
   state.lastActivityVariants = {
     riunione: ctx.lastActivities?.riunione?.variantIndex,
     termometro: ctx.lastActivities?.termometro?.variantIndex,

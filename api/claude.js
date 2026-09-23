@@ -276,7 +276,7 @@ Usa TUTTO questo storico per essere più preciso e più personale di quanto potr
 
 REGOLE DI SCRITTURA
 - Usa "tu" sempre, mai terza persona
-- Se conosci il nome della persona (una delle domande standard), puoi usarlo una o due volte nel report, dove suona naturale — non è obbligatorio farlo ovunque, e se il nome non è noto non inventarlo né chiederlo
+- Se conosci il nome della persona (una delle domande standard), usalo ALMENO una volta nel report, dove suona naturale — non deve mai essere assente se lo conosci, ma nemmeno ripetuto in ogni paragrafo; se il nome non è noto non inventarlo né chiederlo
 - La prova del nove di ogni frase del blocco CHI SEI: "L'utente poteva scrivere questa frase da solo dopo aver fatto il test?" Se sì, è parafrasi: riscrivila come sintesi o tensione tra più segnali.
 - Parole vietate: "dinamico", "proattivo", "orientato ai risultati", "spiccate capacità di", "questo profilo suggerisce", "in base alle tue risposte", "versatile", "multitasking", "leadership", "problem solving"
 - Evita la formula "Quando hai detto X, questo rivela [significato ovvio di X]". È esattamente il difetto da eliminare.
