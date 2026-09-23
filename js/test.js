@@ -828,6 +828,13 @@ function selectOption(btn, value, questionData) {
 
 // ─── SUBMIT ───────────────────────────────────────────────────
 async function submitAnswer(value, questionData) {
+  // Il messaggio di bentornato deve comparire solo sulla primissima domanda
+  // mostrata, non restare appiccicato per tutto il test: appena si risponde
+  // (a quella prima domanda, standard o adattiva che sia — le domande
+  // saltate silenziosamente da buildStandardQueue non passano da qui) lo
+  // rimuoviamo. Idempotente: sulle risposte successive non trova più nulla.
+  document.getElementById('welcome-back-notice')?.remove();
+
   const responseTime = Date.now() - state.lastQuestionTime;
 
   state.history.push({
@@ -1815,6 +1822,7 @@ function showWelcomeBack(teaser, skippedLabels) {
   }
   if (parts.length === 0) return;
   const notice = document.createElement('div');
+  notice.id = 'welcome-back-notice';
   notice.className = 'restore-notice';
   notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.9;line-height:1.5;';
   notice.textContent = parts.join(' ');
