@@ -68,11 +68,12 @@ function buildHistoricalSummary(history) {
 async function fetchCumulativeContext() {
   let summary = null;
   let cvText = null;
+  let history = null;
   try {
     const session = await getSession();
-    if (!session) return { summary, cvText };
+    if (!session) return { summary, cvText, history };
     try {
-      const history = await getHistoricalProfile();
+      history = await getHistoricalProfile();
       summary = buildHistoricalSummary(history);
     } catch (e) {
       console.error('Recupero storico dei test precedenti fallito:', e);
@@ -96,7 +97,44 @@ async function fetchCumulativeContext() {
   } catch (e) {
     console.error('Controllo storico/CV fallito:', e);
   }
-  return { summary, cvText };
+  return { summary, cvText, history };
+}
+
+// Confronto strutturato (non scritto dall'AI) tra gli assi del report appena
+// generato e quelli del report precedente più recente: sceglie l'asse con la
+// variazione più marcata e la restituisce in una riga sola. Dati sempre
+// veri per costruzione, mai un'impressione del modello — stessa filosofia
+// del teaser di bentornato in test.js. Sotto una soglia minima non dice
+// nulla: un paio di punti di oscillazione non è un cambiamento da segnalare.
+const ASSI_REPORT = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const SOGLIA_CAMBIAMENTO = 8;
+
+function buildChangeNote(newAssi, history) {
+  if (!newAssi || !Array.isArray(history) || history.length === 0) return null;
+  const prevAssi = history[0]?.report_json?.assi; // history è già ordinato dal più recente
+  if (!prevAssi) return null;
+
+  let maxKey = null;
+  let maxDelta = 0;
+  ASSI_REPORT.forEach((k) => {
+    const a = typeof newAssi[k] === 'number' ? newAssi[k] : null;
+    const b = typeof prevAssi[k] === 'number' ? prevAssi[k] : null;
+    if (a == null || b == null) return;
+    const delta = a - b;
+    if (Math.abs(delta) > Math.abs(maxDelta)) { maxDelta = delta; maxKey = k; }
+  });
+
+  if (!maxKey || Math.abs(maxDelta) < SOGLIA_CAMBIAMENTO) return null;
+  const verbo = maxDelta > 0 ? 'più marcato' : 'meno marcato';
+  return `Rispetto all'ultima volta, il tuo asse ${maxKey} risulta ${verbo}.`;
+}
+
+function showChangeNote(text) {
+  const el = document.getElementById('storico-cambiamento');
+  if (!el) return;
+  if (!text) { el.classList.add('hidden'); return; }
+  el.textContent = text;
+  el.classList.remove('hidden');
 }
 
 // ─── GENERA REPORT ───────────────────────────────────────────
@@ -928,6 +966,7 @@ async function generateAndSave() {
     stopLoadingTimer();
     if (!data) throw new Error('Report non valido');
     renderReport(data);
+    showChangeNote(buildChangeNote(data.report?.assi, cumulativeContext.history));
 
     try {
       const aspiration = (localStorage.getItem('rf_aspiration') || '').trim() || null;
