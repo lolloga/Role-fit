@@ -2,6 +2,7 @@ export const maxDuration = 60;
 
 import { PROMPT_REPORT } from './claude.js';
 import { envReady, serviceHeaders, getUserFromToken, extractCvText } from './_cv-shared.js';
+import { rateLimit } from './_guard.js';
 
 // Endpoint lato server per il CV del candidato: dopo l'upload (fatto dal
 // browser direttamente su Supabase Storage, protetto da RLS scoped alla
@@ -48,6 +49,11 @@ export default async function handler(req, res) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     const user = await getUserFromToken(token);
     if (!user?.id) return res.status(401).json({ error: 'Unauthorized' });
+    // Ogni chiamata rigenera un report completo (fino a 8000 token): un limite
+    // per utente impedisce di farlo in loop.
+    if (!rateLimit(`cv:${user.id}`, 5, 60 * 60 * 1000)) {
+      return res.status(429).json({ error: 'Hai già rigenerato il profilo più volte di recente. Riprova tra un po\'.' });
+    }
 
     const profileRes = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=cv_path`,
@@ -144,9 +150,11 @@ export default async function handler(req, res) {
     if (!insertRes.ok) return res.status(500).json({ error: 'Impossibile salvare il nuovo report' });
     const [newReport] = await insertRes.json();
 
-    // Non blocchiamo la risposta sull'esito di questo update: il report è
-    // già salvato correttamente, questo timestamp è solo informativo per la UI.
-    fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
+    // L'esito di questo update non cambia la risposta (il report è già
+    // salvato, il timestamp è solo informativo per la UI), ma va atteso: su
+    // Vercel una promessa lasciata in sospeso dopo la risposta può essere
+    // interrotta prima di arrivare al database.
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
       method: 'PATCH',
       headers: serviceHeaders(),
       body: JSON.stringify({ cv_updated_at: new Date().toISOString() }),

@@ -1,19 +1,44 @@
 export const maxDuration = 45;
 
+import { clientIp, isSameOrigin, rateLimit, validateMessages } from './_guard.js';
+
 // Endpoint lato server per il flusso aziende: creare un'azienda/ricerca e
 // calcolare il matching con i candidati già presenti su RoleFit.
 //
-// Usa sempre la SERVICE ROLE KEY (mai l'anon key) perché deve leggere la
-// tabella `reports` di TUTTI gli utenti per calcolare il matching — cosa che
-// le policy RLS impediscono volutamente all'anon key. Per questo il calcolo
-// resta sempre lato server: il browser non ha mai accesso diretto ai dati dei
-// candidati, solo al risultato già filtrato che questo endpoint restituisce.
+// Usa sempre la SERVICE ROLE KEY (mai l'anon key) perché deve leggere report
+// e profili di altri utenti per calcolare il matching — cosa che le policy
+// RLS impediscono volutamente all'anon key. Il browser non ha mai accesso
+// diretto ai dati dei candidati, solo al risultato filtrato che esce da qui.
+//
+// PRIVACY — tre regole che questo file deve sempre rispettare:
+// 1. Visibili alle aziende sono SOLO i candidati che l'hanno scelto: oggi il
+//    consenso è caricare il CV (il sito lo dice esplicitamente: "Carica il CV
+//    e diventi visibile alle aziende"). Chi ha solo fatto il test non compare.
+// 2. Le aziende non hanno login: chiunque può creare una ricerca. Per questo
+//    il dettaglio di un candidato si apre solo passando da una ricerca in cui
+//    quel candidato risulta davvero compatibile, mai con un user_id qualunque.
+// 3. All'azienda arrivano solo i campi scritti per lei (riepilogo in terza
+//    persona, ruoli, assi, domande non personali), mai il report personale
+//    scritto in seconda persona per il candidato.
 
 const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
 const SOGLIA_MATCH = 80;
 // Quanti candidati (già ordinati per compatibilità sui 6 assi) passano al
 // controllo semantico AI. Tenerlo basso limita costo/latenza della validazione.
 const MAX_CANDIDATI_DA_VALIDARE = 15;
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMITS = {
+  crea_azienda: 10,
+  crea_job: 10,
+  match: 30,
+  dettaglio_candidato: 60,
+};
+// Ogni apertura della pagina risultati rilancia la validazione AI: oltre al
+// limite per IP, uno per ricerca evita che un link condiviso o ricaricato in
+// loop generi costi senza fine.
+const MATCH_PER_JOB_LIMIT = 10;
 
 const PROMPT_MATCH_VALIDAZIONE = `
 Sei un validatore di matching per RoleFit lato aziende. Ricevi una richiesta di ruolo (titolo + sintesi del profilo cercato) e una lista di candidati che hanno già superato una soglia numerica di compatibilità calcolata sui 6 assi psicologici del profilo. Il tuo compito è verificare, per ciascun candidato, se il ruolo cercato dall'azienda è REALMENTE coerente con quello che è emerso dal suo test — non solo sui numeri astratti, ma guardando i ruoli concreti che il suo test gli ha assegnato come compatibili o incompatibili.
@@ -120,6 +145,16 @@ function supabaseHeaders() {
   };
 }
 
+function isUuid(v) {
+  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
+
+function cleanText(v, max) {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t && t.length <= max ? t : null;
+}
+
 // Distanza media assoluta tra i due profili sui 6 assi, convertita in % di
 // compatibilità (100 = profili identici sugli assi che contano per il ruolo).
 function computeMatch(targetAssi, candidateAssi) {
@@ -138,15 +173,85 @@ function computeMatch(targetAssi, candidateAssi) {
   return Math.round(100 - totalDiff / count);
 }
 
+// Il profilo target arriva dal browser (generato dall'AI lato client): lo
+// accettiamo solo se ha la forma attesa, così nel DB non finisce di tutto.
+function validTargetProfile(tp) {
+  if (!tp || typeof tp !== 'object') return null;
+  const sintesi = cleanText(tp.sintesi, 3000);
+  if (!sintesi || !tp.assi || typeof tp.assi !== 'object') return null;
+  const assi = {};
+  for (const key of ASSI_KEYS) {
+    const v = Number(tp.assi[key]);
+    if (tp.assi[key] === null || tp.assi[key] === '' || !Number.isFinite(v) || v < 0 || v > 100) return null;
+    assi[key] = Math.round(v);
+  }
+  return { sintesi, assi };
+}
+
+async function loadJob(job_id) {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${encodeURIComponent(job_id)}&status=eq.active&select=id,role_title,target_profile`,
+    { headers: supabaseHeaders() }
+  );
+  if (!r.ok) throw new Error('Impossibile leggere la ricerca');
+  const [job] = await r.json();
+  return job || null;
+}
+
+// Candidati visibili (hanno scelto di esserlo caricando il CV) con il loro
+// report più recente, ordinati per compatibilità numerica col profilo target.
+// Usato sia per la lista risultati sia come controllo di autorizzazione del
+// dettaglio: si apre solo il profilo di chi è in questa shortlist.
+async function computeShortlist(job) {
+  const profilesRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?cv_path=not.is.null&select=id,nome,email`,
+    { headers: supabaseHeaders() }
+  );
+  if (!profilesRes.ok) throw new Error('Impossibile leggere i profili');
+  const profiles = await profilesRes.json();
+  if (!profiles.length) return [];
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+
+  const ids = profiles.map((p) => encodeURIComponent(p.id)).join(',');
+  const reportsRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/reports?user_id=in.(${ids})&select=user_id,report_json,created_at&order=created_at.desc`,
+    { headers: supabaseHeaders() }
+  );
+  if (!reportsRes.ok) throw new Error('Impossibile leggere i candidati');
+  const reports = await reportsRes.json();
+
+  // Ordinati dal più recente: il primo che incontriamo per utente è l'ultimo test.
+  const latestByUser = new Map();
+  for (const r of reports) {
+    if (!latestByUser.has(r.user_id)) latestByUser.set(r.user_id, r);
+  }
+
+  return Array.from(latestByUser.values())
+    .map((r) => ({
+      user_id: r.user_id,
+      nome: profileById.get(r.user_id)?.nome || null,
+      email: profileById.get(r.user_id)?.email || null,
+      match: computeMatch(job.target_profile?.assi, r.report_json?.assi),
+      ruoli: (r.report_json?.ruoli || []).map((x) => x.nome),
+      ruoli_mismatch: (r.report_json?.ruoli_mismatch || []).map((x) => x.nome),
+      come_funzioni: r.report_json?.chi_sei?.come_funzioni || null,
+    }))
+    .filter((c) => c.match !== null)
+    .sort((a, b) => b.match - a.match)
+    .slice(0, MAX_CANDIDATI_DA_VALIDARE);
+}
+
 async function creaAzienda(body, res) {
-  const { company_name, contact_name, contact_email } = body;
-  if (!company_name || !contact_email) {
-    return res.status(400).json({ error: 'company_name e contact_email sono obbligatori' });
+  const company_name = cleanText(body.company_name, 120);
+  const contact_email = cleanText(body.contact_email, 254);
+  const contact_name = body.contact_name ? cleanText(body.contact_name, 120) : null;
+  if (!company_name || !contact_email || !EMAIL_RE.test(contact_email)) {
+    return res.status(400).json({ error: 'Nome azienda ed email valida sono obbligatori' });
   }
   const r = await fetch(`${SUPABASE_URL}/rest/v1/company_profiles`, {
     method: 'POST',
     headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
-    body: JSON.stringify({ company_name, contact_name: contact_name || null, contact_email }),
+    body: JSON.stringify({ company_name, contact_name, contact_email }),
   });
   if (!r.ok) return res.status(500).json({ error: 'Impossibile creare il profilo azienda' });
   const [row] = await r.json();
@@ -154,9 +259,14 @@ async function creaAzienda(body, res) {
 }
 
 async function creaJob(body, res) {
-  const { company_id, role_title, test_history, target_profile } = body;
-  if (!company_id || !role_title || !target_profile) {
-    return res.status(400).json({ error: 'company_id, role_title e target_profile sono obbligatori' });
+  const { company_id, test_history } = body;
+  const role_title = cleanText(body.role_title, 120);
+  const target_profile = validTargetProfile(body.target_profile);
+  if (!isUuid(company_id) || !role_title || !target_profile) {
+    return res.status(400).json({ error: 'Dati della ricerca non validi' });
+  }
+  if (test_history != null && validateMessages(test_history, { maxMessages: 60, maxCharsPerMessage: 8000, maxTotalChars: 60000 })) {
+    return res.status(400).json({ error: 'Conversazione non valida' });
   }
   const r = await fetch(`${SUPABASE_URL}/rest/v1/job_requests`, {
     method: 'POST',
@@ -175,46 +285,18 @@ async function creaJob(body, res) {
 
 async function calcolaMatch(body, res) {
   const { job_id } = body;
-  if (!job_id) return res.status(400).json({ error: 'job_id obbligatorio' });
-
-  const jobRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${encodeURIComponent(job_id)}&select=*`,
-    { headers: supabaseHeaders() }
-  );
-  if (!jobRes.ok) return res.status(500).json({ error: 'Impossibile leggere la ricerca' });
-  const [job] = await jobRes.json();
-  if (!job) return res.status(404).json({ error: 'Ricerca non trovata' });
-
-  const reportsRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/reports?select=id,user_id,report_json,created_at`,
-    { headers: supabaseHeaders() }
-  );
-  if (!reportsRes.ok) return res.status(500).json({ error: 'Impossibile leggere i candidati' });
-  const reports = await reportsRes.json();
-
-  // Un candidato può avere più report nel tempo: teniamo solo il più recente.
-  const latestByUser = new Map();
-  for (const r of reports) {
-    const prev = latestByUser.get(r.user_id);
-    if (!prev || new Date(r.created_at) > new Date(prev.created_at)) {
-      latestByUser.set(r.user_id, r);
-    }
+  if (!isUuid(job_id)) return res.status(400).json({ error: 'job_id non valido' });
+  if (!rateLimit(`azienda:match-job:${job_id}`, MATCH_PER_JOB_LIMIT, RATE_WINDOW_MS)) {
+    return res.status(429).json({ error: 'Troppe richieste per questa ricerca. Riprova tra qualche minuto.' });
   }
 
-  const shortlist = Array.from(latestByUser.values())
-    .map((r) => ({
-      user_id: r.user_id,
-      match: computeMatch(job.target_profile?.assi, r.report_json?.assi),
-      ruoli: (r.report_json?.ruoli || []).map((x) => x.nome),
-      ruoli_mismatch: (r.report_json?.ruoli_mismatch || []).map((x) => x.nome),
-      come_funzioni: r.report_json?.chi_sei?.come_funzioni || null,
-    }))
-    .filter((c) => c.match !== null)
-    .sort((a, b) => b.match - a.match)
-    .slice(0, MAX_CANDIDATI_DA_VALIDARE);
+  const job = await loadJob(job_id);
+  if (!job) return res.status(404).json({ error: 'Ricerca non trovata' });
+  const publicJob = { id: job.id, role_title: job.role_title, target_profile: job.target_profile };
 
+  const shortlist = await computeShortlist(job);
   if (shortlist.length === 0) {
-    return res.status(200).json({ job, candidates: [] });
+    return res.status(200).json({ job: publicJob, candidates: [] });
   }
 
   // Passo 2: validazione semantica sui ruoli reali emersi dal test di ognuno,
@@ -233,42 +315,27 @@ async function calcolaMatch(body, res) {
     })
     .filter((c) => c.match >= SOGLIA_MATCH)
     .sort((a, b) => b.match - a.match)
-    .slice(0, 10);
+    .slice(0, 10)
+    .map((c) => ({
+      user_id: c.user_id,
+      // L'email resta nel dettaglio (per il contatto), non nella lista.
+      nome: c.nome,
+      match: c.match,
+      ruoli: c.ruoli,
+      // Se la validazione AI non è disponibile (errore/timeout), ripieghiamo su
+      // un'unica frase informativa invece di lasciare vuota la spiegazione.
+      perche_azienda: c.perche_azienda || `Compatibilità calcolata sul profilo psicologico-professionale rispetto al ruolo di ${job.role_title}.`,
+    }));
 
-  if (candidates.length === 0) {
-    return res.status(200).json({ job, candidates: [] });
-  }
-
-  const userIds = candidates.map((c) => c.user_id);
-  const profilesRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=in.(${userIds.map(encodeURIComponent).join(',')})&select=id,email`,
-    { headers: supabaseHeaders() }
-  );
-  const profiles = profilesRes.ok ? await profilesRes.json() : [];
-  const emailById = new Map(profiles.map((p) => [p.id, p.email]));
-
-  const result = candidates.map((c) => ({
-    user_id: c.user_id,
-    email: emailById.get(c.user_id) || null,
-    match: c.match,
-    ruoli: c.ruoli,
-    // Se la validazione AI non è disponibile (errore/timeout), ripieghiamo su
-    // un'unica frase informativa invece di lasciare vuota la spiegazione.
-    perche_azienda: c.perche_azienda || `Compatibilità calcolata sul profilo psicologico-professionale rispetto al ruolo di ${job.role_title}.`,
-  }));
-
-  return res.status(200).json({ job, candidates: result });
+  return res.status(200).json({ job: publicJob, candidates, soglia: SOGLIA_MATCH });
 }
 
 // URL firmato a scadenza per il CV del candidato (bucket privato "cv").
 // Generato sempre lato server con la service role key: le aziende non hanno
 // mai accesso diretto allo storage, solo a questo link temporaneo.
-// Il valore di profiles.cv_path è aggiornabile dal client (RLS "own profile
-// update" copre qualunque colonna della propria riga): lo usiamo solo come
-// flag "CV presente" e ricostruiamo il percorso reale dallo user_id, così un
-// utente non può farsi generare un link firmato per il file di qualcun altro.
-async function getCvSignedUrl(user_id, hasCv) {
-  if (!hasCv) return null;
+// Il path si ricostruisce dallo user_id (profiles.cv_path è scrivibile dal
+// client): così nessuno può farsi generare un link per il file di altri.
+async function getCvSignedUrl(user_id) {
   try {
     const cvPath = `${user_id}/cv.pdf`;
     const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/cv/${cvPath}`, {
@@ -285,8 +352,19 @@ async function getCvSignedUrl(user_id, hasCv) {
 }
 
 async function dettaglioCandidato(body, res) {
-  const { user_id } = body;
-  if (!user_id) return res.status(400).json({ error: 'user_id obbligatorio' });
+  const { user_id, job_id } = body;
+  if (!isUuid(user_id) || !isUuid(job_id)) {
+    return res.status(400).json({ error: 'Parametri non validi' });
+  }
+
+  const job = await loadJob(job_id);
+  if (!job) return res.status(404).json({ error: 'Ricerca non trovata' });
+
+  const shortlist = await computeShortlist(job);
+  const candidato = shortlist.find((c) => c.user_id === user_id);
+  // Stessa risposta per "non esiste" e "non autorizzato": non confermiamo
+  // a chi prova user_id a caso se un candidato esiste o no.
+  if (!candidato) return res.status(404).json({ error: 'Candidato non trovato' });
 
   const reportsRes = await fetch(
     `${SUPABASE_URL}/rest/v1/reports?user_id=eq.${encodeURIComponent(user_id)}&select=report_json,test_history,created_at&order=created_at.desc&limit=1`,
@@ -296,27 +374,32 @@ async function dettaglioCandidato(body, res) {
   const [report] = await reportsRes.json();
   if (!report) return res.status(404).json({ error: 'Candidato non trovato' });
 
-  const profileRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user_id)}&select=email,cv_path`,
-    { headers: supabaseHeaders() }
-  );
-  const [profile] = profileRes.ok ? await profileRes.json() : [];
-  const cvUrl = await getCvSignedUrl(user_id, !!profile?.cv_path);
+  const cvUrl = await getCvSignedUrl(user_id);
 
   // Log domande/risposte per l'azienda: SOLO le domande esplicitamente
   // marcate come non personali (indiretta: false). Se il test è stato
   // fatto prima che questo campo esistesse, non c'è modo di sapere quali
   // domande fossero personali — meglio non mostrare nulla che rischiare di
-  // esporre una risposta privata per errore.
+  // esporre una risposta privata per errore. Il nome è un dato anagrafico,
+  // non una risposta al test: non va nel log.
   const answers = report.test_history?.answers;
   const qaDisponibile = Array.isArray(answers);
   const qaLog = qaDisponibile
-    ? answers.filter((a) => a.indiretta === false).map((a) => ({ domanda: a.question, risposta: a.answer }))
+    ? answers
+        .filter((a) => a.indiretta === false && a.id !== 'nome')
+        .map((a) => ({ domanda: a.question, risposta: a.answer }))
     : [];
 
+  const rj = report.report_json || {};
   return res.status(200).json({
-    email: profile?.email || null,
-    report: report.report_json,
+    nome: candidato.nome,
+    email: candidato.email,
+    report: {
+      riepilogo_aziende: rj.riepilogo_aziende || null,
+      ruoli: (rj.ruoli || []).map((r) => ({ nome: r.nome, match: r.match, cosa_fa: r.cosa_fa })),
+      assi: rj.assi || null,
+      assi_confidenza: rj.assi_confidenza || null,
+    },
     qa_log: qaLog,
     qa_disponibile: qaDisponibile,
     cv_url: cvUrl,
@@ -332,12 +415,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { action } = req.body;
+    const { action } = req.body || {};
+    if (!Object.prototype.hasOwnProperty.call(RATE_LIMITS, action)) {
+      return res.status(400).json({ error: 'action non valida' });
+    }
+    if (!isSameOrigin(req)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!rateLimit(`azienda:${action}:${clientIp(req)}`, RATE_LIMITS[action], RATE_WINDOW_MS)) {
+      return res.status(429).json({ error: 'Troppe richieste. Riprova tra qualche minuto.' });
+    }
     if (action === 'crea_azienda') return await creaAzienda(req.body, res);
     if (action === 'crea_job') return await creaJob(req.body, res);
     if (action === 'match') return await calcolaMatch(req.body, res);
-    if (action === 'dettaglio_candidato') return await dettaglioCandidato(req.body, res);
-    return res.status(400).json({ error: 'action non valida' });
+    return await dettaglioCandidato(req.body, res);
   } catch (error) {
     console.error('Errore /api/azienda:', error);
     return res.status(500).json({ error: 'Internal error' });

@@ -1353,3 +1353,14 @@ body { padding-top: 68px; }
   .about-grid { grid-template-columns: 1fr; }
   .hero__actions { flex-direction: column; align-items: flex-start; }
 }
+
+/* Focus visibile per chi naviga con la tastiera (non appare al click/tocco). */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--emerald-light);
+  outline-offset: 3px;
+}

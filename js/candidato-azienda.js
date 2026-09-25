@@ -164,16 +164,25 @@ function renderQa(qaLog, qaDisponibile) {
   }
 
   try {
+    // Il dettaglio si apre solo nel contesto di una ricerca: il server
+    // verifica che questo candidato sia davvero compatibile con job_id.
+    if (!jobId) throw new Error('Ricerca mancante');
     const res = await fetch('/api/azienda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'dettaglio_candidato', user_id: userId }),
+      body: JSON.stringify({ action: 'dettaglio_candidato', user_id: userId, job_id: jobId }),
     });
     const data = await res.json();
 
     if (!res.ok || data.error) throw new Error(data.error || 'Errore sconosciuto');
 
-    document.getElementById('candidato-email').textContent = data.email || 'Candidato';
+    document.getElementById('candidato-nome').textContent = data.nome || 'Candidato compatibile';
+    if (data.email) {
+      const emailLink = document.getElementById('candidato-email');
+      emailLink.textContent = data.email;
+      emailLink.href = 'mailto:' + data.email;
+      document.getElementById('candidato-contatto').classList.remove('hidden');
+    }
 
     if (data.cv_url) {
       document.getElementById('cv-link').href = data.cv_url;

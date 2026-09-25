@@ -4,6 +4,8 @@ import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
 // Serve per ri-persistere le valutazioni ruolo attuale/aspirato calcolate dopo.
 let currentReportId = null;
+// Valutazione del ruolo aspirato arrivata prima che il report fosse salvato.
+let pendingAspiredEval = null;
 
 // Il testo dei report è generato dall'AI a partire anche da risposte libere
 // dell'utente: senza escaping, un payload HTML/script infilato in una
@@ -188,6 +190,9 @@ async function generateReport(cumulativeContext) {
 
   const data = await response.json();
 
+  if (response.status === 429) {
+    throw new Error('Troppe richieste in poco tempo. Aspetta qualche minuto e ricarica la pagina per riprovare.');
+  }
   if (!data.content || !data.content[0] || !data.content[0].text) {
     throw new Error('Risposta API vuota o non valida');
   }
@@ -684,8 +689,13 @@ async function mostraRuoloAspirato(ruoloInput) {
     loader.remove();
     if (data) {
       renderRuoloAspirato(ruoloInput, data);
+      // La valutazione parte mentre il report si sta ancora salvando: se
+      // finisce prima, l'id non c'è ancora e la salviamo appena arriva
+      // (vedi generateAndSave), invece di perderla.
       if (currentReportId) {
         updateReportEval(currentReportId, { aspired_role_eval: data }).catch(() => {});
+      } else {
+        pendingAspiredEval = data;
       }
     }
   } catch (err) {
@@ -764,19 +774,35 @@ async function submitRuoloAttuale() {
 }
 
 // ─── CONDIVIDI ────────────────────────────────────────────────
-function shareReport() {
+function buildShareText(source) {
   const report = JSON.parse(sessionStorage.getItem('rf_report') || '{}');
-  if (!report.ruoli) return;
+  if (!report.ruoli) return null;
+  const link = `${location.origin}/?utm_source=${source}&utm_medium=social&utm_campaign=share_report`;
+  const bonus = report.bonus?.nome ? `\n\nRuolo bonus: ${report.bonus.nome}` : '';
+  return `Ho fatto il test RoleFit 🎯\n\nI miei 3 ruoli:\n${report.ruoli.map(r => `• ${r.nome} (${r.match}%)`).join('\n')}${bonus}\n\nScopri il tuo → ${link}`;
+}
 
-  const text = `Ho fatto il test RoleFit 🎯\n\nI miei 3 ruoli:\n${report.ruoli.map(r => `• ${r.nome} (${r.match}%)`).join('\n')}\n\nRuolo bonus: ${report.bonus?.nome}\n\nScopri il tuo → role-fit-beta.vercel.app`;
+function shareReport() {
+  const text = buildShareText('share');
+  if (!text) return;
 
   if (navigator.share) {
-    navigator.share({ text });
+    navigator.share({ text }).catch(() => {});
   } else {
     navigator.clipboard.writeText(text).then(() => {
       alert('Testo copiato! Incollalo dove vuoi condividerlo.');
     });
   }
+}
+
+// Apre il composer di LinkedIn con il testo già scritto; il link genera
+// l'anteprima con og-image.png. Copiamo il testo anche negli appunti: se
+// l'app LinkedIn ignora il parametro text, basta incollarlo.
+function shareLinkedIn() {
+  const text = buildShareText('linkedin');
+  if (!text) return;
+  navigator.clipboard?.writeText(text).catch(() => {});
+  window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
 // ─── RESTART ─────────────────────────────────────────────────
@@ -825,9 +851,18 @@ function showAuthGate() {
     try {
       const history = JSON.parse(localStorage.getItem('rf_history') || 'null');
       const activities = JSON.parse(localStorage.getItem('rf_activities') || 'null');
+      const answers = JSON.parse(localStorage.getItem('rf_answers') || 'null');
       const aspiration = (localStorage.getItem('rf_aspiration') || '').trim() || null;
       if (history) {
-        const draft = await createDraft({ history, activities, aspiration });
+        // Anche le risposte devono viaggiare nella bozza: se il link si apre
+        // in un altro browser (tipico su mobile: app LinkedIn → app email →
+        // Safari/Chrome) rf_answers lì non c'è, e il report veniva salvato
+        // senza — nome mai memorizzato, età/formazione richieste di nuovo al
+        // test successivo, domande vuote per le aziende. La tabella delle bozze
+        // non ha una colonna apposita: le mettiamo dentro activities sotto una
+        // chiave riservata, che report.js toglie al recupero.
+        const draftActivities = Array.isArray(answers) ? { ...(activities || {}), _answers: answers } : activities;
+        const draft = await createDraft({ history, activities: draftActivities, aspiration });
         draftId = draft.id;
       }
     } catch (e) {
@@ -983,6 +1018,10 @@ async function generateAndSave() {
       const saved = await saveReportWithRetry({ report_json: data.report, aspiration, test_history });
       currentReportId = saved.id;
       localStorage.setItem('rf_report_saved', '1');
+      if (pendingAspiredEval) {
+        updateReportEval(currentReportId, { aspired_role_eval: pendingAspiredEval }).catch(() => {});
+        pendingAspiredEval = null;
+      }
 
       // Se il test ha appena chiesto il nome (era sconosciuto, e l'utente l'ha
       // dato), lo salviamo sul profilo una volta per tutte: da qui in poi
@@ -1008,7 +1047,7 @@ async function generateAndSave() {
     stopLoadingTimer();
     console.error('Errore generazione report:', err);
     document.getElementById('loading-text').textContent =
-      err?.message && err.message.includes('Ricarica la pagina')
+      err?.message && /ricarica la pagina/i.test(err.message)
         ? err.message
         : 'Qualcosa è andato storto. Ricarica la pagina per riprovare.';
     return false;
@@ -1055,8 +1094,10 @@ async function init() {
     // Bozza non trovata: link scaduto, mai creato, o già ripulito dalla manutenzione.
     if (!draft) { showLoadingError('Link non valido o scaduto. Torna al test e richiedi di nuovo l\'accesso.'); return; }
 
+    const { _answers: draftAnswers, ...draftActivities } = draft.activities || {};
     localStorage.setItem('rf_history', JSON.stringify(draft.history));
-    localStorage.setItem('rf_activities', JSON.stringify(draft.activities || {}));
+    localStorage.setItem('rf_activities', JSON.stringify(draftActivities));
+    if (Array.isArray(draftAnswers)) localStorage.setItem('rf_answers', JSON.stringify(draftAnswers));
     localStorage.setItem('rf_aspiration', draft.aspiration || '');
     localStorage.removeItem('rf_report_saved');
     const ok = await generateAndSave();
@@ -1088,4 +1129,5 @@ document.addEventListener('DOMContentLoaded', init);
 // Esposizione per gli handler inline in report.html (onclick=...)
 window.submitRuoloAttuale = submitRuoloAttuale;
 window.shareReport = shareReport;
+window.shareLinkedIn = shareLinkedIn;
 window.restartTest = restartTest;

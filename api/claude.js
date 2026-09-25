@@ -3,6 +3,8 @@
 // stretto e rischiava di far interrompere a Vercel la funzione a metà.
 export const maxDuration = 60;
 
+import { clientIp, isSameOrigin, rateLimit, validateMessages } from './_guard.js';
+
 const PROMPT_DECISIONE = `
 Sei il motore del test adattivo di RoleFit. Il tuo obiettivo è costruire un profilo psicologico-professionale preciso abbastanza da identificare con alta confidenza i 3 ruoli più compatibili con l'utente — più 1 ruolo bonus sorprendente.
 
@@ -498,13 +500,42 @@ async function isValidSupabaseUser(token) {
   }
 }
 
+// Richieste ammesse per IP ogni 10 minuti, per fase. Tarate larghe per non
+// bloccare più persone dietro lo stesso IP (uffici, università), ma abbastanza
+// strette da fermare chi usa l'endpoint come proxy gratuito verso Claude.
+const RATE_LIMITS = {
+  test: 150,
+  report: 20,
+  dizionario: 40,
+  compatibilita: 60,
+  azienda_test: 80,
+  azienda_report: 20,
+};
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    const { messages, fase } = req.body;
+    const { messages, fase } = req.body || {};
+
+    if (!Object.prototype.hasOwnProperty.call(RATE_LIMITS, fase)) {
+      return res.status(400).json({ error: 'Fase non valida' });
+    }
+    if (!isSameOrigin(req)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!rateLimit(`claude:${fase}:${clientIp(req)}`, RATE_LIMITS[fase], RATE_WINDOW_MS)) {
+      return res.status(429).json({ error: 'Troppe richieste. Riprova tra qualche minuto.' });
+    }
+    const invalid = validateMessages(messages, fase === 'dizionario'
+      ? { maxMessages: 1, maxCharsPerMessage: 15000, maxTotalChars: 15000 }
+      : undefined);
+    if (invalid) {
+      return res.status(400).json({ error: invalid });
+    }
 
     // JWT-gate sulle fasi più care (generazione report e valutazione compatibilità):
     // avvengono solo dopo il login, quindi pretendiamo un token Supabase valido.
@@ -588,6 +619,22 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
     };
     const model = models[fase] || 'claude-sonnet-4-6';
 
+    // Prompt caching: nelle fasi a turni (test candidato e azienda) ogni
+    // chiamata rimanda lo stesso prompt di sistema e tutta la conversazione
+    // precedente. Marcando il prompt e l'ultimo messaggio come cacheabili,
+    // alla domanda successiva quel prefisso viene letto dalla cache (costo
+    // ~10% e risposta più rapida). Sotto la soglia minima di token Anthropic
+    // ignora semplicemente il marcatore.
+    const multiTurn = fase === 'test' || fase === 'azienda_test';
+    const systemParam = multiTurn
+      ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+      : system;
+    const messagesParam = multiTurn
+      ? messages.map((m, i) => i === messages.length - 1
+          ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }] }
+          : m)
+      : messages;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -599,8 +646,8 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
         model,
         max_tokens: maxTokens,
         temperature,
-        system,
-        messages
+        system: systemParam,
+        messages: messagesParam
       })
     });
 
