@@ -68,7 +68,7 @@ function loadState() {
 // ─── DOMANDE STANDARD (no AI) ──────────────────────────────────
 const STANDARD_STEPS = [
   { step: 'company_name', text: 'Come si chiama la tua azienda?', type: 'text', placeholder: 'Nome azienda' },
-  { step: 'contact_email', text: 'A quale email possiamo ricontattarvi?', context: 'I risultati li vedete subito, alla fine: vi daremo un link da salvare per ritrovarli.', type: 'email', placeholder: 'latua@azienda.com' },
+  { step: 'contact_email', text: 'A quale email possiamo ricontattarvi?', context: 'RoleFit è in beta: per provarlo potete scrivere anche un indirizzo di prova, il test va avanti lo stesso. I risultati li vedete subito, alla fine, con un link da salvare per ritrovarli.', type: 'email', placeholder: 'latua@azienda.com' },
   { step: 'role_title', text: 'Per quale ruolo state cercando questa persona?', type: 'text', placeholder: 'Es. Account Manager, Data Analyst...' },
   {
     step: 'settore', text: 'In che area si inserisce questo ruolo?', type: 'multiple_choice',
@@ -291,14 +291,6 @@ let answering = false;
 async function handleAnswer(value) {
   if (answering) return;
   const standardStep = STANDARD_STEPS.find((s) => s.step === state.step);
-
-  if (standardStep && standardStep.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
-    const ctxEl = document.getElementById('question-context');
-    ctxEl.textContent = 'Inserisci un indirizzo email valido.';
-    ctxEl.style.color = 'var(--rose)';
-    ctxEl.classList.remove('hidden');
-    return;
-  }
 
   answering = true;
   if (standardStep) {

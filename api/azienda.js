@@ -26,7 +26,6 @@ const SOGLIA_MATCH = 80;
 // Quanti candidati (già ordinati per compatibilità sui 6 assi) passano al
 // controllo semantico AI. Tenerlo basso limita costo/latenza della validazione.
 const MAX_CANDIDATI_DA_VALIDARE = 15;
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMITS = {
@@ -245,8 +244,10 @@ async function creaAzienda(body, res) {
   const company_name = cleanText(body.company_name, 120);
   const contact_email = cleanText(body.contact_email, 254);
   const contact_name = body.contact_name ? cleanText(body.contact_name, 120) : null;
-  if (!company_name || !contact_email || !EMAIL_RE.test(contact_email)) {
-    return res.status(400).json({ error: 'Nome azienda ed email valida sono obbligatori' });
+  // In beta l'email non viene verificata: si può scrivere anche un indirizzo
+  // di prova (la pagina lo dice). Resta obbligatorio un testo non vuoto.
+  if (!company_name || !contact_email) {
+    return res.status(400).json({ error: 'Nome azienda ed email sono obbligatori' });
   }
   const r = await fetch(`${SUPABASE_URL}/rest/v1/company_profiles`, {
     method: 'POST',
