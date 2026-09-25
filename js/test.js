@@ -93,6 +93,15 @@ const state = {
   // esattamente lo stesso contenuto due volte di fila (vedi getRandomVariant).
   lastActivityVariants: {},
   _variantIndex: {},
+  // Servono a riprendere il test esattamente dove era dopo un ricaricamento
+  // (su mobile, specie nel browser interno di LinkedIn, la pagina viene
+  // ricaricata spesso quando si cambia app): true = currentQuestion è a
+  // schermo e non ancora risposta; currentActivity = attività aperta.
+  _awaitingAnswer: false,
+  currentActivity: null,
+  // Domanda già generata dall'AI ma rimandata perché è scattata un'attività:
+  // si mostra appena l'attività è completata (vedi completeActivity).
+  pendingQuestion: null,
 };
 
 // ─── PERSISTENZA ─────────────────────────────────────────────
@@ -118,6 +127,9 @@ function saveState() {
     _contextInjected: state._contextInjected,
     lastActivityVariants: state.lastActivityVariants,
     _variantIndex: state._variantIndex,
+    _awaitingAnswer: state._awaitingAnswer,
+    currentActivity: state.currentActivity,
+    pendingQuestion: state.pendingQuestion,
   };
   localStorage.setItem('rf_state', JSON.stringify(toSave));
 }
@@ -128,6 +140,9 @@ function loadState() {
   try {
     const parsed = JSON.parse(saved);
     Object.assign(state, parsed);
+    // Stato salvato da una versione precedente del test (senza il flag che
+    // dice se la domanda a schermo è già stata risposta): resumeTest lo deduce.
+    state._legacyState = !('_awaitingAnswer' in parsed);
     // Compatibilità con un test lasciato a metà prima di questa funzionalità
     // (stato salvato senza "standardQueue"): la ricostruiamo dalla vecchia
     // convenzione posizionale, altrimenti un test già in corso al momento
@@ -256,17 +271,11 @@ function buildStandardQueue(knownAnswers) {
   STANDARD_QUESTIONS.forEach((q) => {
     const prev = SKIPPABLE_STANDARD_IDS.includes(q.id) ? known.get(q.id) : null;
     if (prev && prev.answer) {
-      state.history.push({
-        type: 'question',
-        questionData: q,
-        conversationLength: state.conversationHistory.length,
-        questionCount: state.questionCount,
-        fixedCount: state.fixedCount,
-        adaptiveCount: state.adaptiveCount,
-      });
+      // Niente voce in state.history: una risposta riusata in silenzio non
+      // deve ricomparire premendo "Cambia risposta" sulla prima domanda vera.
       state.conversationHistory.push({
         role: 'user',
-        content: `Risposta: "${prev.answer}" (già nota dal test precedente, non richiesta di nuovo)`,
+        content: `Domanda: "${q.text}"\nRisposta: "${prev.answer}" (già nota dal test precedente, non richiesta di nuovo)`,
       });
       state.answers.push({ id: q.id, question: q.text, answer: prev.answer, time: 0, isOpen: false, indiretta: false });
       state.questionCount++;
@@ -509,6 +518,10 @@ function getRandomVariant(key, avoidIndex) {
 }
 
 // ─── CHIAMATA API ─────────────────────────────────────────────
+// true se l'ultima chiamata è stata bloccata dal limite di richieste:
+// showTestError mostra allora un messaggio più chiaro di "qualcosa è andato storto".
+let lastApiRateLimited = false;
+
 async function callClaude(fase = 'test') {
   const response = await fetch('/api/claude', {
     method: 'POST',
@@ -519,7 +532,8 @@ async function callClaude(fase = 'test') {
     })
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
+  lastApiRateLimited = response.status === 429;
 
   // Se l'API ha risposto con un errore (modello non valido, rate limit, sovraccarico...),
   // non c'è data.content — logghiamo l'errore vero invece di crashare su content[0].
@@ -565,7 +579,14 @@ const PHASE_ORDER = ['building', 'deepening', 'almost', 'done'];
 function updateProgress() {
   const idx = PHASE_ORDER.indexOf(state.currentPhase);
   const step = idx === -1 ? 1 : idx + 1;
-  document.getElementById('progress-bar').style.width = (step / PHASE_ORDER.length * 100) + '%';
+  // La fase la decide l'AI e cambia di rado: la barra avanza anche con le
+  // domande e le attività fatte (stima ~24 passi in tutto), senza scendere
+  // sotto l'inizio della fase corrente e senza toccare il 100% prima della
+  // fine. Prima saltava a blocchi del 25% e restava ferma a lungo.
+  const floor = (step - 1) / PHASE_ORDER.length * 100;
+  const done = (state.questionCount || 0) + Object.keys(state.activityResults || {}).length;
+  const pct = step === PHASE_ORDER.length ? 100 : Math.max(floor + 2, Math.min(95, done / 24 * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
   const stepEl = document.getElementById('phase-step');
   if (stepEl) stepEl.textContent = `Passo ${step} di ${PHASE_ORDER.length}`;
 }
@@ -596,12 +617,18 @@ function updatePhase(phase) {
 function renderQuestion(questionData) {
   state.lastQuestionTime = Date.now();
   state.currentQuestion = questionData;
+  state._awaitingAnswer = true;
   saveState();
 
   stopThinking();
   document.getElementById('thinking-state').classList.add('hidden');
   document.getElementById('activity-area').classList.add('hidden');
   document.getElementById('active-question').classList.remove('hidden');
+
+  // "Cambia risposta" solo se c'è davvero una risposta precedente da cambiare:
+  // sulla prima domanda il pulsante non faceva nulla.
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn) backBtn.classList.toggle('hidden', state.history.length === 0);
 
   const textEl = document.getElementById('question-text');
   textEl.style.animation = 'none';
@@ -840,16 +867,29 @@ async function submitAnswer(value, questionData) {
   // saltate silenziosamente da buildStandardQueue non passano da qui) lo
   // rimuoviamo. Idempotente: sulle risposte successive non trova più nulla.
   document.getElementById('welcome-back-notice')?.remove();
+  document.getElementById('restore-notice')?.remove();
+
+  // Una risposta per domanda: Invio + clic ravvicinati sul campo libero
+  // (o un doppio tocco) non devono registrarla due volte.
+  if (!state._awaitingAnswer) return;
+  state._awaitingAnswer = false;
 
   const responseTime = Date.now() - state.lastQuestionTime;
+  const isStandard = STANDARD_QUESTIONS.some(q => q.id === questionData.id);
 
+  // Istantanea completa di prima della risposta: "Cambia risposta" (goBack)
+  // la ripristina per intero, coda delle domande standard e risposte comprese.
   state.history.push({
     type: 'question',
     questionData,
     conversationLength: state.conversationHistory.length,
     questionCount: state.questionCount,
     fixedCount: state.fixedCount,
-    adaptiveCount: state.adaptiveCount
+    adaptiveCount: state.adaptiveCount,
+    answersLength: state.answers.length,
+    standardQueue: [...state.standardQueue],
+    worksCurrently: state.worksCurrently,
+    contextInjected: state._contextInjected,
   });
 
   // Rileva se l'utente sta lavorando — ora sulla domanda 'momento'.
@@ -858,12 +898,15 @@ async function submitAnswer(value, questionData) {
     state.worksCurrently = !value.startsWith('Ho appena finito gli studi');
   }
 
+  // Per le domande standard il testo della domanda non è altrove nella
+  // conversazione (per le adattive sì: è nel messaggio dell'AI subito prima).
+  // Il formato "Risposta: \"...\"" va mantenuto: report.js lo cerca per capire
+  // se la persona lavora.
   state.conversationHistory.push({
     role: 'user',
-    content: `Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
+    content: `${isStandard ? `Domanda: "${questionData.text}"\n` : ''}Risposta: "${value}" (tempo: ${Math.round(responseTime / 1000)}s)`
   });
 
-  const isStandard = STANDARD_QUESTIONS.some(q => q.id === questionData.id);
   // Le domande standard non sono mai personali. Per le adattive, ci fidiamo
   // solo di un "indiretta: false" esplicito dell'AI — qualunque altra cosa
   // (true, o il campo mancante) viene trattata come domanda da non esporre
@@ -943,8 +986,15 @@ async function getNextStep() {
 
   const result = await callClaude('test');
 
-  if (!result) {
-    console.error('Risposta Claude non valida');
+  // Una risposta vuota o senza un'azione riconoscibile non entra nella
+  // conversazione: se ci finisse come ultimo messaggio dell'AI, il retry
+  // successivo le chiederebbe di "continuarla" invece di rispondere.
+  const valido = result && (
+    result.action === 'report' ||
+    (result.action === 'ask' && result.question && typeof result.question.text === 'string' && Array.isArray(result.question.options))
+  );
+  if (!valido) {
+    console.error('Risposta Claude non valida:', result);
     stopThinking();
     // Senza questo, l'utente restava a guardare l'animazione di pensiero
     // all'infinito, senza nessun errore né modo di riprovare: la risposta
@@ -971,36 +1021,7 @@ async function getNextStep() {
       return;
     }
     goToReport();
-  } else if (result.action === 'ask' && result.question) {
-    // Segnale già chiaro su tutte e 3 le dimensioni: le attività sotto
-    // servono a raccogliere segnale extra, non ha senso infliggerle a chi
-    // il modello ha già "letto" bene. Il test resta lungo per chi è ambiguo,
-    // si accorcia per chi è leggibile — non è un taglio arbitrario.
-    const segnaliChiari = isSignalChiaro(result.internal);
-
-    // Attività Dilemma dopo 7 domande totali
-    if (state.questionCount >= 7 && !state.activityResults['dilemma'] && !state.activitySkipped['dilemma']) {
-      if (segnaliChiari) {
-        state.activitySkipped['dilemma'] = true;
-        saveState();
-      } else {
-        showActivity('dilemma');
-        return;
-      }
-    }
-    // Attività Costruisci a metà adattive (Smonta l'Annuncio segue sempre
-    // Costruisci: se si salta la prima si salta anche la seconda).
-    if (state.adaptiveCount >= 4 && !state.activityResults['costruisci'] && !state.activitySkipped['costruisci']) {
-      if (segnaliChiari) {
-        state.activitySkipped['costruisci'] = true;
-        state.activitySkipped['smonta'] = true;
-        saveState();
-      } else {
-        showActivity('costruisci');
-        return;
-      }
-    }
-
+  } else {
     // VALIDAZIONE DOMANDA — una domanda valida deve avere 4 opzioni concrete
     const q = result.question;
     const opzioniGeneriche = ['sì, decisamente', 'in parte', 'non proprio', 'no, per niente'];
@@ -1033,6 +1054,40 @@ async function getNextStep() {
     }
 
     q.type = 'multiple_choice';
+
+    // Segnale già chiaro su tutte e 3 le dimensioni: le attività sotto
+    // servono a raccogliere segnale extra, non ha senso infliggerle a chi
+    // il modello ha già "letto" bene. Il test resta lungo per chi è ambiguo,
+    // si accorcia per chi è leggibile — non è un taglio arbitrario.
+    const segnaliChiari = isSignalChiaro(result.internal);
+
+    // Se scatta un'attività, la domanda appena generata non si butta: resta
+    // in attesa e viene mostrata subito dopo (vedi completeActivity).
+    // Attività Dilemma dopo 7 domande totali
+    if (state.questionCount >= 7 && !state.activityResults['dilemma'] && !state.activitySkipped['dilemma']) {
+      if (segnaliChiari) {
+        state.activitySkipped['dilemma'] = true;
+        saveState();
+      } else {
+        state.pendingQuestion = q;
+        showActivity('dilemma');
+        return;
+      }
+    }
+    // Attività Costruisci a metà adattive (Smonta l'Annuncio segue sempre
+    // Costruisci: se si salta la prima si salta anche la seconda).
+    if (state.adaptiveCount >= 4 && !state.activityResults['costruisci'] && !state.activitySkipped['costruisci']) {
+      if (segnaliChiari) {
+        state.activitySkipped['costruisci'] = true;
+        state.activitySkipped['smonta'] = true;
+        saveState();
+      } else {
+        state.pendingQuestion = q;
+        showActivity('costruisci');
+        return;
+      }
+    }
+
     stopThinking();
     renderQuestion(q);
   }
@@ -1043,7 +1098,9 @@ async function getNextStep() {
 // riprova la stessa chiamata, senza perdere la risposta già data.
 function showTestError() {
   const phraseEl = document.getElementById('thinking-phrase');
-  phraseEl.textContent = 'Qualcosa è andato storto.';
+  phraseEl.textContent = lastApiRateLimited
+    ? 'Troppe richieste in poco tempo: aspetta un paio di minuti e riprova.'
+    : 'Qualcosa è andato storto.';
   phraseEl.style.color = 'var(--rose)';
 
   const thinkingState = document.getElementById('thinking-state');
@@ -1072,6 +1129,8 @@ function showThinking() {
 // ─── ATTIVITÀ ─────────────────────────────────────────────────
 function showActivity(activityId) {
   stopThinking();
+  state.currentActivity = activityId;
+  saveState();
   document.getElementById('active-question').classList.add('hidden');
   document.getElementById('thinking-state').classList.add('hidden');
 
@@ -1356,7 +1415,10 @@ async function completeActivity(activityId, result) {
     result = { ...result, variantIndex: state._variantIndex[activityId] };
   }
 
+  document.getElementById('restore-notice')?.remove();
   state.activityResults[activityId] = result;
+  updateProgress();
+  state.currentActivity = null;
   state.conversationHistory.push({
     role: 'user',
     content: `[Attività: ${activityId}] ${JSON.stringify(result)}`
@@ -1369,11 +1431,25 @@ async function completeActivity(activityId, result) {
     return;
   }
 
+  // Se l'attività era scattata dopo che l'AI aveva già generato la domanda
+  // successiva, mostriamo quella invece di richiederne un'altra: una chiamata
+  // (e qualche secondo di attesa) in meno per ogni attività.
+  if (state.pendingQuestion) {
+    const q = state.pendingQuestion;
+    state.pendingQuestion = null;
+    renderQuestion(q);
+    return;
+  }
+
   await getNextStep();
 }
 
 function showSmonta() {
   stopThinking();
+  state.currentActivity = 'smonta';
+  saveState();
+  document.getElementById('active-question').classList.add('hidden');
+  document.getElementById('thinking-state').classList.add('hidden');
   const area = document.getElementById('activity-area');
   area.classList.remove('hidden');
   area.innerHTML = '';
@@ -1685,6 +1761,10 @@ function showAspirationQuestion() {
 
   // Rimuove eventuali avvisi di ripristino residui
   qArea.querySelectorAll('.restore-notice').forEach(n => n.remove());
+  // Da qui il test è chiuso: "Cambia risposta" riaprirebbe domande su cui
+  // l'AI ha già deciso. L'unico "indietro" è quello interno al campo libero.
+  document.getElementById('back-btn')?.classList.add('hidden');
+  state._awaitingAnswer = false;
 
   const ctxEl = document.getElementById('question-context');
   const inputEl = document.getElementById('question-input');
@@ -1822,14 +1902,31 @@ function renderAspirationInput() {
 }
 
 // ─── TORNA INDIETRO ───────────────────────────────────────────
+// Riporta tutto allo stato di prima dell'ultima risposta, non solo la
+// conversazione: prima la coda delle domande standard non veniva ripristinata
+// (tornando indietro su una domanda standard, quella dopo veniva saltata) e le
+// risposte restavano duplicate nell'elenco passato al report e alle aziende.
+// Le attività già svolte non si perdono: il loro risultato resta nella
+// conversazione anche se si torna a una domanda precedente.
 function goBack() {
   if (state.history.length === 0) return;
   const prev = state.history.pop();
 
-  state.conversationHistory = state.conversationHistory.slice(0, prev.conversationLength);
-  state.questionCount = prev.questionCount;
+  const removed = state.conversationHistory.slice(prev.conversationLength);
+  const activityMessages = removed.filter(
+    (m) => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[Attività:')
+  );
+  state.conversationHistory = state.conversationHistory
+    .slice(0, prev.conversationLength)
+    .concat(activityMessages);
+  state.questionCount = prev.questionCount + activityMessages.length;
   state.fixedCount = prev.fixedCount;
   state.adaptiveCount = prev.adaptiveCount;
+  if (typeof prev.answersLength === 'number') state.answers.length = prev.answersLength;
+  if (Array.isArray(prev.standardQueue)) state.standardQueue = prev.standardQueue;
+  if (typeof prev.worksCurrently === 'boolean') state.worksCurrently = prev.worksCurrently;
+  if (typeof prev.contextInjected === 'boolean') state._contextInjected = prev.contextInjected;
+  state.pendingQuestion = null;
 
   saveState();
   renderQuestion(prev.questionData);
@@ -1907,31 +2004,62 @@ async function startFreshTest() {
   await getNextStep();
 }
 
+// Per uno stato salvato prima che esistesse _awaitingAnswer: una domanda
+// standard è ancora da rispondere se è in testa alla coda; un'adattiva se
+// l'ultimo messaggio è quello dell'AI che l'ha posta.
+function inferAwaitingAnswer() {
+  const q = state.currentQuestion;
+  if (!q) return false;
+  if (STANDARD_QUESTIONS.some((s) => s.id === q.id)) return state.standardQueue[0]?.id === q.id;
+  const last = state.conversationHistory[state.conversationHistory.length - 1];
+  return last?.role === 'assistant';
+}
+
+// Riprende il test esattamente dove era, qualunque fosse lo schermo:
+// domanda (standard o adattiva), attività, domanda finale, o l'attesa della
+// domanda successiva. Prima si riprendeva solo da una domanda standard: un
+// ricaricamento durante le domande adattive — cioè quasi tutto il test —
+// ripartiva da zero.
+async function resumeTest() {
+  updatePhase(state.currentPhase);
+  updateProgress();
+
+  const notice = document.createElement('div');
+  notice.id = 'restore-notice';
+  notice.className = 'restore-notice';
+  notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
+  notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
+  document.getElementById('question-area').prepend(notice);
+
+  if (state._aspirationAsked) {
+    showAspirationQuestion();
+    return;
+  }
+  if (state.currentActivity && !state.activityResults[state.currentActivity]) {
+    if (state.currentActivity === 'smonta') showSmonta();
+    else showActivity(state.currentActivity);
+    return;
+  }
+  const awaiting = state._legacyState ? inferAwaitingAnswer() : state._awaitingAnswer;
+  if (awaiting && state.currentQuestion) {
+    renderQuestion(state.currentQuestion);
+    return;
+  }
+  // La risposta era già stata data: stavamo aspettando la domanda successiva.
+  // Se l'ultimo messaggio è dell'AI senza una domanda a schermo (ricarica in
+  // quell'istante), lo togliamo: rimandarlo come ultimo messaggio farebbe
+  // "continuare" la risposta all'AI invece di generarne una nuova.
+  const last = state.conversationHistory[state.conversationHistory.length - 1];
+  if (last?.role === 'assistant') state.conversationHistory.pop();
+  await getNextStep();
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 async function init() {
   const restored = loadState();
 
-  if (restored && state.currentQuestion && state.questionCount > 0) {
-    const isStandardQuestion = STANDARD_QUESTIONS.some(q => q.id === state.currentQuestion.id);
-    const isWorkQuestion = state.currentQuestion.id === 'ruolo_attuale';
-
-    if (!isStandardQuestion && !isWorkQuestion) {
-      await startFreshTest();
-      return;
-    }
-
-    updatePhase(state.currentPhase);
-    updateProgress();
-
-    const notice = document.createElement('div');
-    notice.className = 'restore-notice';
-    notice.style.cssText = 'font-size:0.82rem;color:var(--emerald-light);margin-bottom:16px;opacity:0.8;';
-    notice.textContent = '✓ Progressi ripristinati — sei al punto dove ti eri fermato.';
-
-    document.getElementById('active-question').classList.remove('hidden');
-    document.getElementById('active-question').prepend(notice);
-
-    renderQuestion(state.currentQuestion);
+  if (restored && state.questionCount > 0 && state.conversationHistory.length > 0) {
+    await resumeTest();
     return;
   }
 

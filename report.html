@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RoleFit — Il tuo report</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
@@ -37,6 +39,8 @@
     .sky-mini-wrap { align-self: center; width: 120px; height: 120px; }
     .sky-mini { width: 100%; height: 100%; display: block; }
   </style>
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
@@ -87,6 +91,7 @@
           />
           <button id="auth-btn" class="btn btn--primary" style="width:100%;">Inviami il link →</button>
           <p id="auth-error" class="hidden" style="font-size:0.82rem;color:var(--rose);margin-top:10px;"></p>
+          <p style="font-size:0.74rem;color:var(--text-faint);margin-top:14px;line-height:1.5;">Usiamo l'email solo per farti accedere ai tuoi report. Le aziende non la vedono, a meno che tu non scelga di renderti visibile caricando il CV.</p>
         </div>
 
         <div id="auth-sent" class="hidden">
@@ -185,7 +190,7 @@
           <div class="next-card cv" id="next-cv-card">
             <div class="next-eyebrow">Visibilità · facoltativa</div>
             <h3 class="next-heading" id="next-cv-heading">Le aziende su RoleFit cercano profili come il tuo.</h3>
-            <p class="next-body" id="next-cv-body">Carica il CV e diventi visibile alle aziende in base al tuo profilo. Resta una scelta tua: puoi rimuoverlo quando vuoi.</p>
+            <p class="next-body" id="next-cv-body">Carica il CV e diventi visibile alle aziende in base al tuo profilo. Resta una scelta tua: puoi rimuoverlo quando vuoi dal tuo profilo.</p>
             <input type="file" id="next-cv-input" accept="application/pdf" class="hidden" />
             <p id="next-cv-error" class="hidden next-meta" style="color:var(--rose-light);"></p>
             <p id="next-cv-done" class="hidden next-meta" style="color:var(--emerald-light);">✓ CV caricato — <a id="next-cv-done-link" href="#" style="color:var(--emerald-light);">vedi il report aggiornato →</a></p>
@@ -199,6 +204,7 @@
 
       <div class="report-actions">
         <a href="dizionario.html" class="btn btn--primary">Approfondisci i ruoli →</a>
+        <button class="btn btn--ghost" onclick="shareLinkedIn()">Condividi su LinkedIn</button>
         <button class="btn btn--ghost" onclick="shareReport()">Condividi il report</button>
         <button class="btn btn--ghost" onclick="restartTest()">Rifai il test</button>
       </div>

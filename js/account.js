@@ -1,5 +1,5 @@
 // ─── PROFILO LAYOUT D (magic link) ───────────────────────────
-import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile, uploadCv, saveCvPath } from './supabase.js';
+import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile, uploadCv, saveCvPath, removeCv } from './supabase.js';
 
 // Il banco di prova mostra sia testo scritto dall'utente (il ruolo cercato)
 // sia testo generato dall'AI: senza escaping, un payload HTML/script
@@ -251,6 +251,26 @@ function setupCv() {
   if (!btn || !input) return;
 
   renderCvCurrent();
+
+  const removeBtn = document.getElementById('cv-remove-btn');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', async () => {
+      if (!window.confirm('Vuoi rimuovere il CV? Non sarai più visibile alle aziende. I tuoi report restano.')) return;
+      removeBtn.disabled = true;
+      errEl.classList.add('hidden');
+      try {
+        await removeCv();
+        done.classList.add('hidden');
+        await renderCvCurrent();
+      } catch (e) {
+        console.error('Rimozione CV fallita:', e);
+        errEl.textContent = 'Non sono riuscito a rimuovere il CV. Riprova tra poco.';
+        errEl.classList.remove('hidden');
+      } finally {
+        removeBtn.disabled = false;
+      }
+    });
+  }
 
   btn.addEventListener('click', () => input.click());
 
@@ -730,6 +750,38 @@ function renderStorico(reports) {
   });
 }
 
+// ─── Cancellazione account ───
+function setupDeleteAccount() {
+  const btn = document.getElementById('delete-account-btn');
+  const errEl = document.getElementById('delete-account-error');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!window.confirm('Vuoi cancellare definitivamente il tuo account? Report, storico e CV verranno eliminati e non potranno essere recuperati.')) return;
+    btn.disabled = true;
+    errEl.classList.add('hidden');
+    try {
+      const token = await getAccessToken();
+      const res = await fetch('/api/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'delete' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Cancellazione non riuscita');
+      await signOut().catch(() => {});
+      ['rf_state', 'rf_answers', 'rf_report', 'rf_report_saved', 'rf_history', 'rf_activities', 'rf_aspiration'].forEach(k => {
+        try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch { /* storage non disponibile */ }
+      });
+      window.location.href = 'index.html';
+    } catch (e) {
+      console.error('Cancellazione account fallita:', e);
+      errEl.textContent = e.message || 'Non sono riuscito a cancellare l\'account. Riprova tra poco.';
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+    }
+  });
+}
+
 // ─── Init ───
 async function init() {
   const session = await getSession();
@@ -742,6 +794,9 @@ async function init() {
 
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) logoutBtn.addEventListener('click', async () => { await signOut(); window.location.reload(); });
+  const logoutBtnMobile = document.getElementById('logout-btn-mobile');
+  if (logoutBtnMobile) logoutBtnMobile.addEventListener('click', async () => { await signOut(); window.location.reload(); });
+  setupDeleteAccount();
 
   try {
     const reports = await listReports();

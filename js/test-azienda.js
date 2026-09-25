@@ -68,7 +68,7 @@ function loadState() {
 // ─── DOMANDE STANDARD (no AI) ──────────────────────────────────
 const STANDARD_STEPS = [
   { step: 'company_name', text: 'Come si chiama la tua azienda?', type: 'text', placeholder: 'Nome azienda' },
-  { step: 'contact_email', text: 'A quale email vi mandiamo i risultati?', type: 'email', placeholder: 'latua@azienda.com' },
+  { step: 'contact_email', text: 'A quale email possiamo ricontattarvi?', context: 'I risultati li vedete subito, alla fine: vi daremo un link da salvare per ritrovarli.', type: 'email', placeholder: 'latua@azienda.com' },
   { step: 'role_title', text: 'Per quale ruolo state cercando questa persona?', type: 'text', placeholder: 'Es. Account Manager, Data Analyst...' },
   {
     step: 'settore', text: 'In che area si inserisce questo ruolo?', type: 'multiple_choice',
@@ -93,30 +93,55 @@ function nextStandardStep(currentStep) {
 
 // ─── API ────────────────────────────────────────────────────────
 async function callClaude(fase) {
-  const response = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: state.conversationHistory, fase }),
-  });
-  const data = await response.json();
-  if (!data.content || !data.content[0] || !data.content[0].text) {
-    console.error('Errore API Claude (fase ' + fase + '):', data.error || data);
-    return null;
-  }
   try {
+    const response = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: state.conversationHistory, fase }),
+    });
+    const data = await response.json();
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error('Errore API Claude (fase ' + fase + '):', data.error || data);
+      return null;
+    }
     return JSON.parse(data.content[0].text);
-  } catch {
+  } catch (e) {
+    console.error('Chiamata Claude fallita (fase ' + fase + '):', e);
     return null;
   }
 }
 
 async function callAzienda(action, payload) {
-  const response = await fetch('/api/azienda', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...payload }),
-  });
-  return response.json();
+  try {
+    const response = await fetch('/api/azienda', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return await response.json();
+  } catch (e) {
+    console.error('Chiamata /api/azienda fallita (' + action + '):', e);
+    return { error: 'network' };
+  }
+}
+
+// Errore recuperabile: un messaggio e un pulsante che riprova l'ultima
+// operazione. Prima l'errore veniva mostrato come una "domanda" con un campo
+// di testo: se l'utente ci scriveva qualcosa, finiva nella conversazione come
+// risposta e la corrompeva.
+function renderError(message, retry) {
+  stopThinking();
+  document.getElementById('thinking-state').classList.add('hidden');
+  document.getElementById('active-question').classList.remove('hidden');
+  document.getElementById('question-text').textContent = message;
+  document.getElementById('question-context').classList.add('hidden');
+  const input = document.getElementById('question-input');
+  input.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--primary';
+  btn.textContent = 'Riprova';
+  btn.addEventListener('click', retry);
+  input.appendChild(btn);
 }
 
 // ─── PROGRESS / FASE ──────────────────────────────────────────
@@ -214,12 +239,14 @@ function renderOpenInput(container, questionData) {
 }
 
 function renderQuestion({ text, context, type, options, placeholder }) {
+  answering = false;
   stopThinking();
   document.getElementById('thinking-state').classList.add('hidden');
   document.getElementById('active-question').classList.remove('hidden');
 
   document.getElementById('question-text').textContent = text;
   const ctxEl = document.getElementById('question-context');
+  ctxEl.style.color = '';
   if (context) {
     ctxEl.textContent = context;
     ctxEl.classList.remove('hidden');
@@ -257,9 +284,23 @@ function renderQuestion({ text, context, type, options, placeholder }) {
 }
 
 // ─── FLUSSO ─────────────────────────────────────────────────────
+// Un doppio tocco (o Invio + click) mandava la stessa risposta due volte,
+// duplicandola nella conversazione. Si riapre a ogni nuova domanda o errore.
+let answering = false;
+
 async function handleAnswer(value) {
+  if (answering) return;
   const standardStep = STANDARD_STEPS.find((s) => s.step === state.step);
 
+  if (standardStep && standardStep.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+    const ctxEl = document.getElementById('question-context');
+    ctxEl.textContent = 'Inserisci un indirizzo email valido.';
+    ctxEl.style.color = 'var(--rose)';
+    ctxEl.classList.remove('hidden');
+    return;
+  }
+
+  answering = true;
   if (standardStep) {
     state[state.step] = value;
     const next = nextStandardStep(state.step);
@@ -294,7 +335,7 @@ async function askAdaptive() {
   showThinking();
   const result = await callClaude('azienda_test');
   if (!result) {
-    renderQuestion({ text: 'Qualcosa è andato storto. Ricarica la pagina e riprova.', type: 'text', placeholder: '' });
+    renderError('Qualcosa è andato storto. Le tue risposte sono salvate: riprova.', askAdaptive);
     return;
   }
   if (result.action === 'report') {
@@ -313,27 +354,33 @@ async function generateReport() {
 
   const reportResult = await callClaude('azienda_report');
   if (!reportResult || !reportResult.target_profile) {
-    renderQuestion({ text: 'Non sono riuscito a generare il profilo. Ricarica la pagina e riprova.', type: 'text', placeholder: '' });
+    renderError('Non sono riuscito a generare il profilo. Le tue risposte sono salvate: riprova.', generateReport);
     return;
   }
 
-  const aziendaRes = await callAzienda('crea_azienda', {
-    company_name: state.company_name,
-    contact_email: state.contact_email,
-  });
-  if (aziendaRes.error) {
-    renderQuestion({ text: 'Errore nel salvataggio. Riprova tra poco.', type: 'text', placeholder: '' });
-    return;
+  // Se un tentativo precedente ha già creato l'azienda, non ne creiamo una
+  // seconda riprovando dopo un errore sul salvataggio della ricerca.
+  if (!state.company_id) {
+    const aziendaRes = await callAzienda('crea_azienda', {
+      company_name: state.company_name,
+      contact_email: state.contact_email,
+    });
+    if (aziendaRes.error || !aziendaRes.id) {
+      renderError('Errore nel salvataggio. Riprova tra poco.', generateReport);
+      return;
+    }
+    state.company_id = aziendaRes.id;
+    saveState();
   }
 
   const jobRes = await callAzienda('crea_job', {
-    company_id: aziendaRes.id,
+    company_id: state.company_id,
     role_title: state.role_title,
     test_history: state.conversationHistory,
     target_profile: reportResult.target_profile,
   });
-  if (jobRes.error) {
-    renderQuestion({ text: 'Errore nel salvataggio della ricerca. Riprova tra poco.', type: 'text', placeholder: '' });
+  if (jobRes.error || !jobRes.id) {
+    renderError('Errore nel salvataggio della ricerca. Riprova tra poco.', generateReport);
     return;
   }
 

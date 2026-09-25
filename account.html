@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Il tuo profilo — RoleFit</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
@@ -188,6 +190,8 @@
       .bb-item.active { color: #5DCAA5; }
     }
   </style>
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
@@ -218,6 +222,7 @@
         <input id="account-email" type="email" placeholder="nome@email.it" class="pf-input" />
         <p id="account-auth-error" class="hidden" style="color:#FF6496; font-size:12px; margin:0 0 10px;"></p>
         <button id="account-auth-btn" class="pf-btn" style="width:100%; justify-content:center;">Inviami il link →</button>
+        <p style="font-size:11px; color:rgba(240,255,244,0.4); margin:14px 0 0; line-height:1.5;">Usiamo l'email solo per farti accedere ai tuoi report. Le aziende non la vedono, a meno che tu non scelga di renderti visibile caricando il CV.</p>
       </div>
       <div id="account-auth-sent" class="hidden">
         <p class="pcard-sub">Ti abbiamo mandato un'email. Apri il link per entrare nel tuo profilo.</p>
@@ -304,12 +309,13 @@
 
       <div class="pcard">
         <p class="pcard-label">Perché caricarlo</p>
-        <p class="pcard-sub">Carica il tuo CV in PDF: lo useremo insieme alle risposte del tuo ultimo test per rigenerare un profilo più preciso e concreto. Se un'azienda ti trova tra i candidati compatibili per una ricerca, potrà visionare il file originale.</p>
+        <p class="pcard-sub">Carica il tuo CV in PDF: lo useremo insieme alle risposte del tuo ultimo test per rigenerare un profilo più preciso e concreto. Caricarlo è anche la tua scelta di essere visibile alle aziende: se una ricerca ti trova compatibile, l'azienda vede il tuo profilo, il tuo nome, la tua email e il CV. Senza CV, il tuo report resta solo tuo. Puoi rimuoverlo quando vuoi.</p>
       </div>
 
       <div class="pcard hidden" id="cv-current">
-        <p class="pcard-label" style="color:#5DCAA5;">CV caricato</p>
+        <p class="pcard-label" style="color:#5DCAA5;">CV caricato · sei visibile alle aziende</p>
         <p class="pcard-sub" id="cv-status">—</p>
+        <button id="cv-remove-btn" type="button" style="margin-top:12px; background:none; border:none; padding:0; color:#FF6496; font-size:12px; cursor:pointer; text-decoration:underline;">Rimuovi il CV e non essere più visibile</button>
       </div>
 
       <div class="pcard">
@@ -328,6 +334,13 @@
         <p class="pcard-label" style="color:#5DCAA5;">Fatto</p>
         <p class="pcard-sub" style="margin-bottom:12px;">Il tuo profilo è stato rigenerato tenendo conto del CV.</p>
         <a href="#" id="cv-done-link" class="pf-btn">Vedi il profilo aggiornato →</a>
+      </div>
+          <div class="pcard" id="data-card">
+        <p class="pcard-label">I tuoi dati</p>
+        <p class="pcard-sub" style="margin-bottom:12px;">Puoi uscire dal tuo profilo o cancellare definitivamente account, report e CV. La cancellazione non si può annullare.</p>
+        <button id="logout-btn-mobile" type="button" class="pf-btn" style="margin-right:10px;">Esci</button>
+        <button id="delete-account-btn" type="button" style="margin-top:12px; background:none; border:none; padding:0; color:#FF6496; font-size:12px; cursor:pointer; text-decoration:underline;">Elimina account e tutti i dati</button>
+        <p id="delete-account-error" class="hidden" style="color:#FF6496; font-size:12px; margin-top:10px;"></p>
       </div>
     </section>
 

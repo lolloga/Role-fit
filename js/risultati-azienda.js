@@ -33,19 +33,19 @@ function renderAssi(assi) {
   }).join('');
 }
 
-function renderCandidati(candidates, jobId) {
+function renderCandidati(candidates, jobId, soglia) {
   const list = document.getElementById('candidati-list');
   if (candidates.length === 0) {
-    list.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">Nessun candidato sopra la soglia di compatibilità (75%) al momento — il pool di profili su RoleFit è ancora piccolo, riprova più avanti.</p>';
+    list.innerHTML = `<p style="color:var(--text-muted);font-size:0.9rem;">Nessun candidato sopra la soglia di compatibilità (${esc(soglia || 80)}%) al momento. Su RoleFit compaiono solo le persone che hanno scelto di rendersi visibili alle aziende, e il pool sta crescendo: tenete questo link e riapritelo tra qualche giorno.</p>`;
     return;
   }
 
-  list.innerHTML = candidates.map((c) => {
+  list.innerHTML = candidates.map((c, i) => {
     const href = `candidato-azienda.html?job_id=${encodeURIComponent(jobId)}&user_id=${encodeURIComponent(c.user_id)}&perche=${encodeURIComponent(c.perche_azienda || '')}`;
     return `
     <a class="ruolo-card" href="${href}" style="display:block;text-decoration:none;color:inherit;cursor:pointer;">
       <div class="ruolo-header">
-        <div class="ruolo-nome">${esc(c.email) || 'Candidato'}</div>
+        <div class="ruolo-nome">${esc(c.nome) || `Candidato ${i + 1}`}</div>
         <div class="ruolo-match">
           <span class="ruolo-match-number">${esc(c.match)}%</span>
           <span class="ruolo-match-label">compatibilità</span>
@@ -65,6 +65,22 @@ function renderCandidati(candidates, jobId) {
     </a>
   `;
   }).join('');
+}
+
+// Le aziende non hanno un account: questo link è l'unico modo per tornare ai
+// risultati (e per vedere i nuovi candidati man mano che il pool cresce).
+function setupSaveLink() {
+  const btn = document.getElementById('copy-link-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      btn.textContent = 'Link copiato ✓';
+    } catch {
+      btn.textContent = 'Copia il link dalla barra degli indirizzi';
+    }
+    setTimeout(() => { btn.textContent = 'Copia il link'; }, 2500);
+  });
 }
 
 (async function init() {
@@ -90,7 +106,8 @@ function renderCandidati(candidates, jobId) {
     document.getElementById('ruolo-titolo').innerHTML = `${esc(data.job.role_title)},<br><em>tradotto in numeri.</em>`;
     document.getElementById('target-sintesi').innerHTML = `<p>${esc(data.job.target_profile.sintesi)}</p>`;
     renderAssi(data.job.target_profile.assi);
-    renderCandidati(data.candidates, jobId);
+    renderCandidati(data.candidates, jobId, data.soglia);
+    setupSaveLink();
 
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('results-content').classList.remove('hidden');

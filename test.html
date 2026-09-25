@@ -4,16 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RoleFit — Il test</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="description" content="Un test adattivo di 15 minuti: domande, piccoli giochi e scenari per capire quali ruoli sono più in linea con te.">
+  <link rel="canonical" href="https://role-fit-beta.vercel.app/test.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="RoleFit">
+  <meta property="og:locale" content="it_IT">
+  <meta property="og:url" content="https://role-fit-beta.vercel.app/test.html">
+  <meta property="og:title" content="RoleFit — Il test">
+  <meta property="og:description" content="Un test adattivo di 15 minuti: domande, piccoli giochi e scenari per capire quali ruoli sono più in linea con te.">
+  <meta property="og:image" content="https://role-fit-beta.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="627">
+  <meta property="og:image:alt" content="RoleFit — Il tuo lavoro, il mio obiettivo.">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <nav class="site-nav">
   <div class="container--wide">
-    <a href="index.html" class="site-nav-logo" onclick="localStorage.removeItem('rf_state')">Role<span class="logo-fit">Fit</span></a>
+    <a href="index.html" class="site-nav-logo">Role<span class="logo-fit">Fit</span></a>
     <a href="account.html" class="site-nav-cta" id="site-nav-cta"><span class="nav-txt-full">Il tuo profilo</span><span class="nav-txt-short">Profilo</span></a>
   </div>
 </nav>
@@ -48,7 +64,7 @@
         <div class="ai-thinking-phrases" id="thinking-phrase">Sto elaborando...</div>
       </div>
       <div id="active-question" class="hidden">
-        <div class="question-text" id="question-text"></div>
+        <div class="question-text" id="question-text" aria-live="polite"></div>
         <div class="question-context" id="question-context"></div>
         <div id="question-input"></div>
         <button class="back-btn" id="back-btn" onclick="goBack()" style="color: var(--emerald-light);">

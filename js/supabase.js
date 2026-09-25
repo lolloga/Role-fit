@@ -175,6 +175,23 @@ export async function saveCvPath(path) {
   if (error) throw error;
 }
 
+// Rimuove il CV: cancella il file dal bucket (policy "own cv delete") e
+// azzera cv_path. È anche il modo per tornare invisibili alle aziende, che
+// vedono solo chi ha un CV caricato (vedi api/azienda.js). Prima il profilo,
+// poi il file: se la cancellazione del file fallisse, la visibilità è già
+// stata tolta, che è la parte che conta per l'utente.
+export async function removeCv() {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const { error: profileError } = await sb
+    .from('profiles')
+    .update({ cv_path: null, cv_updated_at: null })
+    .eq('id', session.user.id);
+  if (profileError) throw profileError;
+  const { error: storageError } = await sb.storage.from('cv').remove([`${session.user.id}/cv.pdf`]);
+  if (storageError) console.error('Rimozione file CV non riuscita (profilo già reso invisibile):', storageError);
+}
+
 // ─── BOZZE (input del test, prima del login) ──────────────────
 // Salva gli input del test come bozza anonima e restituisce { id }. L'id finisce
 // nel magic link, così il report sopravvive anche se il link si apre altrove.
