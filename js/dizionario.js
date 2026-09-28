@@ -105,6 +105,10 @@ function renderResult(ruolo) {
   el.innerHTML = `
     <h1 class="dizionario-nome">${esc(ruolo.nome)}</h1>
     <div class="dizionario-aliases">${aliasHtml}</div>
+    <div class="diz-save-wrap" style="margin:4px 0 20px;">
+      <button type="button" class="btn btn--ghost" id="diz-save-btn" style="padding:10px 18px;font-size:0.88rem;">☆ Salva nel tuo profilo</button>
+      <span id="diz-save-msg" style="display:block;margin-top:8px;font-size:0.82rem;color:var(--text-muted);"></span>
+    </div>
     <div class="dizionario-grid">
       <div class="diz-block" style="grid-column: 1 / -1;">
         <div class="diz-block-label">Cosa fa davvero</div>
@@ -148,12 +152,46 @@ function renderResult(ruolo) {
     </div>
   `;
 
+  setupSaveButton(ruolo);
+
   el.querySelectorAll('.diz-tag').forEach((tag) => {
     tag.addEventListener('click', () => searchFromTag(tag.dataset.role));
   });
 
   el.classList.remove('hidden');
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Salva il ruolo tra i "Ruoli salvati" del profilo. Il modulo Supabase si
+// carica solo al click (questa pagina funziona anche senza login): chi non
+// ha fatto l'accesso riceve l'invito ad accedere invece di un errore.
+function setupSaveButton(ruolo) {
+  const btn = document.getElementById('diz-save-btn');
+  const msg = document.getElementById('diz-save-msg');
+  if (!btn || !ruolo?.nome) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    msg.style.color = 'var(--text-muted)';
+    msg.textContent = '';
+    try {
+      const { getSession, saveRole } = await import('./supabase.js');
+      const session = await getSession();
+      if (!session) {
+        msg.innerHTML = 'Per salvare i ruoli <a href="account.html" style="color:var(--emerald-light);">accedi al tuo profilo</a>: ti basta l\'email.';
+        btn.disabled = false;
+        return;
+      }
+      const nota = (ruolo.descrizione || '').slice(0, 300);
+      await saveRole({ nome: ruolo.nome, nota, fonte: 'dizionario' });
+      btn.textContent = '★ Salvato nel profilo';
+      msg.innerHTML = '<a href="account.html#ruoli" style="color:var(--emerald-light);">Vedi i tuoi ruoli salvati →</a>';
+    } catch (e) {
+      console.error('Salvataggio ruolo dal dizionario fallito:', e);
+      msg.style.color = 'var(--rose)';
+      msg.textContent = 'Non sono riuscito a salvarlo. Riprova tra poco.';
+      btn.disabled = false;
+    }
+  });
 }
 
 function searchFromTag(role) {

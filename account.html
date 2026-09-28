@@ -165,6 +165,79 @@
     .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .legend-note { text-align: center; font-size: 0.72rem; color: rgba(240,255,244,0.4); margin: 10px auto 0; max-width: 50ch; font-style: italic; }
 
+    /* — SALUTO E STATISTICHE (Panoramica) — */
+    .sb-name { margin: 0 0 2px; color: #F0FFF4; font-weight: bold; font-size: 14px; text-align: center; }
+    .hello { margin-bottom: 18px; }
+    .hello .sec-title { margin-bottom: 4px; }
+    .hello-sub { margin: 0; font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); }
+    .link-btn { background: none; border: none; padding: 0; margin-top: 8px; color: #5DCAA5; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-family: inherit; }
+    .link-btn.rose { color: #FF6496; }
+    .stats-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+    .stat-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+      border: 1px solid rgba(29,158,117,0.35); background: rgba(29,158,117,0.08); color: rgba(240,255,244,0.8);
+      font-size: 12px; cursor: pointer; font-family: inherit; }
+    .stat-chip strong { color: #F0FFF4; }
+    .stat-chip.off { border-color: rgba(255,100,150,0.35); background: rgba(255,100,150,0.06); }
+    .stat-chip.static { cursor: default; }
+
+    /* — EMPTY STATE — */
+    .pcard-hero { border-color: #5DCAA5; background: linear-gradient(160deg, rgba(29,158,117,0.14), rgba(255,255,255,0.03)); }
+    .empty-list { list-style: none; padding: 0; margin: 14px 0 18px; display: grid; gap: 10px; }
+    .empty-list li { display: flex; gap: 10px; font-size: 13.5px; color: rgba(240,255,244,0.8); line-height: 1.5; }
+    .empty-list li span { color: #5DCAA5; width: 18px; flex-shrink: 0; text-align: center; }
+    .empty-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .empty-meta { font-size: 12px; color: rgba(240,255,244,0.45); font-family: var(--font-mono, monospace); }
+    .demo-label { font-size: 12px; color: rgba(240,255,244,0.45); margin: 22px 0 6px; text-align: center; font-style: italic; }
+    #pf-constellation.is-demo .sky-wrap { opacity: 0.5; pointer-events: none; }
+    #pf-constellation.is-demo .timeline, #pf-constellation.is-demo .cnst-sub, #pf-constellation.is-demo .sky-hint { display: none; }
+
+    /* — ASPIRAZIONE — */
+    .asp-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .asp-pct { font-family: var(--font-display, Georgia), serif; font-size: 34px; font-weight: 300; line-height: 1; margin: 0; flex-shrink: 0; }
+    .asp-desc { border-top: 1px solid rgba(93,202,165,0.2); padding-top: 12px; margin-top: 12px !important; }
+    .asp-trend { font-size: 12.5px; color: #5DCAA5; font-style: italic; margin: 10px 0 0; }
+    .card-actions { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; }
+
+    /* — SOTTOTITOLI DI SEZIONE — */
+    .sec-sub { font-family: var(--font-display, Georgia), serif; font-size: 18px; color: #F0FFF4; margin: 30px 0 10px; }
+    .sec-intro { font-size: 13px; color: var(--text-secondary, rgba(240,255,244,0.65)); margin: -4px 0 14px; line-height: 1.55; }
+
+    /* — RUOLI SALVATI / RICERCHE — */
+    .list-item { display: flex; gap: 14px; justify-content: space-between; align-items: flex-start;
+      background: var(--card, rgba(255,255,255,0.05)); border: 1px solid rgba(29,158,117,0.45);
+      border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .list-main { min-width: 0; flex: 1; }
+    .list-title { margin: 0; font-size: 15px; font-weight: bold; color: #F0FFF4; overflow-wrap: anywhere; }
+    .list-title .muted { font-weight: normal; color: rgba(240,255,244,0.5); font-size: 13px; }
+    .list-meta { margin: 3px 0 0; font-size: 11.5px; color: rgba(240,255,244,0.45); }
+    .list-note { margin: 6px 0 0; font-size: 12.5px; color: rgba(240,255,244,0.7); line-height: 1.5; }
+    .list-pct { font-family: var(--font-display, Georgia), serif; font-size: 24px; font-weight: 300; color: #5DCAA5; margin: 0; flex-shrink: 0; }
+    .list-pct.none { color: rgba(240,255,244,0.3); font-size: 18px; }
+    .list-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+    .list-actions .link-btn, .list-actions a { margin: 0; font-size: 12.5px; color: #5DCAA5; text-decoration: underline; text-underline-offset: 3px; }
+    .list-actions .link-btn.rose { color: #FF6496; }
+    .viewed { display: inline-block; margin-top: 8px; font-size: 11.5px; color: #FFB8C6; background: rgba(255,100,150,0.1);
+      border: 1px solid rgba(255,100,150,0.3); border-radius: 999px; padding: 3px 10px; }
+    .empty-note { font-size: 13px; color: rgba(240,255,244,0.55); line-height: 1.6; padding: 6px 2px 4px; margin: 0; }
+    .empty-note a { color: #5DCAA5; }
+
+    /* — VISIBILITÀ — */
+    .status-pill { display: inline-block; font-size: 11px; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase;
+      border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+    .status-pill.on { color: #5DCAA5; background: rgba(29,158,117,0.14); border: 1px solid rgba(29,158,117,0.4); }
+    .status-pill.off { color: #FFB8C6; background: rgba(255,100,150,0.08); border: 1px solid rgba(255,100,150,0.35); }
+
+    /* — IMPOSTAZIONI — */
+    .form-row { display: flex; gap: 10px; margin-top: 12px; }
+    .form-row .pf-input { margin: 0; flex: 1; min-width: 0; }
+    .form-row .pf-btn { flex-shrink: 0; padding: 10px 18px; }
+    .form-msg { font-size: 12px; margin: 10px 0 0; line-height: 1.5; }
+    .form-msg.ok { color: #5DCAA5; }
+    .form-msg.err { color: #FF6496; }
+    .toggle { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; margin-top: 10px; font-size: 13px; color: rgba(240,255,244,0.8); line-height: 1.5; }
+    .toggle input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: #1D9E75; flex-shrink: 0; }
+    .data-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+
     /* — BOTTOM BAR (mobile) — */
     .app-bottombar { display: none; }
 
@@ -188,6 +261,9 @@
         background: none; border: none; color: rgba(240,255,244,0.45); font-size: 9.5px; cursor: pointer; padding: 4px 2px; font-family: var(--font-body, sans-serif); }
       .bb-item .ico { font-size: 18px; }
       .bb-item.active { color: #5DCAA5; }
+      .form-row { flex-direction: column; }
+      .form-row .pf-btn { justify-content: center; }
+      .asp-pct { font-size: 28px; }
     }
   </style>
   <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
@@ -237,13 +313,15 @@
   <!-- SIDEBAR desktop -->
   <aside class="app-sidebar">
     <div id="sb-avatar" class="sb-avatar">··</div>
+    <p id="sb-name" class="sb-name hidden"></p>
     <p id="sb-email" class="sb-email">—</p>
     <p id="sb-since" class="sb-since">—</p>
     <nav class="sb-nav">
       <button class="sb-item active" data-sec="panoramica"><span class="ico">◈</span> Panoramica</button>
       <button class="sb-item" data-sec="storico"><span class="ico">🕒</span> Storico</button>
-      <button class="sb-item" data-sec="cv"><span class="ico">📄</span> Il mio CV</button>
-      <button class="sb-item" data-sec="banco"><span class="ico">⚖</span> Banco di prova ruoli</button>
+      <button class="sb-item" data-sec="ruoli"><span class="ico">⚖</span> Ruoli</button>
+      <button class="sb-item" data-sec="aziende"><span class="ico">🏢</span> Aziende e CV</button>
+      <button class="sb-item" data-sec="impostazioni"><span class="ico">⚙</span> Impostazioni</button>
       <a class="sb-item" href="test.html"><span class="ico">↻</span> Rifai il test</a>
     </nav>
     <button class="sb-logout" id="logout-btn">Esci</button>
@@ -255,11 +333,29 @@
 
     <!-- PANORAMICA -->
     <section class="app-sec" data-sec="panoramica">
-      <h1 class="sec-title">Panoramica</h1>
+      <div class="hello">
+        <h1 class="sec-title" id="hello-title">Il tuo profilo</h1>
+        <p class="hello-sub" id="hello-sub"></p>
+        <button type="button" class="link-btn hidden" id="hello-add-name">Come ti chiami? Aggiungi il tuo nome →</button>
+      </div>
 
-      <div class="pcard" id="pf-empty">
-        <p class="pcard-label">Il tuo profilo</p>
-        <p class="pcard-sub">Non hai ancora fatto il test. Fallo per scoprire i ruoli più adatti a te.</p>
+      <div class="stats-row" id="stats-row"></div>
+
+      <div id="pf-empty" class="hidden">
+        <div class="pcard pcard-hero">
+          <p class="pcard-label">Il tuo profilo prende forma con il primo test</p>
+          <p class="pcard-title">Scopri come funzioni e dove rendi di più.</p>
+          <ul class="empty-list">
+            <li><span>◈</span>La tua costellazione: come ti muovi su 6 dimensioni, dall'analisi alla relazione.</li>
+            <li><span>★</span>I 3 ruoli più in linea con te, con il perché e come ci si entra.</li>
+            <li><span>⚖</span>Quanto il ruolo che hai in mente è davvero compatibile con te.</li>
+          </ul>
+          <div class="empty-foot">
+            <a href="test.html" class="pf-btn">Fai il test →</a>
+            <span class="empty-meta">15 minuti · gratis</span>
+          </div>
+        </div>
+        <p class="demo-label">Un esempio di come apparirà il tuo profilo:</p>
       </div>
 
       <div id="pf-constellation" class="hidden">
@@ -290,7 +386,9 @@
         <p class="legend-note hidden" id="cnst-nota">○ L'alone che pulsa piano indica dimensioni su cui il test ha ancora pochi segnali — non un giudizio più basso, solo meno certezza per ora.</p>
       </div>
 
-      <div style="margin-top:20px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
+      <div id="pf-aspiration" class="hidden" style="margin-top:22px;"></div>
+
+      <div id="pf-retake" class="hidden" style="margin-top:20px;"><a href="test.html" class="pf-btn">↻ Rifai il test</a></div>
     </section>
 
     <!-- STORICO -->
@@ -303,10 +401,52 @@
       </div>
     </section>
 
-    <!-- CV -->
-    <section class="app-sec hidden" data-sec="cv">
-      <h1 class="sec-title">Il mio CV</h1>
+    <!-- RUOLI: banco di prova + ruoli salvati -->
+    <section class="app-sec hidden" data-sec="ruoli">
+      <h1 class="sec-title">Ruoli</h1>
+      <div class="pcard">
+        <p class="pcard-label">Banco di prova</p>
+        <p class="pcard-sub" id="banco-intro" style="margin-bottom:14px;">Scrivi un ruolo e scopri quanto combacia con il tuo profilo. Lo stesso ruolo cambia da settore a settore — indicane uno se vuoi un confronto più preciso. Se hai fatto più test, vedrai anche come la compatibilità è cambiata nel tempo.</p>
+        <input id="banco-input" type="text" placeholder="Es. Product Manager, Data Analyst, HR Specialist…" class="pf-input" style="margin-bottom:10px;" />
+        <select id="banco-settore" class="pf-input" style="margin-bottom:10px;">
+          <option value="">Nessun settore specifico</option>
+          <option>Tecnologia e digitale</option>
+          <option>Finanza, banche e assicurazioni</option>
+          <option>Sanità e farmaceutico</option>
+          <option>Industria, energia e ambiente</option>
+          <option>Moda, lusso e design</option>
+          <option>Commercio, retail e largo consumo</option>
+          <option>Media, comunicazione e marketing</option>
+          <option>Arte, cultura e intrattenimento</option>
+          <option>Turismo, ristorazione e ospitalità</option>
+          <option>Istruzione, formazione e ricerca</option>
+          <option>Pubblica amministrazione e non profit</option>
+          <option>Edilizia, immobiliare e infrastrutture</option>
+          <option>Difesa</option>
+        </select>
+        <button id="banco-btn" class="pf-btn" style="width:100%; justify-content:center;">Valuta ruolo</button>
+      </div>
+      <div id="banco-result"></div>
 
+      <h2 class="sec-sub">Ruoli salvati</h2>
+      <p class="sec-intro">I ruoli che hai messo da parte dal banco di prova o dal <a href="dizionario.html" style="color:#5DCAA5;">Dizionario dei ruoli</a>, per ritrovarli e rivalutarli dopo un nuovo test.</p>
+      <div id="saved-list"><p class="empty-note">Carico…</p></div>
+    </section>
+
+    <!-- AZIENDE E CV -->
+    <section class="app-sec hidden" data-sec="aziende">
+      <h1 class="sec-title">Aziende e CV</h1>
+
+      <div class="pcard" id="visib-card">
+        <span class="status-pill off" id="visib-pill">Non visibile</span>
+        <p class="pcard-sub" id="visib-text">Le aziende non ti vedono. Carica il CV qui sotto per comparire nelle ricerche compatibili con il tuo profilo.</p>
+      </div>
+
+      <h2 class="sec-sub">Ricerche in cui sei comparso</h2>
+      <p class="sec-intro">Quando un'azienda cerca un profilo come il tuo, qui vedi chi è, per quale ruolo e se ha aperto il tuo profilo.</p>
+      <div id="matches-list"><p class="empty-note">Carico…</p></div>
+
+      <h2 class="sec-sub">Il tuo CV</h2>
       <div class="pcard">
         <p class="pcard-label">Perché caricarlo</p>
         <p class="pcard-sub">Carica il tuo CV in PDF: lo useremo insieme alle risposte del tuo ultimo test per rigenerare un profilo più preciso e concreto. Caricarlo è anche la tua scelta di essere visibile alle aziende: se una ricerca ti trova compatibile, l'azienda vede il tuo profilo, il tuo nome, la tua email e il CV. Senza CV, il tuo report resta solo tuo. Puoi rimuoverlo quando vuoi.</p>
@@ -335,40 +475,52 @@
         <p class="pcard-sub" style="margin-bottom:12px;">Il tuo profilo è stato rigenerato tenendo conto del CV.</p>
         <a href="#" id="cv-done-link" class="pf-btn">Vedi il profilo aggiornato →</a>
       </div>
-          <div class="pcard" id="data-card">
-        <p class="pcard-label">I tuoi dati</p>
-        <p class="pcard-sub" style="margin-bottom:12px;">Puoi uscire dal tuo profilo o cancellare definitivamente account, report e CV. La cancellazione non si può annullare.</p>
-        <button id="logout-btn-mobile" type="button" class="pf-btn" style="margin-right:10px;">Esci</button>
-        <button id="delete-account-btn" type="button" style="margin-top:12px; background:none; border:none; padding:0; color:#FF6496; font-size:12px; cursor:pointer; text-decoration:underline;">Elimina account e tutti i dati</button>
-        <p id="delete-account-error" class="hidden" style="color:#FF6496; font-size:12px; margin-top:10px;"></p>
-      </div>
     </section>
 
-    <!-- BANCO DI PROVA -->
-    <section class="app-sec hidden" data-sec="banco">
-      <h1 class="sec-title">Banco di prova ruoli</h1>
+    <!-- IMPOSTAZIONI -->
+    <section class="app-sec hidden" data-sec="impostazioni">
+      <h1 class="sec-title">Impostazioni</h1>
+
       <div class="pcard">
-        <p class="pcard-sub" style="margin-bottom:14px;">Scrivi un ruolo e scopri quanto combacia con il tuo profilo. Lo stesso ruolo cambia da settore a settore — indicane uno se vuoi un confronto più preciso. Se hai fatto più test, vedrai anche come la compatibilità è cambiata nel tempo.</p>
-        <input id="banco-input" type="text" placeholder="Es. Product Manager, Data Analyst, HR Specialist…" class="pf-input" style="margin-bottom:10px;" />
-        <select id="banco-settore" class="pf-input" style="margin-bottom:10px;">
-          <option value="">Nessun settore specifico</option>
-          <option>Tecnologia e digitale</option>
-          <option>Finanza, banche e assicurazioni</option>
-          <option>Sanità e farmaceutico</option>
-          <option>Industria, energia e ambiente</option>
-          <option>Moda, lusso e design</option>
-          <option>Commercio, retail e largo consumo</option>
-          <option>Media, comunicazione e marketing</option>
-          <option>Arte, cultura e intrattenimento</option>
-          <option>Turismo, ristorazione e ospitalità</option>
-          <option>Istruzione, formazione e ricerca</option>
-          <option>Pubblica amministrazione e non profit</option>
-          <option>Edilizia, immobiliare e infrastrutture</option>
-          <option>Difesa</option>
-        </select>
-        <button id="banco-btn" class="pf-btn" style="width:100%; justify-content:center;">Valuta ruolo</button>
+        <p class="pcard-label">Il tuo nome</p>
+        <p class="pcard-sub">Lo usiamo nel test e nel report. Se sei visibile alle aziende, lo vedono anche loro.</p>
+        <div class="form-row">
+          <input id="set-nome" type="text" class="pf-input" maxlength="40" placeholder="Il tuo nome" autocomplete="given-name" />
+          <button id="set-nome-btn" type="button" class="pf-btn">Salva</button>
+        </div>
+        <p id="set-nome-msg" class="form-msg hidden"></p>
       </div>
-      <div id="banco-result"></div>
+
+      <div class="pcard">
+        <p class="pcard-label">Email di accesso</p>
+        <p class="pcard-sub">Attuale: <strong id="set-email-current" style="color:#F0FFF4; overflow-wrap:anywhere;">—</strong></p>
+        <div class="form-row">
+          <input id="set-email" type="email" class="pf-input" placeholder="nuova@email.it" autocomplete="email" />
+          <button id="set-email-btn" type="button" class="pf-btn">Cambia</button>
+        </div>
+        <p id="set-email-msg" class="form-msg hidden"></p>
+      </div>
+
+      <div class="pcard">
+        <p class="pcard-label">Comunicazioni</p>
+        <label class="toggle">
+          <input type="checkbox" id="set-marketing" />
+          <span>Voglio ricevere email da RoleFit su novità e nuove funzioni. Puoi cambiare idea quando vuoi.</span>
+        </label>
+        <p id="set-marketing-msg" class="form-msg hidden"></p>
+      </div>
+
+      <div class="pcard" id="data-card">
+        <p class="pcard-label">I tuoi dati</p>
+        <p class="pcard-sub">Scarica una copia di tutto quello che RoleFit conserva su di te, esci dal profilo o cancella tutto definitivamente. La cancellazione non si può annullare.</p>
+        <div class="data-actions">
+          <button id="export-btn" type="button" class="pf-btn">Scarica i tuoi dati</button>
+          <button id="logout-btn-mobile" type="button" class="pf-btn">Esci</button>
+        </div>
+        <p id="export-msg" class="form-msg hidden"></p>
+        <button id="delete-account-btn" type="button" style="margin-top:16px; background:none; border:none; padding:0; color:#FF6496; font-size:12px; cursor:pointer; text-decoration:underline;">Elimina account e tutti i dati</button>
+        <p id="delete-account-error" class="hidden" style="color:#FF6496; font-size:12px; margin-top:10px;"></p>
+      </div>
     </section>
   </main>
 
@@ -376,9 +528,9 @@
   <nav class="app-bottombar">
     <button class="bb-item active" data-sec="panoramica"><span class="ico">◈</span>Profilo</button>
     <button class="bb-item" data-sec="storico"><span class="ico">🕒</span>Storico</button>
-    <button class="bb-item" data-sec="cv"><span class="ico">📄</span>CV</button>
-    <button class="bb-item" data-sec="banco"><span class="ico">⚖</span>Ruoli</button>
-    <a class="bb-item" href="test.html"><span class="ico">↻</span>Test</a>
+    <button class="bb-item" data-sec="ruoli"><span class="ico">⚖</span>Ruoli</button>
+    <button class="bb-item" data-sec="aziende"><span class="ico">🏢</span>Aziende</button>
+    <button class="bb-item" data-sec="impostazioni"><span class="ico">⚙</span>Impostazioni</button>
   </nav>
 
 </div>

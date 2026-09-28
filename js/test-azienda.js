@@ -67,7 +67,7 @@ function loadState() {
 
 // ─── DOMANDE STANDARD (no AI) ──────────────────────────────────
 const STANDARD_STEPS = [
-  { step: 'company_name', text: 'Come si chiama la tua azienda?', type: 'text', placeholder: 'Nome azienda' },
+  { step: 'company_name', text: 'Come si chiama la tua azienda?', context: 'I candidati compatibili vedranno nel loro profilo il nome dell\'azienda e il ruolo per cui li avete trovati.', type: 'text', placeholder: 'Nome azienda' },
   { step: 'contact_email', text: 'A quale email possiamo ricontattarvi?', context: 'RoleFit è in beta: per provarlo potete scrivere anche un indirizzo di prova, il test va avanti lo stesso. I risultati li vedete subito, alla fine, con un link da salvare per ritrovarli.', type: 'email', placeholder: 'latua@azienda.com' },
   { step: 'role_title', text: 'Per quale ruolo state cercando questa persona?', type: 'text', placeholder: 'Es. Account Manager, Data Analyst...' },
   {

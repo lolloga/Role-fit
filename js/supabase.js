@@ -78,7 +78,7 @@ export async function updateReportEval(id, patch) {
 export async function listReports() {
   const { data, error } = await sb
     .from('reports')
-    .select('id, created_at, report_json')
+    .select('id, created_at, report_json, aspiration, aspired_role_eval')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -135,7 +135,7 @@ export async function getProfile() {
   if (!session) return null;
   const { data, error } = await sb
     .from('profiles')
-    .select('cv_path, cv_updated_at, nome')
+    .select('cv_path, cv_updated_at, nome, email, marketing_consent')
     .eq('id', session.user.id)
     .single();
   if (error) throw error;
@@ -150,6 +150,96 @@ export async function saveUserName(nome) {
   if (!session) throw new Error('Non autenticato');
   const { error } = await sb.from('profiles').update({ nome }).eq('id', session.user.id);
   if (error) throw error;
+}
+
+// Aggiorna i campi del profilo modificabili dalle impostazioni. Solo le
+// chiavi elencate: il resto della riga (es. cv_path) ha le sue funzioni.
+export async function updateProfile(patch) {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const allowed = {};
+  if ('nome' in patch) allowed.nome = patch.nome;
+  if ('marketing_consent' in patch) allowed.marketing_consent = !!patch.marketing_consent;
+  const { error } = await sb.from('profiles').update(allowed).eq('id', session.user.id);
+  if (error) throw error;
+}
+
+// Avvia il cambio dell'email di accesso: Supabase manda un link di conferma
+// e il cambio diventa effettivo solo quando viene aperto. profiles.email si
+// riallinea da sola con il trigger di migration-8.
+export async function changeEmail(email) {
+  const { error } = await sb.auth.updateUser(
+    { email },
+    { emailRedirectTo: `${location.origin}/account.html#impostazioni` }
+  );
+  if (error) throw error;
+}
+
+// ─── RUOLI SALVATI (migration-8) ───────────────────────────────
+export async function listSavedRoles() {
+  const { data, error } = await sb
+    .from('saved_roles')
+    .select('id, nome, settore, match, nota, fonte, created_at, updated_at')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// Salva (o aggiorna, se c'è già lo stesso ruolo nello stesso settore) un
+// ruolo. I campi vuoti non vengono inviati: così salvare dal dizionario un
+// ruolo già valutato nel banco di prova non ne cancella il punteggio.
+export async function saveRole({ nome, settore = null, match = null, nota = null, fonte = 'banco' }) {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const row = { user_id: session.user.id, nome: String(nome).trim().slice(0, 120), fonte, updated_at: new Date().toISOString() };
+  if (settore) row.settore = String(settore).slice(0, 120);
+  if (typeof match === 'number' && Number.isFinite(match)) row.match = Math.max(0, Math.min(100, Math.round(match)));
+  if (nota) row.nota = String(nota).slice(0, 1000);
+  const { error } = await sb
+    .from('saved_roles')
+    .upsert(row, { onConflict: 'user_id,nome_key,settore_key' });
+  if (error) throw error;
+}
+
+export async function removeSavedRole(id) {
+  const { error } = await sb.from('saved_roles').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── RICERCHE AZIENDALI IN CUI SEI COMPARSO (migration-8) ─────
+export async function listJobMatches() {
+  const { data, error } = await sb
+    .from('job_matches')
+    .select('id, role_title, company_name, match, first_seen_at, last_seen_at, viewed_at')
+    .order('last_seen_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// ─── I TUOI DATI (esportazione, GDPR art. 20) ──────────────────
+// Tutto ciò che l'utente può leggere di sé, in un unico oggetto. Una tabella
+// che non esiste ancora (migrazione non eseguita) non blocca l'esportazione.
+export async function exportMyData() {
+  const session = await getSession();
+  if (!session) throw new Error('Non autenticato');
+  const safe = async (query) => {
+    const { data, error } = await query;
+    return error ? [] : (data || []);
+  };
+  const [profile, reports, savedRoles, jobMatches] = await Promise.all([
+    safe(sb.from('profiles').select('*').eq('id', session.user.id)),
+    safe(sb.from('reports').select('*').order('created_at', { ascending: true })),
+    safe(sb.from('saved_roles').select('nome, settore, match, nota, fonte, created_at, updated_at')),
+    safe(sb.from('job_matches').select('role_title, company_name, match, first_seen_at, last_seen_at, viewed_at')),
+  ]);
+  return {
+    esportato_il: new Date().toISOString(),
+    account: { email: session.user.email, creato_il: session.user.created_at },
+    profilo: profile[0] || null,
+    report: reports,
+    ruoli_salvati: savedRoles,
+    ricerche_aziendali: jobMatches,
+  };
 }
 
 // Carica il PDF nel bucket privato "cv", dentro la cartella dell'utente
