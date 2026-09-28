@@ -1,9 +1,13 @@
 // ─── PROFILO LAYOUT D (magic link) ───────────────────────────
-import { getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile, uploadCv, saveCvPath, removeCv } from './supabase.js';
+import {
+  getSession, signInWithMagicLink, signOut, listReports, getAccessToken, getProfile,
+  uploadCv, saveCvPath, removeCv, updateProfile, changeEmail,
+  listSavedRoles, saveRole, removeSavedRole, listJobMatches, exportMyData,
+} from './supabase.js';
 
-// Il banco di prova mostra sia testo scritto dall'utente (il ruolo cercato)
-// sia testo generato dall'AI: senza escaping, un payload HTML/script
-// finirebbe nel DOM.
+// Il profilo mostra sia testo scritto dall'utente (nome, ruoli cercati) sia
+// testo generato dall'AI o scritto dalle aziende (nome azienda, ruolo):
+// senza escaping, un payload HTML/script finirebbe nel DOM.
 function esc(str) {
   if (str == null) return '';
   return String(str)
@@ -13,6 +17,8 @@ function esc(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 // ─── Gate magic link (redirect al profilo) ───
 function showGate() {
@@ -27,7 +33,7 @@ function showGate() {
   const submit = async () => {
     const email = (emailInput.value || '').trim();
     errEl.classList.add('hidden');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (!EMAIL_RE.test(email)) {
       errEl.textContent = 'Inserisci un indirizzo email valido.';
       errEl.classList.remove('hidden');
       return;
@@ -59,20 +65,189 @@ function formatShort(iso) {
   try { return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }); }
   catch { return ''; }
 }
+function formatMonth(iso) {
+  try { return new Date(iso).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); }
+  catch { return ''; }
+}
 function rolesLine(report_json) {
   const ruoli = Array.isArray(report_json?.ruoli) ? report_json.ruoli.slice(0, 3) : [];
   if (!ruoli.length) return 'Report RoleFit';
   return ruoli.map((r) => (r?.nome || 'Ruolo') + ((typeof r?.match === 'number') ? ' ' + r.match + '%' : '')).join(' · ');
 }
-function initials(email) {
+function initials(nome, email) {
+  const fromName = (nome || '').trim().split(/\s+/).filter(Boolean);
+  if (fromName.length) {
+    return ((fromName[0][0] || '') + (fromName[1]?.[0] || '')).toUpperCase();
+  }
   const base = (email || '').split('@')[0] || '';
   const parts = base.split(/[.\-_]/).filter(Boolean);
   const txt = (parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '');
   return (txt || '··').toUpperCase().slice(0, 2);
 }
+function matchColor(m) {
+  return m >= 55 ? '#5DCAA5' : m >= 35 ? '#FFD060' : '#FF6496';
+}
+function roleKey(nome, settore) {
+  return (nome || '').trim().toLowerCase() + '|' + (settore || '').trim().toLowerCase();
+}
+function showMsg(el, text, kind) {
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'form-msg ' + (kind || '');
+  el.classList.remove('hidden');
+}
 
-// Tiene i report caricati, per il banco di prova ruoli.
-let REPORTS = [];
+// ─── Stato della pagina ───
+let SESSION = null;
+let PROFILE = null;   // riga profiles (nome, email, cv, consenso)
+let REPORTS = [];     // report dell'utente, dal più recente
+let SAVED = [];       // ruoli salvati
+let MATCHES = [];     // ricerche aziendali in cui è comparso
+// false se le tabelle di migration-8 non esistono ancora: le sezioni
+// relative mostrano un messaggio neutro invece di un errore.
+let SAVED_OK = true;
+let MATCHES_OK = true;
+
+// ─── NAVIGAZIONE TRA SEZIONI (sidebar + bottom bar + #hash) ───
+const SECTIONS = ['panoramica', 'storico', 'ruoli', 'aziende', 'impostazioni'];
+
+function showSection(sec, { updateHash = true } = {}) {
+  if (!SECTIONS.includes(sec)) sec = 'panoramica';
+  document.querySelectorAll('.app-sec').forEach((s) => s.classList.toggle('hidden', s.getAttribute('data-sec') !== sec));
+  document.querySelectorAll('.sb-item[data-sec], .bb-item[data-sec]').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-sec') === sec);
+  });
+  if (updateHash) {
+    try { history.replaceState(null, '', sec === 'panoramica' ? location.pathname + location.search : '#' + sec); } catch { /* file:// o simili */ }
+  }
+  window.scrollTo({ top: 0 });
+}
+
+function setupNav() {
+  document.querySelectorAll('.sb-item[data-sec], .bb-item[data-sec]').forEach((btn) => {
+    btn.addEventListener('click', () => showSection(btn.getAttribute('data-sec')));
+  });
+  const fromHash = (location.hash || '').replace('#', '');
+  if (SECTIONS.includes(fromHash)) showSection(fromHash, { updateHash: false });
+}
+
+// ─── IDENTITÀ: sidebar, saluto, statistiche ───────────────────
+function renderIdentity() {
+  const email = SESSION.user?.email || PROFILE?.email || '';
+  const nome = (PROFILE?.nome || '').trim();
+
+  document.getElementById('sb-avatar').textContent = initials(nome, email);
+  const navAvatar = document.querySelector('#site-nav-cta.site-nav-avatar');
+  if (navAvatar) navAvatar.textContent = initials(nome, email);
+  const sbName = document.getElementById('sb-name');
+  sbName.textContent = nome;
+  sbName.classList.toggle('hidden', !nome);
+  document.getElementById('sb-email').textContent = email || '—';
+  const since = SESSION.user?.created_at;
+  document.getElementById('sb-since').textContent = since ? 'da ' + formatMonth(since) : '';
+
+  document.getElementById('hello-title').textContent = nome ? `Ciao, ${nome}` : 'Il tuo profilo';
+  document.getElementById('hello-sub').textContent = since ? `Su RoleFit da ${formatMonth(since)}` : '';
+  document.getElementById('hello-add-name').classList.toggle('hidden', !!nome);
+}
+
+function renderStats() {
+  const row = document.getElementById('stats-row');
+  if (!row) return;
+  const chips = [];
+  if (REPORTS.length) {
+    chips.push(`<button type="button" class="stat-chip" data-goto="storico"><strong>${REPORTS.length}</strong> ${REPORTS.length === 1 ? 'test fatto' : 'test fatti'} · ultimo ${esc(formatShort(REPORTS[0].created_at))}</button>`);
+  }
+  const visibile = !!PROFILE?.cv_path;
+  chips.push(`<button type="button" class="stat-chip${visibile ? '' : ' off'}" data-goto="aziende">${visibile ? '● Visibile alle aziende' : '○ Non visibile alle aziende'}</button>`);
+  if (MATCHES.length) {
+    chips.push(`<button type="button" class="stat-chip" data-goto="aziende"><strong>${MATCHES.length}</strong> ${MATCHES.length === 1 ? 'ricerca ti ha trovato' : 'ricerche ti hanno trovato'}</button>`);
+  }
+  if (SAVED.length) {
+    chips.push(`<button type="button" class="stat-chip" data-goto="ruoli"><strong>${SAVED.length}</strong> ${SAVED.length === 1 ? 'ruolo salvato' : 'ruoli salvati'}</button>`);
+  }
+  row.innerHTML = chips.join('');
+  row.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => showSection(b.dataset.goto)));
+}
+
+// ─── ASPIRAZIONE (Panoramica) ─────────────────────────────────
+// Il ruolo a cui la persona ha detto di aspirare alla fine del test, con la
+// compatibilità calcolata allora. Se lo ha indicato in più test, mostriamo
+// anche come si è mosso nel tempo.
+function renderAspiration() {
+  const box = document.getElementById('pf-aspiration');
+  if (!box) return;
+  if (!REPORTS.length) { box.classList.add('hidden'); return; }
+
+  const latest = REPORTS.find((r) => (r.aspiration || '').trim());
+  if (!latest) {
+    box.innerHTML =
+      '<div class="pcard">' +
+        '<p class="pcard-label">Hai un ruolo in mente?</p>' +
+        '<p class="pcard-sub">Mettilo alla prova: scopri quanto è compatibile con il tuo profilo, anche in un settore preciso.</p>' +
+        '<div class="card-actions"><button type="button" class="link-btn" id="asp-try">Vai al banco di prova →</button></div>' +
+      '</div>';
+    box.classList.remove('hidden');
+    box.querySelector('#asp-try').addEventListener('click', () => { showSection('ruoli'); document.getElementById('banco-input')?.focus(); });
+    return;
+  }
+
+  const nome = latest.aspiration.trim();
+  const ev = latest.aspired_role_eval;
+  const hasEval = ev && typeof ev.match === 'number';
+
+  // Stesso ruolo in test diversi, dal più recente al più vecchio.
+  const storia = REPORTS
+    .filter((r) => (r.aspiration || '').trim().toLowerCase() === nome.toLowerCase() && typeof r.aspired_role_eval?.match === 'number')
+    .map((r) => ({ data: r.created_at, match: r.aspired_role_eval.match }));
+  let trend = '';
+  if (storia.length >= 2) {
+    const recente = storia[0].match;
+    const vecchio = storia[storia.length - 1];
+    const quando = formatMonth(vecchio.data);
+    if (recente - vecchio.match >= 8) trend = `A ${quando} era al ${vecchio.match}%: ti ci stai avvicinando.`;
+    else if (vecchio.match - recente >= 8) trend = `A ${quando} era al ${vecchio.match}%: il tuo profilo si sta spostando altrove.`;
+    else trend = `Stabile rispetto a ${quando} (${vecchio.match}%).`;
+  }
+
+  const salvato = SAVED.some((s) => roleKey(s.nome, s.settore) === roleKey(nome, ''));
+  box.innerHTML =
+    '<div class="pcard">' +
+      '<div class="asp-top">' +
+        '<div style="min-width:0;">' +
+          '<p class="pcard-label">Il ruolo a cui aspiri</p>' +
+          '<p class="pcard-title" style="font-size:20px; overflow-wrap:anywhere;">' + esc(nome) + '</p>' +
+          (hasEval && ev.titolo ? '<p class="pcard-sub" style="color:#5DCAA5;">' + esc(ev.titolo) + '</p>' : '') +
+        '</div>' +
+        (hasEval ? '<p class="asp-pct" style="color:' + matchColor(ev.match) + ';">' + esc(ev.match) + '%</p>' : '') +
+      '</div>' +
+      (hasEval && ev.descrizione ? '<p class="pcard-sub asp-desc">' + esc(ev.descrizione) + '</p>' : '') +
+      (!hasEval ? '<p class="pcard-sub" style="margin-top:8px;">Non abbiamo ancora calcolato quanto è compatibile con il tuo profilo.</p>' : '') +
+      (trend ? '<p class="asp-trend">' + esc(trend) + '</p>' : '') +
+      '<div class="card-actions">' +
+        '<button type="button" class="link-btn" id="asp-eval">' + (hasEval ? 'Valutalo in un settore preciso →' : 'Valutalo ora →') + '</button>' +
+        (salvato ? '' : '<button type="button" class="link-btn" id="asp-save">☆ Salva tra i ruoli</button>') +
+      '</div>' +
+    '</div>';
+  box.classList.remove('hidden');
+
+  box.querySelector('#asp-eval').addEventListener('click', () => runBancoFor(nome, '', { autorun: !hasEval }));
+  const saveBtn = box.querySelector('#asp-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      try {
+        await saveRole({ nome, match: hasEval ? ev.match : null, nota: hasEval ? ev.titolo : null, fonte: 'banco' });
+        saveBtn.textContent = '★ Salvato';
+        await refreshSaved();
+      } catch (e) {
+        console.error('Salvataggio ruolo aspirato fallito:', e);
+        saveBtn.textContent = 'Non salvato, riprova';
+        saveBtn.disabled = false;
+      }
+    });
+  }
+}
 
 // ─── BANCO DI PROVA RUOLI ─────────────────────────────────────
 // Costruisce un riassunto testuale del profilo da un report_json salvato,
@@ -129,95 +304,360 @@ async function valutaRuoloControReport(ruoloInput, settore, report_json) {
   }
 }
 
-function setupBanco() {
+let bancoRunning = false;
+
+// Porta al banco di prova con il ruolo già scritto; con autorun lo valuta subito.
+function runBancoFor(ruolo, settore, { autorun = true } = {}) {
+  showSection('ruoli');
+  const input = document.getElementById('banco-input');
+  const sel = document.getElementById('banco-settore');
+  if (input) input.value = ruolo || '';
+  if (sel) sel.value = settore || '';
+  if (autorun) runBanco();
+  else input?.focus();
+}
+
+async function runBanco() {
   const btn = document.getElementById('banco-btn');
   const input = document.getElementById('banco-input');
   const settoreSel = document.getElementById('banco-settore');
   const out = document.getElementById('banco-result');
-  if (!btn || !input) return;
+  const ruolo = (input.value || '').trim();
+  const settore = (settoreSel?.value || '').trim();
+  if (!ruolo || bancoRunning) return;
+  if (!REPORTS.length) {
+    out.innerHTML = '<p class="pcard-sub">Fai prima un test: serve almeno un profilo per valutare un ruolo.</p>';
+    return;
+  }
 
-  const run = async () => {
-    const ruolo = (input.value || '').trim();
-    const settore = (settoreSel?.value || '').trim();
-    if (!ruolo) return;
-    if (!REPORTS.length) {
-      out.innerHTML = '<p class="pcard-sub">Fai prima un test: serve almeno un profilo per valutare un ruolo.</p>';
-      return;
+  bancoRunning = true;
+  btn.disabled = true;
+  btn.textContent = 'Valuto…';
+  out.innerHTML = '<p class="pcard-sub" style="font-style:italic;">Sto confrontando "' + esc(ruolo) + '" con il tuo profilo…</p>';
+
+  try {
+    // Valuta sull'ultimo report (il più attuale) — risultato principale
+    const last = REPORTS[0];
+    const valLast = await valutaRuoloControReport(ruolo, settore, last.report_json);
+    if (!valLast) throw new Error('Nessun risultato');
+
+    const giaSalvato = SAVED.some((s) => roleKey(s.nome, s.settore) === roleKey(ruolo, settore));
+    const card = document.createElement('div');
+    card.className = 'pcard';
+    card.style.marginBottom = '12px';
+    card.innerHTML =
+      '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
+        '<div style="min-width:0;"><p class="pcard-label">Ruolo valutato</p>' +
+        '<p class="pcard-title" style="font-size:19px; overflow-wrap:anywhere;">' + esc(ruolo) + (settore ? ' <span style="font-size:13px; font-weight:normal; color:rgba(240,255,244,0.5);">— ' + esc(settore) + '</span>' : '') + '</p>' +
+        '<p class="pcard-sub" style="color:#5DCAA5;">' + esc(valLast.titolo) + '</p></div>' +
+        '<div style="text-align:right; flex-shrink:0;">' +
+        '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor(valLast.match) + '; line-height:1; margin:0;">' + esc(valLast.match) + '%</p>' +
+        '<p style="font-size:10px; color:rgba(240,255,244,0.35); text-transform:uppercase; letter-spacing:0.06em; margin:2px 0 0;">sull\'ultimo test</p></div>' +
+      '</div>' +
+      '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + esc(valLast.descrizione) + '</p>' +
+      '<div class="card-actions"><button type="button" class="link-btn" id="banco-save">' + (giaSalvato ? '★ Salvato · aggiornato' : '☆ Salva questo ruolo') + '</button></div>';
+    out.innerHTML = '';
+    out.appendChild(card);
+
+    const payload = { nome: ruolo, settore: settore || null, match: valLast.match, nota: valLast.titolo, fonte: 'banco' };
+    // Un ruolo già salvato si aggiorna da solo col punteggio nuovo.
+    if (giaSalvato) saveRole(payload).then(refreshSaved).catch((e) => console.error('Aggiornamento ruolo salvato fallito:', e));
+    const saveBtn = card.querySelector('#banco-save');
+    if (!giaSalvato) {
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        try {
+          await saveRole(payload);
+          saveBtn.textContent = '★ Salvato tra i tuoi ruoli';
+          await refreshSaved();
+        } catch (e) {
+          console.error('Salvataggio ruolo fallito:', e);
+          saveBtn.textContent = 'Non sono riuscito a salvarlo, riprova';
+          saveBtn.disabled = false;
+        }
+      });
+    } else {
+      saveBtn.disabled = true;
     }
 
-    btn.disabled = true;
-    btn.textContent = 'Valuto…';
-    out.innerHTML = '<p class="pcard-sub" style="font-style:italic;">Sto confrontando "' + esc(ruolo) + '" con il tuo profilo…</p>';
+    // Se ci sono più report, valuta anche sui precedenti per l'andamento
+    if (REPORTS.length >= 2) {
+      const trend = document.createElement('div');
+      trend.className = 'pcard';
+      trend.innerHTML = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px;">Andamento nel tempo</p>' +
+        '<p class="pcard-sub" style="font-style:italic;">Calcolo come questo ruolo combaciava nei test precedenti…</p>';
+      out.appendChild(trend);
 
-    try {
-      // Valuta sull'ultimo report (il più attuale) — risultato principale
-      const last = REPORTS[0];
-      const valLast = await valutaRuoloControReport(ruolo, settore, last.report_json);
-      if (!valLast) throw new Error('Nessun risultato');
-
-      const matchColor = valLast.match >= 80 ? '#5DCAA5' : valLast.match >= 55 ? '#5DCAA5' :
-                         valLast.match >= 35 ? '#FFD060' : '#FF6496';
-
-      let html =
-        '<div class="pcard" style="margin-bottom:12px;">' +
-          '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">' +
-            '<div><p class="pcard-label">Ruolo valutato</p>' +
-            '<p class="pcard-title" style="font-size:19px;">' + esc(ruolo) + (settore ? ' <span style="font-size:13px; font-weight:normal; color:rgba(240,255,244,0.5);">— ' + esc(settore) + '</span>' : '') + '</p>' +
-            '<p class="pcard-sub" style="color:#5DCAA5;">' + esc(valLast.titolo) + '</p></div>' +
-            '<div style="text-align:right; flex-shrink:0;">' +
-            '<p style="font-family:var(--font-display,Georgia),serif; font-size:34px; font-weight:300; color:' + matchColor + '; line-height:1; margin:0;">' + esc(valLast.match) + '%</p>' +
-            '<p style="font-size:10px; color:rgba(240,255,244,0.35); text-transform:uppercase; letter-spacing:0.06em; margin:2px 0 0;">sull\'ultimo test</p></div>' +
-          '</div>' +
-          '<p class="pcard-sub" style="border-top:1px solid rgba(93,202,165,0.2); padding-top:12px; margin-top:14px;">' + esc(valLast.descrizione) + '</p>' +
-        '</div>';
-
-      out.innerHTML = html;
-
-      // Se ci sono più report, valuta anche sui precedenti per l'andamento
-      if (REPORTS.length >= 2) {
-        const trend = document.createElement('div');
-        trend.className = 'pcard';
-        trend.innerHTML = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px;">Andamento nel tempo</p>' +
-          '<p class="pcard-sub" style="font-style:italic;">Calcolo come questo ruolo combaciava nei test precedenti…</p>';
-        out.appendChild(trend);
-
-        const righe = [];
-        // Già calcolato l'ultimo; calcola i precedenti (max altri 2)
-        righe.push({ data: last.created_at, match: valLast.match });
-        for (let i = 1; i < Math.min(REPORTS.length, 3); i++) {
-          const v = await valutaRuoloControReport(ruolo, settore, REPORTS[i].report_json);
-          if (v) righe.push({ data: REPORTS[i].created_at, match: v.match });
-        }
-
-        let trendHtml = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
-        righe.forEach((r) => {
-          trendHtml += '<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
-            '<span class="pcard-sub">' + esc(formatDate(r.data)) + '</span>' +
-            '<span style="font-weight:bold; color:#5DCAA5;">' + esc(r.match) + '%</span></div>';
-        });
-        // Lettura della tendenza (primo = più recente, ultimo = più vecchio)
-        if (righe.length >= 2) {
-          const recente = righe[0].match, vecchio = righe[righe.length - 1].match;
-          let lettura = '';
-          if (recente - vecchio >= 8) lettura = 'La tua compatibilità con questo ruolo è cresciuta nel tempo: ti ci stai avvicinando.';
-          else if (vecchio - recente >= 8) lettura = 'La tua compatibilità con questo ruolo è calata nel tempo: il tuo profilo si sta muovendo altrove.';
-          else lettura = 'La tua compatibilità con questo ruolo è rimasta stabile nel tempo.';
-          trendHtml += '<p class="pcard-sub" style="margin-top:12px; font-style:italic;">' + lettura + '</p>';
-        }
-        trend.innerHTML = trendHtml;
+      const righe = [];
+      // Già calcolato l'ultimo; calcola i precedenti (max altri 2)
+      righe.push({ data: last.created_at, match: valLast.match });
+      for (let i = 1; i < Math.min(REPORTS.length, 3); i++) {
+        const v = await valutaRuoloControReport(ruolo, settore, REPORTS[i].report_json);
+        if (v) righe.push({ data: REPORTS[i].created_at, match: v.match });
       }
 
+      let trendHtml = '<p class="pcard-label" style="color:#F0FFF4; text-transform:none; font-size:13px; margin-bottom:10px;">Andamento nel tempo</p>';
+      righe.forEach((r) => {
+        trendHtml += '<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+          '<span class="pcard-sub">' + esc(formatDate(r.data)) + '</span>' +
+          '<span style="font-weight:bold; color:#5DCAA5;">' + esc(r.match) + '%</span></div>';
+      });
+      // Lettura della tendenza (primo = più recente, ultimo = più vecchio)
+      if (righe.length >= 2) {
+        const recente = righe[0].match, vecchio = righe[righe.length - 1].match;
+        let lettura = '';
+        if (recente - vecchio >= 8) lettura = 'La tua compatibilità con questo ruolo è cresciuta nel tempo: ti ci stai avvicinando.';
+        else if (vecchio - recente >= 8) lettura = 'La tua compatibilità con questo ruolo è calata nel tempo: il tuo profilo si sta muovendo altrove.';
+        else lettura = 'La tua compatibilità con questo ruolo è rimasta stabile nel tempo.';
+        trendHtml += '<p class="pcard-sub" style="margin-top:12px; font-style:italic;">' + lettura + '</p>';
+      }
+      trend.innerHTML = trendHtml;
+    }
+
+  } catch (e) {
+    console.error('Banco di prova fallito:', e);
+    out.innerHTML = '<p class="pcard-sub" style="color:#FF6496;">Non sono riuscito a valutare il ruolo. Riprova tra poco.</p>';
+  } finally {
+    bancoRunning = false;
+    btn.disabled = false;
+    btn.textContent = 'Valuta ruolo';
+  }
+}
+
+function setupBanco() {
+  const btn = document.getElementById('banco-btn');
+  const input = document.getElementById('banco-input');
+  if (!btn || !input) return;
+
+  if (!REPORTS.length) {
+    // Senza un test non c'è un profilo con cui confrontare il ruolo.
+    document.getElementById('banco-intro').innerHTML =
+      'Qui potrai scrivere un ruolo e scoprire quanto combacia con il tuo profilo. Serve prima un test: <a href="test.html" style="color:#5DCAA5;">fallo ora →</a>';
+    input.disabled = true;
+    document.getElementById('banco-settore').disabled = true;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    return;
+  }
+
+  btn.addEventListener('click', runBanco);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runBanco(); });
+}
+
+// ─── RUOLI SALVATI ────────────────────────────────────────────
+const FONTE_LABEL = { banco: 'dal banco di prova', dizionario: 'dal dizionario' };
+
+async function refreshSaved() {
+  try {
+    SAVED = await listSavedRoles();
+    SAVED_OK = true;
+  } catch (e) {
+    console.error('Ruoli salvati non disponibili:', e);
+    SAVED = [];
+    SAVED_OK = false;
+  }
+  renderSaved();
+  renderStats();
+}
+
+function renderSaved() {
+  const list = document.getElementById('saved-list');
+  if (!list) return;
+  if (!SAVED_OK) {
+    list.innerHTML = '<p class="empty-note">I ruoli salvati non sono disponibili in questo momento. Riprova più tardi.</p>';
+    return;
+  }
+  if (!SAVED.length) {
+    list.innerHTML = '<p class="empty-note">Non hai ancora salvato nessun ruolo. Valutane uno qui sopra e premi "Salva", oppure cercalo nel <a href="dizionario.html">Dizionario dei ruoli</a>.</p>';
+    return;
+  }
+  list.innerHTML = '';
+  SAVED.forEach((r) => {
+    const hasMatch = typeof r.match === 'number';
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    item.innerHTML =
+      '<div class="list-main">' +
+        '<p class="list-title">' + esc(r.nome) + (r.settore ? ' <span class="muted">· ' + esc(r.settore) + '</span>' : '') + '</p>' +
+        '<p class="list-meta">Salvato il ' + esc(formatShort(r.created_at)) + ' ' + esc(FONTE_LABEL[r.fonte] || '') + '</p>' +
+        (r.nota ? '<p class="list-note">' + esc(r.nota.length > 180 ? r.nota.slice(0, 177) + '…' : r.nota) + '</p>' : '') +
+        '<div class="list-actions">' +
+          '<button type="button" class="link-btn" data-act="eval">' + (hasMatch ? 'Rivaluta' : 'Valuta la compatibilità') + '</button>' +
+          '<a href="dizionario.html?q=' + encodeURIComponent(r.nome) + '">Scheda del ruolo</a>' +
+          '<button type="button" class="link-btn rose" data-act="remove">Rimuovi</button>' +
+        '</div>' +
+      '</div>' +
+      '<p class="list-pct' + (hasMatch ? '' : ' none') + '"' + (hasMatch ? ' style="color:' + matchColor(r.match) + ';"' : '') + '>' + (hasMatch ? esc(r.match) + '%' : '—') + '</p>';
+    item.querySelector('[data-act="eval"]').addEventListener('click', () => runBancoFor(r.nome, r.settore || ''));
+    item.querySelector('[data-act="remove"]').addEventListener('click', async (ev) => {
+      const b = ev.currentTarget;
+      b.disabled = true;
+      try {
+        await removeSavedRole(r.id);
+        await refreshSaved();
+        renderAspiration();
+      } catch (e) {
+        console.error('Rimozione ruolo salvato fallita:', e);
+        b.textContent = 'Non rimosso, riprova';
+        b.disabled = false;
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+// ─── AZIENDE: visibilità e ricerche in cui sei comparso ───────
+function renderVisibility() {
+  const pill = document.getElementById('visib-pill');
+  const text = document.getElementById('visib-text');
+  if (!pill || !text) return;
+  const visibile = !!PROFILE?.cv_path;
+  pill.textContent = visibile ? 'Visibile alle aziende' : 'Non visibile';
+  pill.className = 'status-pill ' + (visibile ? 'on' : 'off');
+  text.textContent = visibile
+    ? 'Le aziende che cercano un profilo compatibile con il tuo possono trovarti e vedere nome, email, profilo e CV. Per smettere di essere visibile, rimuovi il CV qui sotto.'
+    : 'Le aziende non ti vedono. Carica il CV qui sotto per comparire nelle ricerche compatibili con il tuo profilo.';
+}
+
+async function refreshMatches() {
+  try {
+    MATCHES = await listJobMatches();
+    MATCHES_OK = true;
+  } catch (e) {
+    console.error('Ricerche aziendali non disponibili:', e);
+    MATCHES = [];
+    MATCHES_OK = false;
+  }
+  renderMatches();
+  renderStats();
+}
+
+function renderMatches() {
+  const list = document.getElementById('matches-list');
+  if (!list) return;
+  const visibile = !!PROFILE?.cv_path;
+  if (!MATCHES_OK || !MATCHES.length) {
+    list.innerHTML = visibile
+      ? '<p class="empty-note">Nessuna ricerca per ora. Quando un\'azienda cerca un profilo come il tuo, la vedrai qui.</p>'
+      : '<p class="empty-note">Non compari nelle ricerche delle aziende perché non sei visibile. Se carichi il CV, qui vedrai le ricerche compatibili con te.</p>';
+    return;
+  }
+  list.innerHTML = visibile ? '' : '<p class="empty-note" style="margin-bottom:10px;">Ora non sei visibile: queste sono le ricerche in cui eri comparso prima.</p>';
+  MATCHES.forEach((m) => {
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    const stessoGiorno = formatShort(m.first_seen_at) === formatShort(m.last_seen_at);
+    item.innerHTML =
+      '<div class="list-main">' +
+        '<p class="list-title">' + esc(m.role_title || 'Ricerca senza titolo') + '</p>' +
+        '<p class="list-note" style="margin-top:2px;">' + esc(m.company_name || 'Azienda') + '</p>' +
+        '<p class="list-meta">Comparso il ' + esc(formatShort(m.first_seen_at)) + (stessoGiorno ? '' : ' · ultima volta il ' + esc(formatShort(m.last_seen_at))) + '</p>' +
+        (m.viewed_at ? '<span class="viewed">👁 Ha aperto il tuo profilo il ' + esc(formatDate(m.viewed_at)) + '</span>' : '') +
+      '</div>' +
+      (typeof m.match === 'number' ? '<p class="list-pct" style="color:' + matchColor(m.match) + ';">' + esc(m.match) + '%</p>' : '');
+    list.appendChild(item);
+  });
+}
+
+// ─── IMPOSTAZIONI ─────────────────────────────────────────────
+function setupSettings() {
+  const nomeInput = document.getElementById('set-nome');
+  const nomeBtn = document.getElementById('set-nome-btn');
+  const nomeMsg = document.getElementById('set-nome-msg');
+  nomeInput.value = PROFILE?.nome || '';
+
+  const saveNome = async () => {
+    const nome = nomeInput.value.trim().slice(0, 40);
+    if (nome === (PROFILE?.nome || '').trim()) { showMsg(nomeMsg, 'Nessuna modifica da salvare.', ''); return; }
+    nomeBtn.disabled = true;
+    try {
+      await updateProfile({ nome: nome || null });
+      PROFILE = { ...PROFILE, nome: nome || null };
+      renderIdentity();
+      showMsg(nomeMsg, nome ? 'Nome salvato.' : 'Nome rimosso: il prossimo test te lo chiederà di nuovo.', 'ok');
     } catch (e) {
-      console.error('Banco di prova fallito:', e);
-      out.innerHTML = '<p class="pcard-sub" style="color:#FF6496;">Non sono riuscito a valutare il ruolo. Riprova tra poco.</p>';
+      console.error('Salvataggio nome fallito:', e);
+      showMsg(nomeMsg, 'Non sono riuscito a salvare il nome. Riprova tra poco.', 'err');
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Valuta ruolo';
+      nomeBtn.disabled = false;
     }
   };
+  nomeBtn.addEventListener('click', saveNome);
+  nomeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveNome(); });
 
-  btn.addEventListener('click', run);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+  document.getElementById('hello-add-name').addEventListener('click', () => {
+    showSection('impostazioni');
+    nomeInput.focus();
+  });
+
+  const emailCurrent = document.getElementById('set-email-current');
+  const emailInput = document.getElementById('set-email');
+  const emailBtn = document.getElementById('set-email-btn');
+  const emailMsg = document.getElementById('set-email-msg');
+  const current = SESSION.user?.email || '';
+  emailCurrent.textContent = current || '—';
+
+  const doChange = async () => {
+    const email = emailInput.value.trim();
+    if (!EMAIL_RE.test(email)) { showMsg(emailMsg, 'Inserisci un indirizzo email valido.', 'err'); return; }
+    if (email.toLowerCase() === current.toLowerCase()) { showMsg(emailMsg, 'È già la tua email di accesso.', ''); return; }
+    emailBtn.disabled = true;
+    try {
+      await changeEmail(email);
+      emailInput.value = '';
+      showMsg(emailMsg, `Ti abbiamo mandato un link di conferma a ${email}. Il cambio diventa effettivo quando lo apri; per sicurezza potrebbe arrivare una conferma anche all'indirizzo attuale.`, 'ok');
+    } catch (e) {
+      console.error('Cambio email fallito:', e);
+      showMsg(emailMsg, 'Non sono riuscito ad avviare il cambio. Riprova tra poco.', 'err');
+    } finally {
+      emailBtn.disabled = false;
+    }
+  };
+  emailBtn.addEventListener('click', doChange);
+  emailInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doChange(); });
+
+  const mk = document.getElementById('set-marketing');
+  const mkMsg = document.getElementById('set-marketing-msg');
+  mk.checked = !!PROFILE?.marketing_consent;
+  mk.addEventListener('change', async () => {
+    const value = mk.checked;
+    mk.disabled = true;
+    try {
+      await updateProfile({ marketing_consent: value });
+      PROFILE = { ...PROFILE, marketing_consent: value };
+      showMsg(mkMsg, value ? 'Fatto: ti avviseremo delle novità.' : 'Fatto: non riceverai email sulle novità.', 'ok');
+    } catch (e) {
+      console.error('Salvataggio consenso fallito:', e);
+      mk.checked = !value;
+      showMsg(mkMsg, 'Non sono riuscito a salvare la preferenza. Riprova tra poco.', 'err');
+    } finally {
+      mk.disabled = false;
+    }
+  });
+
+  const exportBtn = document.getElementById('export-btn');
+  const exportMsg = document.getElementById('export-msg');
+  exportBtn.addEventListener('click', async () => {
+    exportBtn.disabled = true;
+    try {
+      const data = await exportMyData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rolefit-dati-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showMsg(exportMsg, 'File scaricato: contiene profilo, report, ruoli salvati e ricerche aziendali.', 'ok');
+    } catch (e) {
+      console.error('Esportazione dati fallita:', e);
+      showMsg(exportMsg, 'Non sono riuscito a preparare il file. Riprova tra poco.', 'err');
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
 }
 
 // ─── CV ─────────────────────────────────────────────────────────
@@ -227,6 +667,10 @@ async function renderCvCurrent() {
   if (!box || !status) return;
   try {
     const profile = await getProfile();
+    if (profile) PROFILE = { ...PROFILE, ...profile };
+    renderVisibility();
+    renderMatches();
+    renderStats();
     if (!profile?.cv_path) {
       box.classList.add('hidden');
       return;
@@ -321,10 +765,8 @@ function setupCv() {
       renderCvCurrent();
 
       try {
-        const reports = await listReports();
-        REPORTS = reports;
-        const session = await getSession();
-        renderProfile(session, reports);
+        REPORTS = await listReports();
+        renderReportsViews();
       } catch { /* la card CV è già aggiornata, il resto si aggiornerà al prossimo giro */ }
 
     } catch (e) {
@@ -338,41 +780,7 @@ function setupCv() {
   });
 }
 
-// ─── Navigazione tra sezioni (sidebar + bottom bar) ───
-function setupNav() {
-  const items = document.querySelectorAll('[data-sec]');
-  const sections = document.querySelectorAll('.app-sec');
-
-  function show(sec) {
-    sections.forEach((s) => s.classList.toggle('hidden', s.getAttribute('data-sec') !== sec));
-    // attiva il pulsante giusto sia in sidebar che in bottom bar
-    document.querySelectorAll('.sb-item[data-sec], .bb-item[data-sec]').forEach((b) => {
-      b.classList.toggle('active', b.getAttribute('data-sec') === sec);
-    });
-  }
-
-  document.querySelectorAll('.sb-item[data-sec], .bb-item[data-sec]').forEach((btn) => {
-    btn.addEventListener('click', () => show(btn.getAttribute('data-sec')));
-  });
-}
-
-// ─── Render dati profilo ───
-function renderProfile(session, reports) {
-  const email = session.user?.email || '';
-  document.getElementById('sb-email').textContent = email || '—';
-  document.getElementById('sb-avatar').textContent = initials(email);
-  const since = session.user?.created_at;
-  document.getElementById('sb-since').textContent =
-    since ? 'da ' + new Date(since).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '';
-
-  // Storico (dentro la sezione)
-  renderStorico(reports);
-
-  // Panoramica: la costellazione sostituisce ultimo risultato + grafico nel
-  // tempo + radar, tutto in un'unica visualizzazione.
-  renderConstellation(reports);
-}
-
+// ─── COSTELLAZIONE E STORICO ──────────────────────────────────
 const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
 const ASSI_COLORI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
 const RUOLO_ANGOLI = [30, 150, 270];
@@ -646,23 +1054,37 @@ function startSkyOnce() {
   if (sky.reduceMotion) setTimeout(() => skyFrame(performance.now()), 30);
 }
 
+// Profilo di esempio mostrato, attenuato e non interattivo, a chi non ha
+// ancora fatto il test: fa vedere cosa otterrà invece di una pagina vuota.
+const DEMO_REPORT = {
+  created_at: new Date().toISOString(),
+  report_json: {
+    assi: { Analisi: 68, Relazione: 82, 'Creatività': 61, 'Curiosità': 77, Leadership: 54, Metodo: 63 },
+    assi_confidenza: {},
+    ruoli: [
+      { nome: 'UX Researcher', match: 88 },
+      { nome: 'Product Manager', match: 84 },
+      { nome: 'Consulente di innovazione', match: 79 },
+    ],
+  },
+};
+
 function renderConstellation(reports) {
   const emptyEl = document.getElementById('pf-empty');
   const wrapEl = document.getElementById('pf-constellation');
   if (!emptyEl || !wrapEl) return;
 
-  const conAssi = reports
+  let conAssi = reports
     .filter(r => r.report_json && r.report_json.assi && typeof r.report_json.assi === 'object')
     .slice(0, 3)
     .reverse(); // dal più vecchio al più recente
 
-  if (conAssi.length < 1) {
-    emptyEl.classList.remove('hidden');
-    wrapEl.classList.add('hidden');
-    return;
-  }
-  emptyEl.classList.add('hidden');
+  const demo = conAssi.length < 1;
+  if (demo) conAssi = [DEMO_REPORT];
+  emptyEl.classList.toggle('hidden', !demo);
   wrapEl.classList.remove('hidden');
+  wrapEl.classList.toggle('is-demo', demo);
+  wrapEl.setAttribute('aria-hidden', demo ? 'true' : 'false');
 
   startSkyOnce();
   if (!sky.canvas) return;
@@ -736,8 +1158,9 @@ function renderStorico(reports) {
   const empty = document.getElementById('st-empty');
   const count = document.getElementById('st-count');
   count.textContent = reports.length + (reports.length === 1 ? ' test completato' : ' test completati');
-  if (!reports.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.toggle('hidden', reports.length > 0);
   list.innerHTML = '';
+  if (!reports.length) return;
   reports.forEach((r, i) => {
     const a = document.createElement('a');
     a.href = 'report.html?id=' + r.id; a.className = 'st-card';
@@ -745,10 +1168,15 @@ function renderStorico(reports) {
     a.innerHTML =
       '<div class="st-card-top"><p class="st-date">' + esc(formatDate(r.created_at)) + '</p>' + badge + '</div>' +
       '<p class="st-roles">' + esc(rolesLine(r.report_json)) + '</p>' +
+      ((r.aspiration || '').trim()
+        ? '<p class="st-roles" style="margin-top:-6px;">Aspiri a: ' + esc(r.aspiration.trim()) +
+          (typeof r.aspired_role_eval?.match === 'number' ? ' · ' + esc(r.aspired_role_eval.match) + '%' : '') + '</p>'
+        : '') +
       '<span class="st-open">Apri il report completo →</span>';
     list.appendChild(a);
   });
 }
+
 
 // ─── Cancellazione account ───
 function setupDeleteAccount() {
@@ -756,7 +1184,7 @@ function setupDeleteAccount() {
   const errEl = document.getElementById('delete-account-error');
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    if (!window.confirm('Vuoi cancellare definitivamente il tuo account? Report, storico e CV verranno eliminati e non potranno essere recuperati.')) return;
+    if (!window.confirm('Vuoi cancellare definitivamente il tuo account? Report, storico, ruoli salvati e CV verranno eliminati e non potranno essere recuperati.')) return;
     btn.disabled = true;
     errEl.classList.add('hidden');
     try {
@@ -782,31 +1210,54 @@ function setupDeleteAccount() {
   });
 }
 
+// Tutto ciò che dipende dai report: si ridisegna anche dopo un nuovo CV.
+function renderReportsViews() {
+  renderStorico(REPORTS);
+  renderConstellation(REPORTS);
+  renderAspiration();
+  renderStats();
+  document.getElementById('pf-retake').classList.toggle('hidden', !REPORTS.length);
+}
+
 // ─── Init ───
 async function init() {
   const session = await getSession();
   if (!session) { showGate(); return; }
+  SESSION = session;
 
   document.getElementById('account-loading').classList.add('hidden');
   document.getElementById('account-content').classList.remove('hidden');
 
   setupNav();
 
-  const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn) logoutBtn.addEventListener('click', async () => { await signOut(); window.location.reload(); });
-  const logoutBtnMobile = document.getElementById('logout-btn-mobile');
-  if (logoutBtnMobile) logoutBtnMobile.addEventListener('click', async () => { await signOut(); window.location.reload(); });
+  const logout = async () => { await signOut(); window.location.reload(); };
+  document.getElementById('logout-btn')?.addEventListener('click', logout);
+  document.getElementById('logout-btn-mobile')?.addEventListener('click', logout);
   setupDeleteAccount();
 
   try {
-    const reports = await listReports();
-    REPORTS = reports;
-    renderProfile(session, reports);
-    setupBanco();
-    setupCv();
+    PROFILE = (await getProfile()) || {};
+  } catch (e) {
+    console.error('Errore nel caricare il profilo:', e);
+    PROFILE = {};
+  }
+  renderIdentity();
+
+  try {
+    REPORTS = await listReports();
   } catch (e) {
     console.error('Errore nel caricare i report:', e);
+    REPORTS = [];
   }
+  renderReportsViews();
+  setupBanco();
+  setupSettings();
+  setupCv();
+
+  // Ruoli salvati e ricerche arrivano da tabelle nuove (migration-8): si
+  // caricano dopo, e se non ci sono ancora le sezioni restano neutre.
+  await Promise.all([refreshSaved(), refreshMatches()]);
+  renderAspiration();
 }
 
 document.addEventListener('DOMContentLoaded', init);

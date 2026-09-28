@@ -189,12 +189,79 @@ function validTargetProfile(tp) {
 
 async function loadJob(job_id) {
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${encodeURIComponent(job_id)}&status=eq.active&select=id,role_title,target_profile`,
+    `${SUPABASE_URL}/rest/v1/job_requests?id=eq.${encodeURIComponent(job_id)}&status=eq.active&select=id,role_title,target_profile,company_profiles(company_name)`,
     { headers: supabaseHeaders() }
   );
   if (!r.ok) throw new Error('Impossibile leggere la ricerca');
   const [job] = await r.json();
   return job || null;
+}
+
+// ─── TRASPARENZA VERSO IL CANDIDATO ──────────────────────────────
+// Il candidato vede nel proprio profilo le ricerche in cui è comparso e se
+// l'azienda ha aperto il suo profilo (tabella job_matches, migration-8).
+// È tutto best-effort: se la tabella non esiste ancora o la scrittura
+// fallisce, il flusso dell'azienda non deve accorgersene.
+function jobMatchBase(job) {
+  return {
+    job_id: job.id,
+    role_title: job.role_title || null,
+    company_name: job.company_profiles?.company_name || null,
+  };
+}
+
+async function recordMatches(job, candidates) {
+  if (!candidates.length) return;
+  try {
+    const now = new Date().toISOString();
+    const rows = candidates.map((c) => ({
+      ...jobMatchBase(job),
+      user_id: c.user_id,
+      match: Math.max(0, Math.min(100, Math.round(Number(c.match) || 0))),
+      last_seen_at: now,
+    }));
+    // Upsert su (user_id, job_id): la prima volta crea la riga, dopo aggiorna
+    // solo punteggio e ultima apparizione (first_seen_at e viewed_at restano).
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/job_matches?on_conflict=user_id,job_id`, {
+      method: 'POST',
+      headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows),
+    });
+    if (!r.ok) console.error('Registrazione job_matches non riuscita:', r.status, await r.text());
+  } catch (e) {
+    console.error('Registrazione job_matches non riuscita:', e);
+  }
+}
+
+async function recordView(job, candidato) {
+  try {
+    const now = new Date().toISOString();
+    const filter = `user_id=eq.${encodeURIComponent(candidato.user_id)}&job_id=eq.${encodeURIComponent(job.id)}`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/job_matches?${filter}`, {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify({ viewed_at: now, last_seen_at: now }),
+    });
+    if (!r.ok) { console.error('Registrazione visualizzazione non riuscita:', r.status, await r.text()); return; }
+    const updated = await r.json();
+    if (Array.isArray(updated) && updated.length) return;
+    // Nessuna riga: il profilo è stato aperto senza passare dalla lista
+    // (link diretto). Lo registriamo comunque, col punteggio sui 6 assi.
+    const ins = await fetch(`${SUPABASE_URL}/rest/v1/job_matches?on_conflict=user_id,job_id`, {
+      method: 'POST',
+      headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        ...jobMatchBase(job),
+        user_id: candidato.user_id,
+        match: Math.max(0, Math.min(100, Math.round(Number(candidato.match) || 0))),
+        last_seen_at: now,
+        viewed_at: now,
+      }),
+    });
+    if (!ins.ok) console.error('Registrazione visualizzazione non riuscita:', ins.status, await ins.text());
+  } catch (e) {
+    console.error('Registrazione visualizzazione non riuscita:', e);
+  }
 }
 
 // Candidati visibili (hanno scelto di esserlo caricando il CV) con il loro
@@ -328,6 +395,8 @@ async function calcolaMatch(body, res) {
       perche_azienda: c.perche_azienda || `Compatibilità calcolata sul profilo psicologico-professionale rispetto al ruolo di ${job.role_title}.`,
     }));
 
+  await recordMatches(job, candidates);
+
   return res.status(200).json({ job: publicJob, candidates, soglia: SOGLIA_MATCH });
 }
 
@@ -375,7 +444,7 @@ async function dettaglioCandidato(body, res) {
   const [report] = await reportsRes.json();
   if (!report) return res.status(404).json({ error: 'Candidato non trovato' });
 
-  const cvUrl = await getCvSignedUrl(user_id);
+  const [cvUrl] = await Promise.all([getCvSignedUrl(user_id), recordView(job, candidato)]);
 
   // Log domande/risposte per l'azienda: SOLO le domande esplicitamente
   // marcate come non personali (indiretta: false). Se il test è stato
