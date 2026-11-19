@@ -1,6 +1,7 @@
 export const maxDuration = 60;
 
-import { PROMPT_REPORT } from './claude.js';
+import { PROMPT_REPORT, PROMPT_REPORT_V2 } from './claude.js';
+import { buildReportRequest, mergeReport } from '../js/v2-engine.js';
 import { envReady, serviceHeaders, getUserFromToken, extractCvText } from './_cv-shared.js';
 import { rateLimit } from './_guard.js';
 
@@ -34,6 +35,38 @@ function parseReportJson(text) {
       .replace(/,\s*]/g, ']');
     return JSON.parse(repaired);
   }
+}
+
+// Salva il report rigenerato come NUOVO report (lo storico resta intatto) e
+// aggiorna la data del CV sul profilo.
+async function saveRegenerated(userId, lastReport, reportJson) {
+  const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
+    method: 'POST',
+    headers: { ...serviceHeaders(), Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: userId,
+      report_json: reportJson,
+      aspiration: lastReport.aspiration || null,
+      test_history: {
+        ...lastReport.test_history,
+        cv_used: true,
+        savedAt: new Date().toISOString(),
+      },
+    }),
+  });
+  if (!insertRes.ok) return null;
+  const [newReport] = await insertRes.json();
+
+  // L'esito di questo update non cambia la risposta (il report è già
+  // salvato, il timestamp è solo informativo per la UI), ma va atteso: su
+  // Vercel una promessa lasciata in sospeso dopo la risposta può essere
+  // interrotta prima di arrivare al database.
+  await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+    method: 'PATCH',
+    headers: serviceHeaders(),
+    body: JSON.stringify({ cv_updated_at: new Date().toISOString() }),
+  }).catch(() => {});
+  return newReport;
 }
 
 export default async function handler(req, res) {
@@ -81,6 +114,45 @@ export default async function handler(req, res) {
     if (!reportsRes.ok) return res.status(500).json({ error: 'Impossibile leggere il report esistente' });
     const [lastReport] = await reportsRes.json();
     if (!lastReport) return res.status(400).json({ error: 'Fai prima il test RoleFit' });
+
+    // Test a capitoli: dimensioni, ruoli e prove sono già calcolati e salvati
+    // con il report. Il CV cambia solo il racconto (come si entra, settori,
+    // confronto con il percorso reale), mai i numeri.
+    const payloadV2 = lastReport.test_history?.versione === 2 ? lastReport.test_history?.activities?._v2 : null;
+    if (payloadV2?.risultato) {
+      const v2Response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 7000,
+          temperature: 0.6,
+          system: PROMPT_REPORT_V2,
+          messages: [{ role: 'user', content: buildReportRequest(payloadV2, { cvText }) }],
+        }),
+      });
+      const v2Data = await v2Response.json();
+      const v2Text = v2Data?.content?.[0]?.text;
+      if (!v2Text) {
+        console.error('Errore rigenerazione report v2 da CV:', v2Data?.error || v2Data);
+        return res.status(500).json({ error: 'Rigenerazione non riuscita' });
+      }
+      let v2Parsed;
+      try {
+        v2Parsed = parseReportJson(v2Text);
+      } catch (e) {
+        console.error('Errore parsing report v2 rigenerato da CV:', e, v2Text.slice(0, 500));
+        return res.status(500).json({ error: 'Rigenerazione non riuscita' });
+      }
+      const reportJson = { ...mergeReport(v2Parsed, payloadV2), cv_usato: true };
+      const saved = await saveRegenerated(user.id, lastReport, reportJson);
+      if (!saved) return res.status(500).json({ error: 'Impossibile salvare il nuovo report' });
+      return res.status(200).json({ report_id: saved.id });
+    }
 
     const history = lastReport.test_history?.history;
     if (!Array.isArray(history) || history.length === 0) {
@@ -133,33 +205,8 @@ export default async function handler(req, res) {
     }
     if (!parsed?.report) return res.status(500).json({ error: 'Rigenerazione non riuscita' });
 
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
-      method: 'POST',
-      headers: { ...serviceHeaders(), Prefer: 'return=representation' },
-      body: JSON.stringify({
-        user_id: user.id,
-        report_json: parsed.report,
-        aspiration: lastReport.aspiration || null,
-        test_history: {
-          ...lastReport.test_history,
-          cv_used: true,
-          savedAt: new Date().toISOString(),
-        },
-      }),
-    });
-    if (!insertRes.ok) return res.status(500).json({ error: 'Impossibile salvare il nuovo report' });
-    const [newReport] = await insertRes.json();
-
-    // L'esito di questo update non cambia la risposta (il report è già
-    // salvato, il timestamp è solo informativo per la UI), ma va atteso: su
-    // Vercel una promessa lasciata in sospeso dopo la risposta può essere
-    // interrotta prima di arrivare al database.
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
-      method: 'PATCH',
-      headers: serviceHeaders(),
-      body: JSON.stringify({ cv_updated_at: new Date().toISOString() }),
-    }).catch(() => {});
-
+    const newReport = await saveRegenerated(user.id, lastReport, parsed.report);
+    if (!newReport) return res.status(500).json({ error: 'Impossibile salvare il nuovo report' });
     return res.status(200).json({ report_id: newReport.id });
   } catch (error) {
     console.error('Errore /api/cv:', error);

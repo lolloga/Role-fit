@@ -1,5 +1,6 @@
 import { getSession, signInWithMagicLink, getAccessToken, saveReport, updateReportEval, getReport, createDraft, claimDraft, deleteDraft, getProfile, uploadCv, saveCvPath, getHistoricalProfile, saveUserName } from './supabase.js';
 import './feedback.js'; // [feedback] carica la sezione feedback (si attiva via evento 'rf-report-shown')
+import { buildReportRequest, mergeReport } from './v2-engine.js';
 
 // id del report salvato su Supabase per la sessione corrente (null finché non salvato).
 // Serve per ri-persistere le valutazioni ruolo attuale/aspirato calcolate dopo.
@@ -108,7 +109,7 @@ async function fetchCumulativeContext() {
 // veri per costruzione, mai un'impressione del modello — stessa filosofia
 // del teaser di bentornato in test.js. Sotto una soglia minima non dice
 // nulla: un paio di punti di oscillazione non è un cambiamento da segnalare.
-const ASSI_REPORT = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const ASSI_REPORT = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo', 'Concretezza'];
 const SOGLIA_CAMBIAMENTO = 8;
 
 function buildChangeNote(newAssi, history) {
@@ -139,32 +140,22 @@ function showChangeNote(text) {
   el.classList.remove('hidden');
 }
 
-// ─── GENERA REPORT ───────────────────────────────────────────
-async function generateReport(cumulativeContext) {
-  const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
-  const activities = JSON.parse(localStorage.getItem('rf_activities') || '{}');
-
-  const activitiesSummary = Object.entries(activities)
-    .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
-    .join('\n');
-
-  const priorParts = [];
-  if (cumulativeContext?.summary) {
-    priorParts.push(`${cumulativeContext.summary}\n\nUsa questo storico secondo le istruzioni già ricevute sul confronto longitudinale e sulla personalizzazione crescente del report.`);
+// Test a capitoli (versione 2): il motore ha già calcolato dimensioni,
+// ruoli e prove, e li passa qui dentro rf_activities._v2 (che viaggia anche
+// nella bozza del link email). null per il test classico.
+function getV2Payload() {
+  try {
+    const activities = JSON.parse(localStorage.getItem('rf_activities') || 'null');
+    const p = activities?._v2;
+    return p && p.versione === 2 && p.risultato ? p : null;
+  } catch {
+    return null;
   }
-  if (cumulativeContext?.cvText) {
-    priorParts.push(`Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${cumulativeContext.cvText}\n"""\n\nUsalo secondo le istruzioni già ricevute su come trattare il CV nel report.`);
-  }
-  const priorBlock = priorParts.length ? `\n\n${priorParts.join('\n\n---\n\n')}` : '';
+}
 
-  const messages = [
-    ...history,
-    {
-      role: 'user',
-      content: `Il test è completato. Genera il report finale.\n\nRiepilogo attività interattive:\n${activitiesSummary}${priorBlock}\n\nGenera il report completo in JSON.`
-    }
-  ];
-
+// Chiamata alla generazione del report con timeout e lettura robusta del
+// JSON, comune al test classico e a quello a capitoli.
+async function callReportApi(messages, fase) {
   const token = await getAccessToken();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
@@ -176,7 +167,7 @@ async function generateReport(cumulativeContext) {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ messages, fase: 'report' }),
+      body: JSON.stringify({ messages, fase }),
       signal: controller.signal,
     });
   } catch (e) {
@@ -221,6 +212,47 @@ async function generateReport(cumulativeContext) {
     }
     return null;
   }
+}
+
+// ─── GENERA REPORT ───────────────────────────────────────────
+async function generateReport(cumulativeContext) {
+  // Test a capitoli: l'AI scrive il racconto, i numeri restano quelli del motore.
+  const payloadV2 = getV2Payload();
+  if (payloadV2) {
+    const content = buildReportRequest(payloadV2, {
+      storico: cumulativeContext?.summary || null,
+      cvText: cumulativeContext?.cvText || null,
+    });
+    const parsed = await callReportApi([{ role: 'user', content }], 'report_v2');
+    if (!parsed) return null;
+    return { report: mergeReport(parsed, payloadV2) };
+  }
+
+  const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
+  const activities = JSON.parse(localStorage.getItem('rf_activities') || '{}');
+
+  const activitiesSummary = Object.entries(activities)
+    .map(([k, v]) => `Attività "${k}": ${JSON.stringify(v)}`)
+    .join('\n');
+
+  const priorParts = [];
+  if (cumulativeContext?.summary) {
+    priorParts.push(`${cumulativeContext.summary}\n\nUsa questo storico secondo le istruzioni già ricevute sul confronto longitudinale e sulla personalizzazione crescente del report.`);
+  }
+  if (cumulativeContext?.cvText) {
+    priorParts.push(`Il candidato ha già caricato il proprio CV sul profilo RoleFit. Ecco un estratto testuale (possibili imperfezioni di formattazione dovute all'estrazione automatica):\n\n"""\n${cumulativeContext.cvText}\n"""\n\nUsalo secondo le istruzioni già ricevute su come trattare il CV nel report.`);
+  }
+  const priorBlock = priorParts.length ? `\n\n${priorParts.join('\n\n---\n\n')}` : '';
+
+  const messages = [
+    ...history,
+    {
+      role: 'user',
+      content: `Il test è completato. Genera il report finale.\n\nRiepilogo attività interattive:\n${activitiesSummary}${priorBlock}\n\nGenera il report completo in JSON.`
+    }
+  ];
+
+  return callReportApi(messages, 'report');
 }
 
 // ─── VALUTA RUOLO ATTUALE ─────────────────────────────────────
@@ -382,6 +414,25 @@ function renderReport(data, { savedView = false } = {}) {
     }
   });
 
+  // Test a capitoli: le scelte concrete su cui si basa il profilo, e un
+  // avviso onesto se le risposte erano troppo rapide o tutte uguali.
+  const proveBox = document.getElementById('prove-box');
+  if (proveBox && Array.isArray(report.prove) && report.prove.length) {
+    const list = document.getElementById('prove-list');
+    list.innerHTML = '';
+    report.prove.forEach((testo) => {
+      const li = document.createElement('li');
+      li.textContent = testo;
+      list.appendChild(li);
+    });
+    const nota = document.getElementById('qualita-nota');
+    if (nota && report.qualita?.nota) {
+      nota.textContent = report.qualita.nota;
+      nota.classList.remove('hidden');
+    }
+    proveBox.classList.remove('hidden');
+  }
+
   const ruoliEl = document.getElementById('ruoli-list');
   report.ruoli.forEach((ruolo) => {
     const card = document.createElement('div');
@@ -449,6 +500,7 @@ function renderReport(data, { savedView = false } = {}) {
   });
 
   const bonusEl = document.getElementById('bonus-card');
+  if (!report.bonus?.nome) document.getElementById('section-bonus')?.classList.add('hidden');
   bonusEl.innerHTML = `
     <div class="bonus-eyebrow">Il ruolo che non ti aspetti</div>
     <div class="bonus-nome">${esc(report.bonus.nome)}</div>
@@ -522,8 +574,8 @@ function renderReport(data, { savedView = false } = {}) {
 // Stessa idea grafica della costellazione di account.js, in scala ridotta:
 // qui l'obiettivo non è esplorare, solo far intuire che il profilo esiste
 // ed è vivo, nel punto della pagina dove l'attenzione è già.
-const ASSI_FISSI_MINI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-const ASSI_COLORI_MINI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
+const ASSI_FISSI_MINI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo', 'Concretezza'];
+const ASSI_COLORI_MINI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0', '#F2A65A'];
 
 function renderNextSky(assi) {
   const canvas = document.getElementById('next-sky');
@@ -557,8 +609,10 @@ function renderNextSky(assi) {
     ctx.fillStyle = '#F0FFF4'; ctx.beginPath(); ctx.arc(CX, CY, coreR, 0, Math.PI * 2); ctx.fill();
 
     const R = Math.min(W, H) * 0.36;
-    const pts = ASSI_FISSI_MINI.map((k, i) => {
-      const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+    // I report del test classico hanno 6 dimensioni, quelli a capitoli 7.
+    const assiMini = ASSI_FISSI_MINI.filter((k) => k !== 'Concretezza' || typeof assi[k] === 'number');
+    const pts = assiMini.map((k, i) => {
+      const a = (Math.PI * 2 * i) / assiMini.length - Math.PI / 2;
       const val = (typeof assi[k] === 'number') ? assi[k] : 0;
       const r = 8 + (val / 100) * R;
       return { x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r };
@@ -706,6 +760,8 @@ async function mostraRuoloAspirato(ruoloInput) {
 
 // ─── CONTROLLA SE LAVORA ──────────────────────────────────────
 function checkWorksCurrently() {
+  const payloadV2 = getV2Payload();
+  if (payloadV2) return !!payloadV2.contesto?.lavora;
   const history = JSON.parse(localStorage.getItem('rf_history') || '[]');
   const opzioniLavoro = [
     'Ho iniziato a lavorare ma non sono sicuro che sia la strada giusta',
@@ -996,6 +1052,12 @@ function stopLoadingTimer() {
 async function generateAndSave() {
   try {
     startLoadingTimer();
+    const payloadV2 = getV2Payload();
+    if (payloadV2?.risultato?.ruoli?.length) {
+      const nomi = payloadV2.risultato.ruoli.map((r) => r.nome);
+      const textEl = document.getElementById('loading-text');
+      if (textEl) textEl.textContent = `Sto scrivendo il tuo report: ${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}.`;
+    }
     const cumulativeContext = await fetchCumulativeContext();
     const data = await generateReport(cumulativeContext);
     stopLoadingTimer();
@@ -1008,6 +1070,7 @@ async function generateAndSave() {
       // Conversazione completa del test (domande + risposte + attività interattive):
       // serve per valutazioni future basate sulle risposte grezze.
       const test_history = {
+        ...(getV2Payload() ? { versione: 2 } : {}),
         history: JSON.parse(localStorage.getItem('rf_history') || '[]'),
         activities: JSON.parse(localStorage.getItem('rf_activities') || '{}'),
         // answers: elenco pulito domanda/risposta con il flag "indiretta" —

@@ -1,5 +1,7 @@
-const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-const ASSI_COLORI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
+// La settima dimensione ("Concretezza") esiste solo nei profili fatti con il
+// test a capitoli: il grafico la mostra solo quando c'è.
+const ASSI_TUTTI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo', 'Concretezza'];
+const COLORI_TUTTI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0', '#F2A65A'];
 
 // Il contenuto qui sotto include testo generato dall'AI e, nel Q&A, le
 // risposte scritte a mano dal candidato: senza escaping, un payload HTML/script
@@ -29,6 +31,8 @@ function confAmount(c) { return c === 'alta' ? 1 : c === 'media' ? 0.6 : c === '
 function renderRadar(assi, confidenza) {
   const canvas = document.getElementById('candidato-sky');
   if (!canvas || !assi) return;
+  const ASSI_FISSI = ASSI_TUTTI.filter((k) => k !== 'Concretezza' || typeof assi[k] === 'number');
+  const ASSI_COLORI = ASSI_FISSI.map((k) => COLORI_TUTTI[ASSI_TUTTI.indexOf(k)]);
   const conf = confidenza || {};
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ctx = canvas.getContext('2d');
@@ -58,7 +62,7 @@ function renderRadar(assi, confidenza) {
 
     const R = Math.min(W, H) * 0.32;
     const pts = ASSI_FISSI.map((k, i) => {
-      const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      const a = (Math.PI * 2 * i) / ASSI_FISSI.length - Math.PI / 2;
       const val = typeof assi[k] === 'number' ? assi[k] : 0;
       const r = 22 + (val / 100) * R;
       return { x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r, angle: a };

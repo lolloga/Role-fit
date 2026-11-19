@@ -2,6 +2,10 @@
   "name": "role-fit",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs && node tests/api.test.mjs",
+    "test:e2e": "node tests/e2e.cjs"
+  },
   "dependencies": {
     "pdf-parse": "^1.1.1"
   }

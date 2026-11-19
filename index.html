@@ -82,20 +82,50 @@
 </footer>
 
 <script>
-  // Un test lasciato a metà non si cancella più aprendo la home: si offre di
-  // riprenderlo (su mobile capita spesso di uscire e rientrare).
+  // Quale test apre il pulsante principale.
+  // QUOTA_TEST_V2 = quota di visitatori mandati al nuovo test a capitoli:
+  // 0 = nessuno (si prova solo da test-v2.html), 0.5 = metà, 1 = tutti.
+  // L'assegnazione resta la stessa sullo stesso dispositivo finché la quota
+  // non cambia, così chi torna ritrova lo stesso test. ?test=2 forza il nuovo.
+  var QUOTA_TEST_V2 = 0;
+
   (function () {
+    var cta = document.getElementById('hero-test-cta');
+    var label = document.getElementById('hero-test-cta-label');
+    function leggi(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
     try {
-      var saved = JSON.parse(localStorage.getItem('rf_state') || 'null');
-      if (!saved || !(saved.questionCount > 0)) return;
-      document.getElementById('hero-test-cta-label').textContent = 'Riprendi il tuo test';
-      var restart = document.createElement('a');
-      restart.href = 'test.html';
-      restart.textContent = 'oppure ricomincia da capo';
-      restart.style.cssText = 'display:block;margin-top:14px;font-size:0.85rem;color:var(--text-muted);';
-      restart.addEventListener('click', function () { localStorage.removeItem('rf_state'); });
-      document.querySelector('.hero__actions').after(restart);
-    } catch (e) { /* stato illeggibile: il pulsante resta "Scopri il tuo profilo" */ }
+      var v2 = leggi('rf_v2_state');
+      var v1 = leggi('rf_state');
+      var inCorso = null;
+      if (v2 && v2.trail && v2.trail.length > 0) inCorso = { href: 'test-v2.html', chiave: 'rf_v2_state' };
+      else if (v1 && v1.questionCount > 0) inCorso = { href: 'test.html', chiave: 'rf_state' };
+
+      if (inCorso) {
+        // Un test lasciato a metà non si cancella più aprendo la home: si
+        // offre di riprenderlo (su mobile capita spesso di uscire e rientrare).
+        cta.href = inCorso.href;
+        label.textContent = 'Riprendi il tuo test';
+        var restart = document.createElement('a');
+        restart.href = inCorso.href;
+        restart.textContent = 'oppure ricomincia da capo';
+        restart.style.cssText = 'display:block;margin-top:14px;font-size:0.85rem;color:var(--text-muted);';
+        restart.addEventListener('click', function () { localStorage.removeItem(inCorso.chiave); });
+        document.querySelector('.hero__actions').after(restart);
+        return;
+      }
+
+      var variante = null;
+      if (/[?&]test=2(\b|$)/.test(location.search)) variante = 'v2';
+      else {
+        var salvata = leggi('rf_test_variant');
+        if (salvata && salvata.q === QUOTA_TEST_V2) variante = salvata.v;
+        else {
+          variante = Math.random() < QUOTA_TEST_V2 ? 'v2' : 'v1';
+          localStorage.setItem('rf_test_variant', JSON.stringify({ q: QUOTA_TEST_V2, v: variante }));
+        }
+      }
+      if (variante === 'v2') cta.href = 'test-v2.html';
+    } catch (e) { /* storage non disponibile: il pulsante resta sul test classico */ }
   })();
 </script>
 <script src="js/hero-signal.js"></script>
