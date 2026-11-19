@@ -94,11 +94,14 @@
     var label = document.getElementById('hero-test-cta-label');
     function leggi(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
     try {
+      var forzaV2 = /[?&]test=2(\b|$)/.test(location.search);
       var v2 = leggi('rf_v2_state');
       var v1 = leggi('rf_state');
       var inCorso = null;
       if (v2 && v2.trail && v2.trail.length > 0) inCorso = { href: 'test-v2.html', chiave: 'rf_v2_state' };
-      else if (v1 && v1.questionCount > 0) inCorso = { href: 'test.html', chiave: 'rf_state' };
+      // Con ?test=2 si chiede il test a capitoli: un test classico lasciato
+      // a metà su questo dispositivo non deve riportare al vecchio test.
+      else if (!forzaV2 && v1 && v1.questionCount > 0) inCorso = { href: 'test.html', chiave: 'rf_state' };
 
       if (inCorso) {
         // Un test lasciato a metà non si cancella più aprendo la home: si
@@ -115,7 +118,7 @@
       }
 
       var variante = null;
-      if (/[?&]test=2(\b|$)/.test(location.search)) variante = 'v2';
+      if (forzaV2) variante = 'v2';
       else {
         var salvata = leggi('rf_test_variant');
         if (salvata && salvata.q === QUOTA_TEST_V2) variante = salvata.v;

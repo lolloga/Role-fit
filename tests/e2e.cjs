@@ -602,6 +602,19 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         assert((await H.page.getAttribute('#hero-test-cta', 'href')) === 'test-v2.html');
         await H.ctx.close();
       });
+      await t('home: con un test classico lasciato a metà, ?test=2 apre comunque il test a capitoli', async () => {
+        const H = await newPage(browser);
+        await H.page.goto(BASE + '/index.html');
+        await H.page.evaluate(() => localStorage.setItem('rf_state', JSON.stringify({ questionCount: 4 })));
+        await H.page.goto(BASE + '/index.html');
+        assert((await H.page.getAttribute('#hero-test-cta', 'href')) === 'test.html', 'senza ?test=2 si riprende il classico');
+        assert((await H.page.textContent('#hero-test-cta-label')).includes('Riprendi'));
+        await H.page.goto(BASE + '/index.html?test=2');
+        assert((await H.page.getAttribute('#hero-test-cta', 'href')) === 'test-v2.html', '?test=2 ignorato');
+        assert(!(await H.page.textContent('#hero-test-cta-label')).includes('Riprendi'));
+        assert(await H.page.evaluate(() => localStorage.getItem('rf_state') !== null), 'il test classico salvato non va cancellato');
+        await H.ctx.close();
+      });
     }
 
     if (want('profilo')) {
