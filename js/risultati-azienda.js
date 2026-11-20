@@ -19,7 +19,9 @@ function getJobId() {
 
 function renderAssi(assi) {
   const container = document.getElementById('target-assi');
-  container.innerHTML = ASSI_KEYS.map((key) => {
+  // "Concretezza" c'è solo nelle ricerche create dopo il test a capitoli.
+  const chiavi = typeof assi.Concretezza === 'number' ? [...ASSI_KEYS, 'Concretezza'] : ASSI_KEYS;
+  container.innerHTML = chiavi.map((key) => {
     const value = assi[key] ?? 0;
     return `
       <div style="margin-bottom:14px;">

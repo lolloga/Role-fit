@@ -781,8 +781,17 @@ function setupCv() {
 }
 
 // ─── COSTELLAZIONE E STORICO ──────────────────────────────────
-const ASSI_FISSI = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
-const ASSI_COLORI = ['#5DCAA5', '#FF9FB8', '#FFD060', '#85C9EB', '#C79CF0', '#7FE0C0'];
+// Il test a capitoli ha aggiunto una settima dimensione, "Concretezza": la
+// costellazione la mostra solo se almeno uno dei report la contiene, così
+// chi ha fatto solo il test classico continua a vedere le sue 6 stelle.
+const ASSI_BASE = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const ASSI_TUTTI = [...ASSI_BASE, 'Concretezza'];
+const COLORI_ASSI = {
+  Analisi: '#5DCAA5', Relazione: '#FF9FB8', Creatività: '#FFD060', Curiosità: '#85C9EB',
+  Leadership: '#C79CF0', Metodo: '#7FE0C0', Concretezza: '#F2A65A',
+};
+let ASSI_FISSI = ASSI_BASE;
+let ASSI_COLORI = ASSI_FISSI.map((k) => COLORI_ASSI[k]);
 const RUOLO_ANGOLI = [30, 150, 270];
 
 // "bassa" pulsa/si affievolisce, "media" resta ferma ma più tenue, "alta" (o
@@ -854,11 +863,19 @@ function fillClampedText(ctx, text, x, y, W, pad = 4) {
   ctx.fillText(text, cx, y);
 }
 
+// Un report più vecchio può non avere tutte le dimensioni mostrate: la
+// stella mancante resta a metà raggio, spenta, con "—" al posto del valore.
+function fillAssi(assi) {
+  const out = {};
+  ASSI_FISSI.forEach((k) => { out[k] = typeof assi?.[k] === 'number' ? assi[k] : 50; });
+  return out;
+}
+
 function goToSnapshot(i) {
   if (i === sky.activeSnapshot || !sky.snapshots[i]) return;
   sky.activeSnapshot = i;
   sky.morphFrom = { ...sky.current };
-  sky.target = { ...sky.snapshots[i].assi };
+  sky.target = fillAssi(sky.snapshots[i].assi);
   sky.targetConf = { ...sky.snapshots[i].conf };
   sky.morphStart = performance.now();
   document.querySelectorAll('.timeline-point').forEach((el, idx) => el.classList.toggle('active', idx === i));
@@ -902,9 +919,11 @@ function skyFrame(now) {
   });
 
   const small = W < 420;
+  const assiSnapshot = sky.snapshots[sky.activeSnapshot]?.assi || {};
   ASSI_FISSI.forEach((k, i) => {
     const pos = starPositions[i];
-    const conf = confAmount(sky.currentConf[k]);
+    const manca = typeof assiSnapshot[k] !== 'number';
+    const conf = manca ? 0.15 : confAmount(sky.currentConf[k]);
     const flicker = conf < 1 ? Math.sin(sky.t * 0.06 + i) * (1 - conf) * 0.4 : 0;
     const haloR = 11 + conf * 9 + flicker * 5;
 
@@ -928,7 +947,7 @@ function skyFrame(now) {
     fillClampedText(ctx, k, lx, ly, W);
     ctx.font = (small ? '9px ' : '11px ') + 'ui-monospace, monospace';
     ctx.fillStyle = 'rgba(240,255,244,0.35)';
-    fillClampedText(ctx, Math.round(sky.current[k] ?? 0) + '', lx, ly + (small ? 12 : 14), W);
+    fillClampedText(ctx, manca ? '—' : Math.round(sky.current[k] ?? 0) + '', lx, ly + (small ? 12 : 14), W);
   });
 
   sky.roles.forEach((r, i) => {
@@ -1059,7 +1078,7 @@ function startSkyOnce() {
 const DEMO_REPORT = {
   created_at: new Date().toISOString(),
   report_json: {
-    assi: { Analisi: 68, Relazione: 82, 'Creatività': 61, 'Curiosità': 77, Leadership: 54, Metodo: 63 },
+    assi: { Analisi: 68, Relazione: 82, 'Creatività': 61, 'Curiosità': 77, Leadership: 54, Metodo: 63, Concretezza: 44 },
     assi_confidenza: {},
     ruoli: [
       { nome: 'UX Researcher', match: 88 },
@@ -1089,10 +1108,17 @@ function renderConstellation(reports) {
   startSkyOnce();
   if (!sky.canvas) return;
 
+  ASSI_FISSI = conAssi.some((r) => typeof r.report_json.assi.Concretezza === 'number') ? ASSI_TUTTI : ASSI_BASE;
+  ASSI_COLORI = ASSI_FISSI.map((k) => COLORI_ASSI[k]);
+
+  // Test fatti con le due versioni del test non sono del tutto confrontabili:
+  // se convivono nella linea del tempo, quelli vecchi vengono segnati.
+  const misto = conAssi.some((r) => r.report_json.versione_test === 2) && conAssi.some((r) => r.report_json.versione_test !== 2);
   sky.snapshots = conAssi.map((r) => ({
     data: formatShort(r.created_at),
     assi: r.report_json.assi,
     conf: r.report_json.assi_confidenza || {},
+    vecchio: misto && r.report_json.versione_test !== 2,
   }));
 
   const latest = conAssi[conAssi.length - 1].report_json;
@@ -1112,6 +1138,8 @@ function renderConstellation(reports) {
   const haBassa = sky.snapshots.some((s) => ASSI_FISSI.some((k) => s.conf[k] === 'bassa'));
   const nota = document.getElementById('cnst-nota');
   if (nota) nota.classList.toggle('hidden', !haBassa);
+  const notaVersione = document.getElementById('cnst-versione');
+  if (notaVersione) notaVersione.classList.toggle('hidden', !misto);
 
   const legend = document.getElementById('cnst-legend');
   if (legend) {
@@ -1132,7 +1160,7 @@ function renderConstellation(reports) {
       }
       const btn = document.createElement('button');
       btn.className = 'timeline-point';
-      btn.innerHTML = `<span class="timeline-dot"></span><span class="timeline-label">${esc(s.data)}${i === sky.snapshots.length - 1 ? ' (oggi)' : ''}</span>`;
+      btn.innerHTML = `<span class="timeline-dot"></span><span class="timeline-label">${esc(s.data)}${s.vecchio ? ' ◦' : ''}${i === sky.snapshots.length - 1 ? ' (oggi)' : ''}</span>`;
       btn.addEventListener('click', () => goToSnapshot(i));
       timelineEl.appendChild(btn);
     });
@@ -1142,7 +1170,7 @@ function renderConstellation(reports) {
   // al primo caricamento (il morph si vede solo quando l'utente naviga nel
   // tempo, non quando la pagina si apre).
   const lastIdx = sky.snapshots.length - 1;
-  sky.current = { ...sky.snapshots[lastIdx].assi };
+  sky.current = fillAssi(sky.snapshots[lastIdx].assi);
   sky.currentConf = { ...sky.snapshots[lastIdx].conf };
   sky.target = { ...sky.current };
   sky.targetConf = { ...sky.currentConf };
@@ -1161,10 +1189,13 @@ function renderStorico(reports) {
   empty.classList.toggle('hidden', reports.length > 0);
   list.innerHTML = '';
   if (!reports.length) return;
+  const haV2 = reports.some((r) => r.report_json?.versione_test === 2);
   reports.forEach((r, i) => {
     const a = document.createElement('a');
     a.href = 'report.html?id=' + r.id; a.className = 'st-card';
-    const badge = (i === 0) ? '<span class="st-badge">Più recente</span>' : '';
+    const badge = (i === 0) ? '<span class="st-badge">Più recente</span>'
+      : (haV2 && r.report_json?.versione_test !== 2) ? '<span class="st-badge" style="background:transparent;color:rgba(240,255,244,0.45);border:1px solid rgba(240,255,244,0.2);">Versione precedente</span>'
+      : '';
     a.innerHTML =
       '<div class="st-card-top"><p class="st-date">' + esc(formatDate(r.created_at)) + '</p>' + badge + '</div>' +
       '<p class="st-roles">' + esc(rolesLine(r.report_json)) + '</p>' +

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#030F0A">
+  <title>RoleFit — Una giornata di lavoro</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="description" content="Il test RoleFit a capitoli: 7 minuti per vivere una giornata di lavoro e scoprire i ruoli più in linea con te.">
+  <!-- Versione in prova: resta fuori dai motori di ricerca finché non sostituisce il test attuale. -->
+  <meta name="robots" content="noindex">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="RoleFit">
+  <meta property="og:locale" content="it_IT">
+  <meta property="og:title" content="RoleFit — Una giornata di lavoro">
+  <meta property="og:description" content="7 minuti per vivere una giornata di lavoro e scoprire i ruoli più in linea con te.">
+  <meta property="og:image" content="https://role-fit-beta.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="627">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;0,900;1,500&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/test-v2.css">
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body class="v2">
+
+<!-- Il cielo cambia con l'ora della giornata del test: ogni strato è una fase,
+     e il passaggio avviene in dissolvenza (i gradienti CSS non si animano). -->
+<div class="v2-sky" aria-hidden="true">
+  <div class="v2-layer" data-fase="alba"></div>
+  <div class="v2-layer" data-fase="mattino"></div>
+  <div class="v2-layer" data-fase="pomeriggio"></div>
+  <div class="v2-layer" data-fase="tramonto"></div>
+  <div class="v2-layer" data-fase="notte"></div>
+</div>
+
+<header class="v2-top">
+  <a class="v2-logo" href="index.html">Role<span>Fit</span></a>
+  <div class="v2-clock">
+    <span class="v2-ora" id="v2-ora">07:30</span>
+    <span class="v2-cap" id="v2-cap">Prologo</span>
+  </div>
+  <button type="button" class="v2-exit" id="v2-exit" aria-label="Esci dal test">✕</button>
+</header>
+<div class="v2-progress" aria-hidden="true"><div class="v2-progress-fill" id="v2-progress-fill"></div></div>
+
+<div class="v2-stars-wrap" id="v2-stars-wrap" aria-hidden="true">
+  <canvas id="v2-stars"></canvas>
+</div>
+
+<main class="v2-stage" id="v2-stage" aria-live="polite"></main>
+
+<button type="button" class="v2-back hidden" id="v2-back">← Indietro</button>
+<div class="v2-toast hidden" id="v2-toast" role="status"></div>
+
+<script type="module" src="js/test-v2.js"></script>
+</body>
+</html>

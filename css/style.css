@@ -1364,3 +1364,20 @@ select:focus-visible {
   outline: 2px solid var(--emerald-light);
   outline-offset: 3px;
 }
+
+/* Report del test a capitoli: le scelte concrete che sostengono il profilo. */
+.prove-box {
+  margin-top: 22px; padding: 18px 20px; border-radius: var(--radius-md);
+  background: rgba(29,158,117,0.06); border: 1px solid rgba(29,158,117,0.3);
+}
+.prove-label {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--emerald-light); margin-bottom: 10px;
+}
+.prove-list { list-style: none; display: grid; gap: 8px; }
+.prove-list li {
+  position: relative; padding-left: 18px;
+  font-size: 0.9rem; line-height: 1.55; color: var(--text-secondary);
+}
+.prove-list li::before { content: '◆'; position: absolute; left: 0; top: 1px; font-size: 0.6rem; color: var(--emerald-light); }
+.prove-nota { margin-top: 12px; font-size: 0.82rem; color: #FFD060; line-height: 1.5; }

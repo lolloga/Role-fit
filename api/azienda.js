@@ -21,7 +21,11 @@ import { clientIp, isSameOrigin, rateLimit, validateMessages } from './_guard.js
 //    persona, ruoli, assi, domande non personali), mai il report personale
 //    scritto in seconda persona per il candidato.
 
-const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo'];
+const ASSI_KEYS = ['Analisi', 'Relazione', 'Creatività', 'Curiosità', 'Leadership', 'Metodo', 'Concretezza'];
+// "Concretezza" è arrivata con il test a capitoli: i profili e le ricerche
+// creati prima non ce l'hanno. È quindi facoltativa nel profilo target, e
+// computeMatch confronta solo le dimensioni presenti da entrambe le parti.
+const ASSI_OBBLIGATORI = ASSI_KEYS.filter((k) => k !== 'Concretezza');
 const SOGLIA_MATCH = 80;
 // Quanti candidati (già ordinati per compatibilità sui 6 assi) passano al
 // controllo semantico AI. Tenerlo basso limita costo/latenza della validazione.
@@ -180,6 +184,7 @@ function validTargetProfile(tp) {
   if (!sintesi || !tp.assi || typeof tp.assi !== 'object') return null;
   const assi = {};
   for (const key of ASSI_KEYS) {
+    if (!ASSI_OBBLIGATORI.includes(key) && tp.assi[key] == null) continue;
     const v = Number(tp.assi[key]);
     if (tp.assi[key] === null || tp.assi[key] === '' || !Number.isFinite(v) || v < 0 || v > 100) return null;
     assi[key] = Math.round(v);

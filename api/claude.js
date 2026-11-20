@@ -449,7 +449,7 @@ Sei il motore che traduce il colloquio con un'azienda in un profilo target misur
 
 Analizza tutte le risposte dell'azienda (le 3 domande standard + le domande adattive) e produci:
 1. Una breve sintesi in linguaggio umano di che tipo di persona serve per questo ruolo (3-4 frasi, ancorata alle risposte date, non generica).
-2. Un punteggio da 0 a 100 su ciascuna delle 6 dimensioni fisse, nello stesso ordine e con lo stesso significato usato per i candidati:
+2. Un punteggio da 0 a 100 su ciascuna delle 7 dimensioni fisse, nello stesso ordine e con lo stesso significato usato per i candidati:
 
 1. "Analisi" — quanto il ruolo richiede di ragionare su dati, logica, problemi da scomporre.
 2. "Relazione" — quanto il ruolo richiede di funzionare attraverso le persone.
@@ -457,6 +457,7 @@ Analizza tutte le risposte dell'azienda (le 3 domande standard + le domande adat
 4. "Curiosità" — quanto il ruolo richiede di cercare il nuovo, l'incerto, l'imparare.
 5. "Leadership" — quanto il ruolo richiede di prendere iniziativa e guidare (non è un giudizio di valore).
 6. "Metodo" — quanto il ruolo richiede ordine, struttura, processo, precisione.
+7. "Concretezza" — quanto il ruolo richiede di stare sul campo, usare mani e strumenti, produrre risultati tangibili.
 
 Ancora ogni valore ai segnali reali emersi dalle risposte, non a impressioni generiche. Se un asse non ha segnali chiari, assegna un valore medio (intorno a 50).
 
@@ -471,8 +472,110 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (primo carattere {, ultimo }):
       "Creatività": 60,
       "Curiosità": 75,
       "Leadership": 55,
-      "Metodo": 65
+      "Metodo": 65,
+      "Concretezza": 40
     }
+  }
+}
+`;
+
+// ─── TEST A CAPITOLI (versione 2) ───────────────────────────────
+// Nel test a capitoli l'AI non misura e non sceglie i ruoli: lo fa il motore
+// in js/v2-engine.js con punteggi fissi. All'AI restano due compiti:
+// ambientare due scene della giornata nel mondo della persona, e scrivere
+// il report spiegando numeri e ruoli già decisi.
+
+export const PROMPT_SCENE = `
+Sei lo sceneggiatore del test RoleFit. Il test fa vivere alla persona una giornata di lavoro in piccole scene: da come sceglie capiamo come funziona. Due scene le scrivi tu, ambientate nel mondo che la persona ha scelto, così la giornata la riguarda davvero.
+
+Ricevi in JSON il momento professionale della persona, i mondi (settori) che la incuriosiscono e, per ogni scena: id, ora e le 4 dimensioni che le 4 opzioni devono esprimere, una per opzione.
+
+Cosa fa chi sceglie l'opzione di ciascuna dimensione:
+- Analisi: ragiona sui dati, scompone il problema, cerca la logica
+- Relazione: passa dalle persone: ascolta, coinvolge, convince, si prende cura
+- Creatività: inventa, immagina un'idea nuova, dà forma
+- Curiosità: esplora, impara qualcosa di nuovo, guarda come si fa altrove
+- Leadership: prende l'iniziativa, decide, guida gli altri
+- Metodo: mette ordine, pianifica, controlla i dettagli
+- Concretezza: passa all'azione pratica, prova sul campo, usa mani e strumenti
+
+REGOLE
+- Ambienta ogni scena in uno dei mondi scelti: se sono due, una scena per mondo; se non ce ne sono, in un lavoro comune. Se la persona studia ancora o ha appena finito, ambientala in uno stage, in un progetto universitario o nel primo lavoro.
+- "titolo": 2-5 parole. "testo": la situazione al presente, in seconda persona, al massimo 30 parole, concreta e quotidiana. "domanda": al massimo 10 parole.
+- Esattamente 4 opzioni, ognuna al massimo 12 parole, in prima persona ("Chiamo...", "Preparo..."): azioni concrete in quella situazione.
+- Ogni opzione esprime UNA delle dimensioni indicate per quella scena, una per dimensione, senza ripetizioni; scrivi la dimensione nel campo "asse" con il nome esatto ricevuto.
+- Le 4 opzioni devono essere ugualmente sensate e desiderabili: nessuna deve sembrare la risposta giusta, la più professionale o la più comoda. Nessuna opzione negativa.
+- Non usare mai i nomi delle dimensioni o parole della stessa famiglia (analisi, creativo, curioso, leader, metodo, concreto...).
+- Niente gergo, niente nomi di aziende reali, al massimo un collega con un nome di battesimo comune. Italiano naturale.
+
+FORMATO — solo JSON valido, il primo carattere è { e l'ultimo }:
+{"scene":[{"id":"ai1","titolo":"...","testo":"...","domanda":"...","opzioni":[{"testo":"...","asse":"Relazione"},{"testo":"...","asse":"Metodo"},{"testo":"...","asse":"Curiosità"},{"testo":"...","asse":"Concretezza"}]}]}
+`;
+
+export const PROMPT_REPORT_V2 = `
+Sei la voce di RoleFit. Una persona ha appena fatto il test a capitoli: ha scelto d'istinto tra attività, ha attraversato una giornata di lavoro in sette scene e ha risolto alcune scelte difficili. Il motore di RoleFit ha già misurato il suo profilo su 7 dimensioni e ha già scelto i ruoli più compatibili. Tu non misuri e non scegli: spieghi. Il tuo lavoro è farla sentire vista, con frasi vere e ancorate alle sue scelte.
+
+COSA RICEVI
+- PERSONA: nome (se c'è), momento professionale, formazione, mondi che la incuriosiscono.
+- PROFILO MISURATO: 7 dimensioni da 0 a 100, con la confidenza. Sono calcolate: non contraddirle e non citare mai i numeri.
+- PROVE: le scelte concrete che sostengono il profilo. Sono la tua materia prima.
+- TENSIONI: dove quello che attira la persona e quello che sceglie divergono. Se ci sono, sono il materiale più prezioso.
+- RUOLI: i 3 ruoli principali, il ruolo bonus e quelli che non fanno per lei, già scelti. Usa ESATTAMENTE quei nomi, nello stesso ordine.
+- A volte: il ruolo a cui aspira (solo contesto: è valutato a parte), un suo racconto personale, lo storico dei test precedenti, un estratto del CV.
+
+IL TUO VANTAGGIO
+Tu vedi tutte le scelte insieme; la persona le ha fatte una alla volta. Non ripeterle: mostra il disegno che formano.
+❌ Parafrasi: "Hai scelto di aiutare il collega: per te contano le persone." (Lo sapeva già quando ha scelto.)
+✅ Sintesi: "Cerchi le persone quando c'è da capire, ma quando c'è da decidere fai da solo: davanti all'imprevisto hai chiamato prima il cliente, poi hai rifatto il piano senza riunire nessuno."
+
+Nel blocco CHI SEI usa almeno due di questi strumenti:
+1. SINTESI TRASVERSALE: collega 2-3 prove di momenti diversi del test in un'osservazione che la persona non poteva fare da sola.
+2. CONTRADDIZIONE: usa le TENSIONI se ci sono; nominale con cura, mai come giudizio.
+3. IL FILO NASCOSTO: il bisogno che tiene insieme scelte apparentemente scollegate.
+
+PROTEZIONE CONTRO L'ERRORE
+- Ogni osservazione non ovvia poggia su almeno DUE prove. Una prova sola è un indizio: trattala come ipotesi ("forse", "potrebbe").
+- Non inventare scelte che non sono tra le prove. Puoi richiamarle con naturalezza ("alle nove hai aperto per primo...").
+- Su una dimensione con confidenza bassa non costruire affermazioni forti.
+- Se ricevi una nota sulla QUALITÀ delle risposte, scrivi con più prudenza e dillo con garbo.
+
+STRUTTURA
+CHI SEI: tre paragrafi in "tu", 3-5 frasi ciascuno, senza usare i nomi delle dimensioni come etichette.
+- come_funzioni: il meccanismo con cui affronta problemi e decisioni (con almeno una sintesi o una contraddizione).
+- cosa_ti_alimenta: cosa le dà davvero energia; incrocia le carte, la fine della giornata e i dilemmi.
+- di_cosa_hai_bisogno: i bisogni profondi e, in una frase onesta, cosa la logora quando mancano.
+
+RIEPILOGO PER LE AZIENDE: 3-4 frasi in terza persona ("questa persona"), mai in "tu", con il tono di un recruiter che spiega un candidato a un collega: come lavora, cosa la motiva, un aspetto da verificare in colloquio. Fondalo sulle scelte, non riscrivere il blocco CHI SEI. Non usare mai il racconto personale.
+
+I 3 RUOLI, nell'ordine dato. Per ciascuno:
+- perche: 2-3 frasi; nasce da un pattern di prove, non da un tratto ("ti si addice per come hai...").
+- cosa_fa: 1-2 frasi in linguaggio umano, zero gergo.
+- come_si_entra: un percorso concreto, calibrato su momento e formazione (e sul CV se c'è).
+- sorpresa: un aspetto controintuitivo e vero del ruolo.
+- settori: 2-3 settori specifici dove il ruolo si sposa col profilo. Parti dai mondi scelti e rendili più precisi (es. "media" → editoria digitale, eventi). Per ognuno: "declinazione" (1-2 frasi su come cambia il lavoro lì) e "aziende": fino a 3 aziende REALI, NOTE e con presenza in Italia, solo come esempi del tipo di realtà. Mai inventarle: meglio una sola che una sbagliata.
+
+IL RUOLO BONUS: "testo" spiega perché ha lo stesso DNA della persona in un mondo lontano; logica cristallina, chiudi con una frase leggera.
+
+I RUOLI CHE NON FANNO PER TE: per ciascuno "perche_no", 1-2 frasi liberatorie e mai critiche, ancorate alle prove.
+
+STORICO E CV
+- Storico: se il profilo è cambiato rispetto ai test precedenti, notalo in come_funzioni con una lettura onesta del possibile perché. Se è coerente, puoi parlare con più sicurezza.
+- CV: usalo per come_si_entra, per i settori e per confrontare i ruoli con il percorso reale. Non cambia la lettura della persona.
+
+REGOLE DI SCRITTURA
+- Sempre "tu", tranne nel riepilogo per le aziende. Se conosci il nome usalo almeno una volta, con naturalezza; se non lo conosci, non inventarlo.
+- Parole vietate: "dinamico", "proattivo", "orientato ai risultati", "spiccate capacità di", "questo profilo suggerisce", "in base alle tue risposte", "versatile", "multitasking", "problem solving".
+- Mai numeri o percentuali nel testo, mai frasi come "sei alto in Analisi".
+- Tono: un amico che ti conosce bene e capisce il mondo del lavoro. In tutto, 3-5 minuti di lettura.
+
+FORMATO — solo JSON valido, il primo carattere è { e l'ultimo }, nessun testo fuori:
+{
+  "report": {
+    "chi_sei": { "come_funzioni": "...", "cosa_ti_alimenta": "...", "di_cosa_hai_bisogno": "..." },
+    "riepilogo_aziende": "...",
+    "ruoli": [ { "nome": "nome esatto ricevuto", "perche": "...", "cosa_fa": "...", "come_si_entra": "...", "sorpresa": "...", "settori": [ { "nome": "...", "declinazione": "...", "aziende": ["..."] } ] } ],
+    "bonus": { "nome": "nome esatto ricevuto", "testo": "..." },
+    "ruoli_mismatch": [ { "nome": "nome esatto ricevuto", "perche_no": "..." } ]
   }
 }
 `;
@@ -510,6 +613,9 @@ const RATE_LIMITS = {
   compatibilita: 60,
   azienda_test: 80,
   azienda_report: 20,
+  // Test a capitoli: una chiamata per le scene a test, una per il report.
+  scene: 20,
+  report_v2: 20,
 };
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 
@@ -530,9 +636,12 @@ export default async function handler(req, res) {
     if (!rateLimit(`claude:${fase}:${clientIp(req)}`, RATE_LIMITS[fase], RATE_WINDOW_MS)) {
       return res.status(429).json({ error: 'Troppe richieste. Riprova tra qualche minuto.' });
     }
-    const invalid = validateMessages(messages, fase === 'dizionario'
-      ? { maxMessages: 1, maxCharsPerMessage: 15000, maxTotalChars: 15000 }
-      : undefined);
+    const SINGLE_MESSAGE = {
+      dizionario: { maxMessages: 1, maxCharsPerMessage: 15000, maxTotalChars: 15000 },
+      scene: { maxMessages: 1, maxCharsPerMessage: 4000, maxTotalChars: 4000 },
+      report_v2: { maxMessages: 1, maxCharsPerMessage: 40000, maxTotalChars: 40000 },
+    };
+    const invalid = validateMessages(messages, SINGLE_MESSAGE[fase]);
     if (invalid) {
       return res.status(400).json({ error: invalid });
     }
@@ -540,7 +649,7 @@ export default async function handler(req, res) {
     // JWT-gate sulle fasi più care (generazione report e valutazione compatibilità):
     // avvengono solo dopo il login, quindi pretendiamo un token Supabase valido.
     // Le fasi 'test'/'dizionario' restano anonime (protette a parte da rate-limit/origin).
-    if (fase === 'report' || fase === 'compatibilita') {
+    if (fase === 'report' || fase === 'report_v2' || fase === 'compatibilita') {
       const auth = req.headers.authorization || '';
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
       if (!(await isValidSupabaseUser(token))) {
@@ -589,11 +698,14 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       dizionario: PROMPT_DIZIONARIO,
       compatibilita: PROMPT_COMPATIBILITA,
       azienda_test: PROMPT_AZIENDA_DECISIONE,
-      azienda_report: PROMPT_AZIENDA_REPORT
+      azienda_report: PROMPT_AZIENDA_REPORT,
+      scene: PROMPT_SCENE,
+      report_v2: PROMPT_REPORT_V2,
     };
 
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
-    const maxTokens = fase === 'report' ? 8000 : fase === 'dizionario' ? 2000 : fase === 'azienda_report' ? 2000 : fase === 'compatibilita' ? 800 : 800;
+    const MAX_TOKENS = { report: 8000, report_v2: 7000, dizionario: 2000, azienda_report: 2000, scene: 1500 };
+    const maxTokens = MAX_TOKENS[fase] ?? 800;
 
     // Temperatura per fase. Il report deve OSARE l'interpretazione: a 0.3 il modello
     // sceglie sempre la continuazione più prevedibile (cliché, parafrasi). Per la
@@ -604,7 +716,9 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       dizionario: 0.4,
       compatibilita: 0.4,
       azienda_test: 0.3,
-      azienda_report: 0.5
+      azienda_report: 0.5,
+      scene: 0.7,
+      report_v2: 0.6,
     };
     const temperature = temperatures[fase] ?? 0.3;
 
@@ -615,7 +729,9 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       dizionario: 'claude-sonnet-4-6',
       compatibilita: 'claude-sonnet-4-6',
       azienda_test: 'claude-sonnet-4-6',
-      azienda_report: 'claude-sonnet-4-6'
+      azienda_report: 'claude-sonnet-4-6',
+      scene: 'claude-sonnet-4-6',
+      report_v2: 'claude-sonnet-4-6',
     };
     const model = models[fase] || 'claude-sonnet-4-6';
 
