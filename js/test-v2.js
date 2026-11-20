@@ -3,16 +3,17 @@
 // Questo file disegna le schermate e raccoglie le risposte; tutta la logica
 // (percorso, punteggi, ruoli) sta in v2-engine.js. Lo stato vive in
 // localStorage a ogni risposta: ricaricare la pagina riparte dal punto
-// esatto. Tutto il testo che arriva da fuori (nome, scene scritte dall'AI)
+// esatto. Tutto il testo che arriva da fuori (nome, testi scritti dall'AI)
 // entra nella pagina solo come testo, mai come HTML.
 
 import {
-  AXES, createState, nextStep, answer as registra, undo, progress, contextOf,
-  sceneContent, validAiScene, computeProfile, buildPayload, buildAnswers,
-  syntheticHistory, PERSONALIZED_SCENES,
+  AXES, ENGINE_VERSION, createState, nextStep, answer as registra, undo, progress, contextOf,
+  cardContent, sceneContent, sceneOpening, dilemmaContent, lockCard, lockScene, lockDilemma,
+  richiestaCarte, accettaCarte, richiestaGiornata, accettaGiornata, richiestaDilemmi, accettaDilemmi,
+  orderFor, computeProfile, buildPayload, buildAnswers, syntheticHistory,
 } from './v2-engine.js';
 import {
-  AXIS_COLORS, CARDS, CARD_QUESTION, MOMENTI, MONDI, MONDO_NON_SO, BACKGROUND, SCENES, DILEMMAS,
+  AXIS_COLORS, CARD_QUESTION, MOMENTI, MONDI, MONDO_NON_SO, BACKGROUND, SCENES,
 } from './v2-items.js';
 
 const STORE = 'rf_v2_state';
@@ -20,9 +21,7 @@ const stage = document.getElementById('v2-stage');
 const backBtn = document.getElementById('v2-back');
 const starsWrap = document.getElementById('v2-stars-wrap');
 
-const CARD_BY_ID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const SCENE_BY_ID = Object.fromEntries(SCENES.map((s) => [s.id, s]));
-const DIL_BY_ID = Object.fromEntries(DILEMMAS.map((d) => [d.id, d]));
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 
 // Come si descrive in breve chi brilla su una dimensione (schermata finale).
@@ -37,10 +36,14 @@ const AXIS_SHORT = {
 };
 
 // ─── STATO ──────────────────────────────────────────────────────
+let rinnovato = false;
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || 'null');
-    if (s && s.v === 2 && Array.isArray(s.ordineCarte) && s.answers && Array.isArray(s.trail)) return s;
+    if (s && s.v === 2 && s.motore === ENGINE_VERSION && Array.isArray(s.ordineCarte) && s.answers && Array.isArray(s.trail)) return s;
+    // Un test iniziato con una versione precedente del motore riparte da capo:
+    // carte e scene non sarebbero più le stesse.
+    if (s && s.v === 2 && Array.isArray(s.trail) && s.trail.length) rinnovato = true;
   } catch { /* stato illeggibile: si riparte */ }
   return null;
 }
@@ -109,69 +112,79 @@ const namePromise = (!state.trail.length && !state.nomeNoto)
   })
   : Promise.resolve(state.nomeNoto);
 
-// ─── SCENE PERSONALIZZATE ──────────────────────────────────────
-// Partono appena si conoscono i mondi della persona: mentre gioca il
-// capitolo 1, l'AI ambienta due scene della giornata in quei mondi. Se non
-// arrivano in tempo (o arrivano sbagliate) si usano le scene standard, che
-// misurano esattamente le stesse cose.
-let scenesInFlight = false;
-async function requestScenes() {
-  const pending = PERSONALIZED_SCENES.filter((s) => !state.scenes[s.id]);
-  if (!pending.length || scenesInFlight || !state.answers.mondi) return;
-  const ctx = contextOf(state);
-  scenesInFlight = true;
+// ─── TESTI SCRITTI DALL'AI ─────────────────────────────────────
+// Appena si conoscono i mondi della persona partono, in parallelo, quattro
+// richieste: le carte, la mattina e il pomeriggio della giornata, i dilemmi.
+// Ognuna arriva mentre la persona gioca il pezzo precedente. Se una non
+// arriva in tempo (o arriva sbagliata) quel pezzo usa i testi standard, che
+// misurano esattamente le stesse cose. L'AI non riceve mai il nome della
+// persona: scrive {nome} e lo inseriamo noi.
+const inflight = {};
+// Se la persona torna indietro e cambia mondi, i testi già scritti per i
+// mondi di prima si buttano, e le risposte ancora in viaggio si ignorano.
+let aiGen = 0;
+
+async function askAi(fase, payload, timeoutMs) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fase: 'scene',
-        messages: [{
-          role: 'user',
-          content: JSON.stringify({
-            momento: ctx.momentoTesto,
-            mondi: ctx.mondi.filter((m) => m !== MONDO_NON_SO),
-            scene: pending,
-          }),
-        }],
-      }),
+      body: JSON.stringify({ fase, messages: [{ role: 'user', content: JSON.stringify(payload) }] }),
       signal: controller.signal,
     });
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const data = await res.json();
-    const list = parseJsonText(data?.content?.[0]?.text)?.scene;
-    if (!Array.isArray(list)) return;
-    for (const def of pending) {
-      if (state.scenes[def.id]) continue; // nel frattempo già mostrata in versione standard
-      const ai = list.find((x) => x && x.id === def.id);
-      if (validAiScene(ai, SCENE_BY_ID[def.id])) {
-        state.scenes[def.id] = {
-          titolo: ai.titolo,
-          testo: ai.testo,
-          domanda: ai.domanda,
-          opzioni: ai.opzioni.map((o) => ({ testo: o.testo, asse: o.asse })),
-        };
-      }
-    }
-    save();
+    return parseJsonText(data?.content?.[0]?.text);
   } catch (e) {
-    console.warn('Scene personalizzate non disponibili, uso quelle standard:', e?.name || e);
+    console.warn(`Testi dell'AI non disponibili (${fase}), uso quelli standard:`, e?.name || e);
+    return null;
   } finally {
     clearTimeout(timer);
-    scenesInFlight = false;
   }
 }
 
-// Una scena personalizzata si "congela" la prima volta che compare: se
-// l'AI risponde dopo, la scena già vista (e magari già scelta) non cambia
-// sotto gli occhi di chi la sta leggendo.
-function lockScene(id) {
-  if (SCENE_BY_ID[id]?.personalizzata && !state.scenes[id]) {
-    state.scenes[id] = { standard: true };
-    save();
+const AI_JOBS = [
+  { nome: 'carte', fase: 'carte', build: () => richiestaCarte(state), accept: (d) => accettaCarte(state, d), timeout: 30000 },
+  { nome: 'mattina', fase: 'giornata', build: () => richiestaGiornata(state, 'mattina'), accept: (d) => accettaGiornata(state, d, 'mattina'), timeout: 60000 },
+  { nome: 'pomeriggio', fase: 'giornata', build: () => richiestaGiornata(state, 'pomeriggio'), accept: (d) => accettaGiornata(state, d, 'pomeriggio'), timeout: 75000 },
+  { nome: 'dilemmi', fase: 'dilemmi', build: () => richiestaDilemmi(state), accept: (d) => accettaDilemmi(state, d), timeout: 90000 },
+];
+
+function requestAi() {
+  if (!state.answers.mondi) return;
+  const mondi = JSON.stringify(contextOf(state).mondi);
+  if (state.aiMondi && state.aiMondi !== mondi) {
+    aiGen++;
+    state.carteAi = {};
+    state.scenes = {};
+    state.dilemmiAi = {};
+    AI_JOBS.forEach((job) => { inflight[job.nome] = null; });
   }
+  state.aiMondi = mondi;
+  save();
+  const gen = aiGen;
+  for (const job of AI_JOBS) {
+    if (inflight[job.nome] || !job.build()) continue;
+    const p = (async () => {
+      // Un secondo tentativo se il primo fallisce, finché quel pezzo serve ancora.
+      for (let tentativo = 0; tentativo < 2; tentativo++) {
+        const payload = job.build();
+        if (!payload) return;
+        const data = await askAi(job.fase, payload, job.timeout);
+        if (gen !== aiGen) return;
+        if (data && job.accept(data) > 0) { save(); return; }
+        await wait(1500);
+      }
+    })().finally(() => { if (inflight[job.nome] === p) inflight[job.nome] = null; });
+    inflight[job.nome] = p;
+  }
+}
+
+// Aspetta (al massimo `ms`) che arrivi un pezzo ancora in viaggio.
+async function waitFor(nome, ms) {
+  if (inflight[nome]) await Promise.race([inflight[nome], wait(ms)]);
 }
 
 // ─── COSTELLAZIONE ─────────────────────────────────────────────
@@ -374,7 +387,11 @@ document.addEventListener('keydown', (e) => {
 function render() {
   const step = nextStep(state);
   if (step.tipo === 'dilemma' && state.dilCorrente !== step.id) { state.dilCorrente = step.id; save(); }
-  if (step.tipo === 'scene') lockScene(step.id);
+  // Quello che compare a schermo non cambia più, anche se l'AI risponde dopo.
+  const congelato = (step.tipo === 'card' && lockCard(state, step.id))
+    || (step.tipo === 'scene' && lockScene(state, step.id))
+    || (step.tipo === 'dilemma' && lockDilemma(state, step.id));
+  if (congelato) save();
   currentKey = step.key;
   shownAt = performance.now();
   keyHandler = null;
@@ -396,7 +413,7 @@ function respond(key, value) {
   const before = computeProfile(state).stats;
   registra(state, key, { ...value, ms: Math.round(performance.now() - shownAt) });
   save();
-  if (key === 'mondi') requestScenes();
+  if (key === 'mondi') requestAi();
   stars.update(computeProfile(state), before);
   render();
 }
@@ -425,7 +442,7 @@ function screenIntro() {
   wrap.append(
     h('p', { class: 'v2-eyebrow', text: 'RoleFit · il test a capitoli' }),
     h('h1', { class: 'v2-title' }, nome ? `Ciao ${nome}. ` : '', 'Una giornata di lavoro, ', h('em', { text: 'in 7 minuti.' })),
-    h('p', { class: 'v2-text', text: 'Niente domande difficili: scegli d\'istinto tra alcune attività, vivi una giornata dalle 9 alle 18 e risolvi qualche dilemma. Da come la vivi capiamo come funzioni e dove rendi di più.' }),
+    h('p', { class: 'v2-text', text: 'Niente domande difficili: scegli d\'istinto tra alcune attività, vivi una giornata di lavoro scritta su misura per te, dalle 9 alle 18, e risolvi qualche dilemma. Ogni volta è diversa. Da come la vivi capiamo come funzioni e dove rendi di più.' }),
     h('ul', { class: 'v2-meta-list' },
       h('li', {}, h('span', { text: '◈' }), '3 capitoli, una cosa per volta'),
       h('li', {}, h('span', { text: '◷' }), 'Circa 7 minuti'),
@@ -478,9 +495,10 @@ function optionList(options, onPick, { badge = (o, i) => LETTERS[i], from = null
 }
 
 function screenMomento(step) {
+  const nome = contextOf(state).nome;
   return h('div', {},
     h('p', { class: 'v2-eyebrow', text: 'Prologo' }),
-    h('h2', { class: 'v2-title', text: 'In che momento sei?' }),
+    h('h2', { class: 'v2-title', text: nome ? `${nome}, in che momento sei?` : 'In che momento sei?' }),
     h('p', { class: 'v2-text', text: 'Della tua vita professionale, oggi.' }),
     optionList(MOMENTI, (o) => respond(step.key, { v: o.id })),
   );
@@ -512,7 +530,7 @@ function screenMondi(step) {
   return h('div', {},
     h('p', { class: 'v2-eyebrow', text: 'Prologo' }),
     h('h2', { class: 'v2-title', text: 'Quali mondi ti incuriosiscono?' }),
-    h('p', { class: 'v2-text', text: 'Scegline uno o due: ambienteremo lì parte della tua giornata. Non serve esserci già dentro.' }),
+    h('p', { class: 'v2-text', text: 'Scegline uno o due: la tua giornata la scriviamo lì, ogni volta in modo diverso. Non serve esserci già dentro.' }),
     chips,
     h('div', { class: 'v2-actions' }, btn),
   );
@@ -520,36 +538,56 @@ function screenMondi(step) {
 
 function screenCapitolo(step) {
   const ctx = contextOf(state);
+  const n = ctx.nome;
   const testi = {
     1: {
       titolo: 'Cosa ti accende',
-      testo: `Ti mostriamo ${state.ordineCarte.length} attività, una alla volta. Rispondi d'istinto: ti piacerebbe passarci una giornata? Non c'è una risposta giusta, e più sei sincero più il risultato ti somiglia.`,
+      testo: `Ti mostriamo ${state.ordineCarte.length} attività, una alla volta. Rispondi d'istinto: ti piacerebbe passarci una giornata? Non c'è una risposta giusta: più rispondi di pancia, più il risultato ti somiglia.`,
       bottone: 'Inizia',
     },
     2: {
       titolo: 'La tua giornata',
-      testo: `${ctx.nome ? `${ctx.nome}, sono` : 'Sono'} le 8:58 e la giornata sta per cominciare: sette momenti, dalle 9 alle 18. Fai quello che faresti davvero, non quello che sembra più giusto.`,
+      testo: `${n ? `${n}, sono` : 'Sono'} le 8:58 e la giornata sta per cominciare: sette momenti, dalle 9 alle 18, con le persone con cui lavori. Fai quello che faresti davvero, non quello che sembra più giusto: la giornata andrà avanti in base alle tue scelte.`,
       bottone: 'Entra nella giornata',
+      // La mattina scritta dall'AI di solito è già pronta; se è ancora in
+      // viaggio la aspettiamo qualche secondo, poi si parte comunque.
+      aspetta: ['mattina', 8000, 'Sto preparando la tua giornata…'],
     },
     3: {
       titolo: 'Scelte difficili',
-      testo: 'La giornata è finita. Ora qualche scelta secca tra due cose che vorresti entrambe: tieni quella che senti più tua.',
+      testo: `${n ? `${n}, la` : 'La'} giornata è finita. Ora qualche scelta secca tra due cose che vorresti entrambe: tieni quella che senti più tua.`,
       bottone: 'Avanti',
+      aspetta: ['dilemmi', 5000, 'Un attimo…'],
     },
   }[step.numero];
+  let partito = false;
+  const btn = mainButton(testi.bottone, async () => {
+    if (partito) return;
+    partito = true;
+    if (testi.aspetta && inflight[testi.aspetta[0]]) {
+      btn.disabled = true;
+      btn.replaceChildren(h('span', { class: 'v2-wait', text: testi.aspetta[2] }));
+      await waitFor(testi.aspetta[0], testi.aspetta[1]);
+    }
+    respond(step.key, { seen: true });
+  });
   return h('div', {},
     h('p', { class: 'v2-eyebrow', text: `Capitolo ${step.numero} di 3` }),
     h('h2', { class: 'v2-title', text: testi.titolo }),
     h('p', { class: 'v2-text', text: testi.testo }),
     step.numero === 1 ? h('p', { class: 'v2-note', text: 'Sul telefono puoi anche trascinare le carte: a destra è sì, a sinistra è no.' }) : null,
-    h('div', { class: 'v2-actions' }, mainButton(testi.bottone, () => respond(step.key, { seen: true }))),
+    h('div', { class: 'v2-actions' }, btn),
   );
 }
 
 // ─── CAPITOLO 1: CARTE ─────────────────────────────────────────
 function screenCard(step) {
-  const card = CARD_BY_ID[step.id];
+  const card = cardContent(state, step.id);
+  const nome = contextOf(state).nome;
   const rimaste = step.totale - step.indice - 1;
+  if (step.indice === Math.floor(step.totale / 2) && !state.answers['card:' + step.id]) {
+    showToast(`Metà mazzo${nome ? `, ${nome}` : ''}: avanti così.`, 2200);
+  }
   const deck = h('div', { class: 'v2-deck' });
   if (rimaste >= 2) deck.append(h('div', { class: 'v2-ghost g2' }));
   if (rimaste >= 1) deck.append(h('div', { class: 'v2-ghost g1' }));
@@ -635,7 +673,11 @@ function sceneHead(sc) {
 
 function screenScene(step) {
   const sc = sceneContent(state, step.id);
-  const wrap = h('div', {}, h('p', { class: 'v2-eyebrow', text: `Scena ${step.indice + 1} di ${step.totale}` }), ...sceneHead(sc));
+  const eco = sceneOpening(state, step.id);
+  const wrap = h('div', {},
+    h('p', { class: 'v2-eyebrow', text: `Scena ${step.indice + 1} di ${step.totale}` }),
+    eco ? h('p', { class: 'v2-eco', text: eco }) : null,
+    ...sceneHead(sc));
 
   if (sc.tipo === 'pick') {
     wrap.append(h('p', { class: 'v2-question', text: sc.domanda }), optionList(sc.opzioni, (o) => respond(step.key, { pick: o.id })));
@@ -773,7 +815,7 @@ function screenScene(step) {
 
 // ─── CAPITOLO 3: DILEMMI ───────────────────────────────────────
 function screenDilemma(step) {
-  const d = DIL_BY_ID[step.id];
+  const d = dilemmaContent(state, step.id);
   let done = false;
   const box = h('div', { class: 'v2-dilemma' });
   const pick = (v, el) => {
@@ -784,17 +826,21 @@ function screenDilemma(step) {
     vibrate();
     setTimeout(() => respond(step.key, { pick: v }), 280);
   };
-  const a = h('button', { type: 'button', class: 'v2-dil-opt', text: d.a.testo });
-  const b = h('button', { type: 'button', class: 'v2-dil-opt', text: d.b.testo });
-  a.addEventListener('click', () => pick('a', a));
-  b.addEventListener('click', () => pick('b', b));
-  box.append(a, h('p', { class: 'v2-oppure', text: 'oppure' }), b);
+  // Quale opzione sta sopra cambia da un test all'altro (ma resta ferma
+  // ricaricando la pagina): la posizione non deve influenzare la scelta.
+  const [sopra, sotto] = orderFor(state, 'dil:' + step.id, ['a', 'b']).map((k) => {
+    const el = h('button', { type: 'button', class: 'v2-dil-opt', text: d[k].testo });
+    el.addEventListener('click', () => pick(k, el));
+    return { k, el };
+  });
+  box.append(sopra.el, h('p', { class: 'v2-oppure', text: 'oppure' }), sotto.el);
   keyHandler = (e) => {
-    if (e.key === 'ArrowUp' || e.key === '1') pick('a', a);
-    else if (e.key === 'ArrowDown' || e.key === '2') pick('b', b);
+    if (e.key === 'ArrowUp' || e.key === '1') pick(sopra.k, sopra.el);
+    else if (e.key === 'ArrowDown' || e.key === '2') pick(sotto.k, sotto.el);
   };
   return h('div', {},
     h('p', { class: 'v2-eyebrow', text: `Scelta ${step.indice + 1}` }),
+    d.intro ? h('p', { class: 'v2-dil-intro', text: d.intro }) : null,
     h('p', { class: 'v2-question', text: 'Quale tieni?' }),
     box);
 }
@@ -937,5 +983,10 @@ const SCREENS = {
 // ─── AVVIO ─────────────────────────────────────────────────────
 stars.update(computeProfile(state));
 render();
-if (restored && state.trail.length) showToast('Bentornato: riprendiamo da dove eri.');
-if (state.answers.mondi) requestScenes();
+if (restored && state.trail.length) {
+  const nome = contextOf(state).nome;
+  showToast(`Eccoti di nuovo${nome ? `, ${nome}` : ''}: riprendiamo da dove eri.`);
+} else if (rinnovato) {
+  showToast('Il test è stato rinnovato da quando l\'hai iniziato: si riparte da capo.', 4500);
+}
+requestAi();
