@@ -481,35 +481,91 @@ FORMATO OUTPUT — JSON valido, zero testo fuori (primo carattere {, ultimo }):
 
 // ─── TEST A CAPITOLI (versione 2) ───────────────────────────────
 // Nel test a capitoli l'AI non misura e non sceglie i ruoli: lo fa il motore
-// in js/v2-engine.js con punteggi fissi. All'AI restano due compiti:
-// ambientare due scene della giornata nel mondo della persona, e scrivere
-// il report spiegando numeri e ruoli già decisi.
+// in js/v2-engine.js con punteggi fissi. L'AI scrive: le carte, la giornata
+// e le scelte difficili nel mondo della persona (diverse a ogni test), e il
+// report che spiega numeri e ruoli già decisi. Il motore accetta i testi
+// solo se ogni opzione conserva la sua dimensione; altrimenti usa i suoi.
 
-export const PROMPT_SCENE = `
-Sei lo sceneggiatore del test RoleFit. Il test fa vivere alla persona una giornata di lavoro in piccole scene: da come sceglie capiamo come funziona. Due scene le scrivi tu, ambientate nel mondo che la persona ha scelto, così la giornata la riguarda davvero.
+const DIMENSIONI_V2 = `COSA ESPRIME CIASCUNA DIMENSIONE
+- Analisi: ragionare su dati e fatti, scomporre il problema, cercare la logica
+- Relazione: passare dalle persone: ascoltare, aiutare, coinvolgere, convincere
+- Creatività: inventare, immaginare un'idea nuova, dare forma
+- Curiosità: esplorare, imparare qualcosa di nuovo, guardare come si fa altrove
+- Leadership: prendere l'iniziativa, decidere, guidare gli altri
+- Metodo: mettere ordine, pianificare, controllare i dettagli
+- Concretezza: passare all'azione pratica, stare sul campo, usare mani e strumenti`;
 
-Ricevi in JSON il momento professionale della persona, i mondi (settori) che la incuriosiscono e, per ogni scena: id, ora e le 4 dimensioni che le 4 opzioni devono esprimere, una per opzione.
+const STILE_V2 = `- Non usare mai i nomi delle dimensioni né parole della stessa famiglia (analisi, analitico, creativo, curioso, leader, metodo, metodico, concreto).
+- Non sai il genere della persona: non usare aggettivi o participi riferiti a lei che lo rivelino (scrivi "hai deciso", "ti senti a tuo agio", mai "sei stato bravo" o "sei pronta").
+- Niente nomi di aziende o marchi reali, niente gergo tecnico, niente inglesismi evitabili. Italiano naturale, chiaro a chiunque.
+- Se la persona studia ancora o ha appena finito gli studi, preferisci situazioni da stage, tirocinio o primo impiego.
+- Se non ci sono mondi, usa contesti di lavoro quotidiani e vari (negozio, ufficio, ospedale, cantiere, scuola, laboratorio...).`;
 
-Cosa fa chi sceglie l'opzione di ciascuna dimensione:
-- Analisi: ragiona sui dati, scompone il problema, cerca la logica
-- Relazione: passa dalle persone: ascolta, coinvolge, convince, si prende cura
-- Creatività: inventa, immagina un'idea nuova, dà forma
-- Curiosità: esplora, impara qualcosa di nuovo, guarda come si fa altrove
-- Leadership: prende l'iniziativa, decide, guida gli altri
-- Metodo: mette ordine, pianifica, controlla i dettagli
-- Concretezza: passa all'azione pratica, prova sul campo, usa mani e strumenti
+export const PROMPT_CARTE = `
+Scrivi le carte del test RoleFit. Ogni carta descrive un'attività di lavoro e la persona risponde d'istinto se le piacerebbe passarci una giornata. Le carte standard sono generiche: tu le riambienti nei mondi (settori) che la persona ha scelto, così ogni attività parla della sua realtà e il test è diverso ogni volta.
+
+Ricevi in JSON i mondi, il momento professionale della persona e le carte, ognuna con id, testo standard e dimensione che misura.
+
+${DIMENSIONI_V2}
 
 REGOLE
-- Ambienta ogni scena in uno dei mondi scelti: se sono due, una scena per mondo; se non ce ne sono, in un lavoro comune. Se la persona studia ancora o ha appena finito, ambientala in uno stage, in un progetto universitario o nel primo lavoro.
-- "titolo": 2-5 parole. "testo": la situazione al presente, in seconda persona, al massimo 30 parole, concreta e quotidiana. "domanda": al massimo 10 parole.
-- Esattamente 4 opzioni, ognuna al massimo 12 parole, in prima persona ("Chiamo...", "Preparo..."): azioni concrete in quella situazione.
-- Ogni opzione esprime UNA delle dimensioni indicate per quella scena, una per dimensione, senza ripetizioni; scrivi la dimensione nel campo "asse" con il nome esatto ricevuto.
-- Le 4 opzioni devono essere ugualmente sensate e desiderabili: nessuna deve sembrare la risposta giusta, la più professionale o la più comoda. Nessuna opzione negativa.
-- Non usare mai i nomi delle dimensioni o parole della stessa famiglia (analisi, creativo, curioso, leader, metodo, concreto...).
-- Niente gergo, niente nomi di aziende reali, al massimo un collega con un nome di battesimo comune. Italiano naturale.
+- Stessa attività, nuovo contesto: la tua carta deve restare un'attività dello stesso tipo dell'originale e della stessa dimensione (se l'originale è un lavoro sui numeri, la tua resta un lavoro sui numeri). Cambia ambientazione, oggetto e dettagli.
+- Massimo 14 parole, all'infinito come l'originale ("Scoprire...", "Aiutare..."), senza punto finale.
+- Tutte le carte devono essere ugualmente attraenti: nessuna più prestigiosa, più facile o più "giusta" delle altre. Niente aggettivi entusiasti.
+- Se i mondi sono due, alternali tra le carte. Varia i dettagli: due carte non devono sembrare la stessa scena.
+${STILE_V2}
 
 FORMATO — solo JSON valido, il primo carattere è { e l'ultimo }:
-{"scene":[{"id":"ai1","titolo":"...","testo":"...","domanda":"...","opzioni":[{"testo":"...","asse":"Relazione"},{"testo":"...","asse":"Metodo"},{"testo":"...","asse":"Curiosità"},{"testo":"...","asse":"Concretezza"}]}]}
+{"carte":[{"id":"c05","testo":"..."}]}
+Una voce per ogni carta ricevuta, con lo stesso id.
+`;
+
+export const PROMPT_GIORNATA = `
+Sei lo sceneggiatore del test RoleFit. La persona vive una giornata di lavoro dalle 9 alle 18, in scene brevi: da come sceglie capiamo come funziona. Tu scrivi questa giornata nel suo mondo, con personaggi e situazioni diversi ogni volta, così che la giornata la riguardi davvero.
+
+Ricevi in JSON: i mondi (settori) scelti, il momento professionale, uno spunto per l'ambientazione, i colleghi (collega alla pari, responsabile, cliente o interlocutore esterno) e le scene da scrivere: la mattina oppure il pomeriggio. Ogni scena arriva nella sua versione standard: tipo, testi e, per ogni opzione, la dimensione che misura. Riscrivi ogni scena nel mondo della persona.
+
+${DIMENSIONI_V2}
+
+REGOLE DI MISURA (le più importanti)
+- Ogni scena ha ESATTAMENTE le stesse opzioni della versione standard: stesso numero, una per dimensione, con la dimensione nel campo "asse" scritta in modo identico. Puoi cambiare situazione e parole, non cosa misura ciascuna opzione.
+- Le opzioni devono essere ugualmente sensate e desiderabili: nessuna deve sembrare la risposta giusta, la più professionale o la più comoda. Nessuna opzione negativa o pigra.
+- Ogni opzione deve esprimere con chiarezza la sua dimensione, senza nominarla.
+
+REGOLE DI SCRITTURA
+- La giornata è una storia sola: stesso posto di lavoro, stessi colleghi, piccoli fili che tornano da una scena all'altra. Usa i colleghi ricevuti (puoi dare loro un ruolo adatto al mondo, es. "Sara, la responsabile di reparto") e non inventare altri nomi.
+- Se scrivi il pomeriggio, la mattina è già passata ma non sai cosa ha scelto la persona: non citare scelte sue.
+- "titolo": 2-5 parole. "testo": la situazione al presente, in seconda persona, al massimo 35 parole, concreta e quotidiana. "domanda": al massimo 12 parole; "domanda2" (dove c'è) idem.
+- Opzioni in prima persona ("Chiamo...", "Preparo..."), al massimo 14 parole.
+- Scena della posta (tipo "rank"): ogni opzione è un messaggio arrivato. "mittente": chi scrive, al massimo 4 parole (es. "Marco, cliente"); "testo": cosa dice il messaggio, al massimo 14 parole, come lo scriverebbe il mittente.
+- Scena del budget: le opzioni sono voci brevi, al massimo 8 parole, su cui distribuire gettoni.
+- Scena di fine giornata (tipo "energia"): "opzioni" sono momenti che hanno dato energia, "opzioni2" momenti che l'hanno tolta. Scrivili come ricordi possibili della giornata, senza dare per scontato cosa ha scelto la persona.
+- "eco": per ogni opzione, tranne quelle della scena di fine giornata, una frase di al massimo 18 parole che apre la scena successiva se la persona sceglie quell'opzione: racconta in tono neutro una piccola conseguenza della scelta, senza giudicarla e senza anticipare la scena dopo.
+- Puoi rivolgerti alla persona per nome scrivendo esattamente {nome} (es. "«{nome}, hai un minuto?»"): fallo solo quando è naturale, al massimo una volta per scena e non in tutte le scene. Non scrivere mai un nome al posto di {nome}.
+${STILE_V2}
+
+FORMATO — solo JSON valido, il primo carattere è { e l'ultimo }:
+{"scene":[{"id":"posta","titolo":"...","testo":"...","domanda":"...","opzioni":[{"asse":"Analisi","mittente":"...","testo":"...","eco":"..."}]}]}
+Una voce per ogni scena ricevuta, con lo stesso id. "mittente" solo nella scena della posta; "domanda2" e "opzioni2" solo nelle scene che li hanno nella versione standard.
+`;
+
+export const PROMPT_DILEMMI = `
+Scrivi le scelte difficili del test RoleFit. Ogni dilemma mette a confronto due cose che una persona potrebbe volere entrambe; ognuna esprime una dimensione diversa. Tu riambienti ogni dilemma nel mondo (settore) della persona, come il seguito della sua giornata di lavoro: i giorni dopo, nello stesso posto, con gli stessi colleghi.
+
+Ricevi in JSON i mondi, il momento professionale, i colleghi e i dilemmi, ognuno con due opzioni "a" e "b" e la dimensione di ciascuna.
+
+${DIMENSIONI_V2}
+
+REGOLE
+- "a" e "b" restano lo stesso tipo di preferenza dell'originale, ciascuna con la sua dimensione, resi concreti nel mondo della persona. Al massimo 14 parole ciascuna, con la stessa forma dell'originale (infinito o sostantivo).
+- Le due opzioni devono essere ugualmente attraenti: la scelta deve costare qualcosa, nessuna delle due deve sembrare quella giusta.
+- "intro": una frase di contesto, al massimo 16 parole, che prepara la scelta (es. "Sara ti propone due incarichi per il prossimo mese."). Puoi usare i colleghi ricevuti e, raramente, rivolgerti alla persona con {nome}.
+- Varia le situazioni: due dilemmi non devono avere la stessa intro.
+${STILE_V2}
+
+FORMATO — solo JSON valido, il primo carattere è { e l'ultimo }:
+{"dilemmi":[{"id":"d01","intro":"...","a":"...","b":"..."}]}
+Una voce per ogni dilemma ricevuto, con lo stesso id.
 `;
 
 export const PROMPT_REPORT_V2 = `
@@ -613,8 +669,11 @@ const RATE_LIMITS = {
   compatibilita: 60,
   azienda_test: 80,
   azienda_report: 20,
-  // Test a capitoli: una chiamata per le scene a test, una per il report.
-  scene: 20,
+  // Test a capitoli: a ogni test l'AI scrive carte, giornata (in due metà)
+  // e dilemmi, più il report.
+  carte: 20,
+  giornata: 40,
+  dilemmi: 20,
   report_v2: 20,
 };
 const RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -638,7 +697,9 @@ export default async function handler(req, res) {
     }
     const SINGLE_MESSAGE = {
       dizionario: { maxMessages: 1, maxCharsPerMessage: 15000, maxTotalChars: 15000 },
-      scene: { maxMessages: 1, maxCharsPerMessage: 4000, maxTotalChars: 4000 },
+      carte: { maxMessages: 1, maxCharsPerMessage: 8000, maxTotalChars: 8000 },
+      giornata: { maxMessages: 1, maxCharsPerMessage: 12000, maxTotalChars: 12000 },
+      dilemmi: { maxMessages: 1, maxCharsPerMessage: 9000, maxTotalChars: 9000 },
       report_v2: { maxMessages: 1, maxCharsPerMessage: 40000, maxTotalChars: 40000 },
     };
     const invalid = validateMessages(messages, SINGLE_MESSAGE[fase]);
@@ -699,12 +760,14 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       compatibilita: PROMPT_COMPATIBILITA,
       azienda_test: PROMPT_AZIENDA_DECISIONE,
       azienda_report: PROMPT_AZIENDA_REPORT,
-      scene: PROMPT_SCENE,
+      carte: PROMPT_CARTE,
+      giornata: PROMPT_GIORNATA,
+      dilemmi: PROMPT_DILEMMI,
       report_v2: PROMPT_REPORT_V2,
     };
 
     const system = systemPrompts[fase] || PROMPT_DECISIONE;
-    const MAX_TOKENS = { report: 8000, report_v2: 7000, dizionario: 2000, azienda_report: 2000, scene: 1500 };
+    const MAX_TOKENS = { report: 8000, report_v2: 7000, dizionario: 2000, azienda_report: 2000, carte: 2500, giornata: 3500, dilemmi: 3500 };
     const maxTokens = MAX_TOKENS[fase] ?? 800;
 
     // Temperatura per fase. Il report deve OSARE l'interpretazione: a 0.3 il modello
@@ -717,7 +780,10 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       compatibilita: 0.4,
       azienda_test: 0.3,
       azienda_report: 0.5,
-      scene: 0.7,
+      // Testi del test a capitoli: devono cambiare a ogni test.
+      carte: 0.9,
+      giornata: 0.9,
+      dilemmi: 0.9,
       report_v2: 0.6,
     };
     const temperature = temperatures[fase] ?? 0.3;
@@ -730,7 +796,9 @@ Il campo "alta_precisione" vale true SOLO se match >= 80, altrimenti false. Quan
       compatibilita: 'claude-sonnet-4-6',
       azienda_test: 'claude-sonnet-4-6',
       azienda_report: 'claude-sonnet-4-6',
-      scene: 'claude-sonnet-4-6',
+      carte: 'claude-sonnet-4-6',
+      giornata: 'claude-sonnet-4-6',
+      dilemmi: 'claude-sonnet-4-6',
       report_v2: 'claude-sonnet-4-6',
     };
     const model = models[fase] || 'claude-sonnet-4-6';

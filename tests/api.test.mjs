@@ -111,17 +111,35 @@ await t('fase report senza login → 401; rate limit oltre 150 domande in 10 min
   for (let i = 0; i < 151; i++) { last = res(); await claude(req({ fase: 'test', messages: one('x') }, { ip: '9.9.9.9' }), last); }
   assert.equal(last.statusCode, 429);
 });
-await t('fase scene: senza login, un solo messaggio corto, prompt dello sceneggiatore', async () => {
-  let r = res();
-  await claude(req({ fase: 'scene', messages: one(JSON.stringify({ mondi: ['Tecnologia e digitale'] })) }), r);
-  assert.equal(r.statusCode, 200);
-  assert.ok(lastAnthropic.system.includes('sceneggiatore'));
-  assert.equal(lastAnthropic.max_tokens, 1500);
-  assert.equal(typeof lastAnthropic.system, 'string', 'niente caching su una chiamata singola');
-  r = res(); await claude(req({ fase: 'scene', messages: [...one('a'), { role: 'assistant', content: 'b' }, ...one('c')] }), r);
-  assert.equal(r.statusCode, 400, 'più messaggi');
-  r = res(); await claude(req({ fase: 'scene', messages: one('x'.repeat(5000)) }), r);
-  assert.equal(r.statusCode, 400, 'messaggio troppo lungo');
+await t('test a capitoli: carte, giornata e dilemmi senza login, ognuno con il suo prompt e un solo messaggio', async () => {
+  const attese = {
+    carte: { prompt: claudeMod.PROMPT_CARTE, max: 2500, limite: 8000 },
+    giornata: { prompt: claudeMod.PROMPT_GIORNATA, max: 3500, limite: 12000 },
+    dilemmi: { prompt: claudeMod.PROMPT_DILEMMI, max: 3500, limite: 9000 },
+  };
+  for (const [fase, x] of Object.entries(attese)) {
+    let r = res();
+    await claude(req({ fase, messages: one(JSON.stringify({ mondi: ['Sanità e farmaceutico'] })) }), r);
+    assert.equal(r.statusCode, 200, fase);
+    assert.equal(lastAnthropic.system, x.prompt, fase);
+    assert.equal(lastAnthropic.max_tokens, x.max, fase);
+    assert.equal(lastAnthropic.temperature, 0.9, `${fase}: i testi devono cambiare a ogni test`);
+    r = res(); await claude(req({ fase, messages: [...one('a'), { role: 'assistant', content: 'b' }, ...one('c')] }), r);
+    assert.equal(r.statusCode, 400, `${fase}: più messaggi`);
+    r = res(); await claude(req({ fase, messages: one('x'.repeat(x.limite + 1)) }), r);
+    assert.equal(r.statusCode, 400, `${fase}: messaggio troppo lungo`);
+  }
+  const r = res(); await claude(req({ fase: 'scene', messages: one('x') }), r);
+  assert.equal(r.statusCode, 400, 'la vecchia fase "scene" non esiste più');
+});
+await t('i prompt del test a capitoli chiedono {nome} come segnaposto, forme neutre e le stesse dimensioni', () => {
+  for (const p of [claudeMod.PROMPT_GIORNATA, claudeMod.PROMPT_DILEMMI]) assert.ok(p.includes('{nome}'));
+  for (const p of [claudeMod.PROMPT_CARTE, claudeMod.PROMPT_GIORNATA, claudeMod.PROMPT_DILEMMI]) {
+    assert.ok(p.includes('genere'), 'forme neutre');
+    assert.ok(p.includes('solo JSON valido'));
+  }
+  assert.ok(claudeMod.PROMPT_GIORNATA.includes('ESATTAMENTE le stesse opzioni'));
+  assert.ok(claudeMod.PROMPT_GIORNATA.includes('"eco"'));
 });
 await t('fase report_v2: serve il login; con token valido usa il prompt v2', async () => {
   let r = res(); await claude(req({ fase: 'report_v2', messages: one('PROFILO') }), r);

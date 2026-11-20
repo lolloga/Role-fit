@@ -3,8 +3,9 @@
 // Separa la MISURA dal RACCONTO. Ogni risposta ha un punteggio deciso prima
 // (v2-items.js), i ruoli escono da una libreria con un profilo per ciascuno
 // (v2-roles.js): le stesse risposte danno sempre gli stessi numeri e gli
-// stessi ruoli. L'AI non decide più nulla di misurabile: personalizza due
-// scene e scrive il report a partire da numeri e prove calcolati qui.
+// stessi ruoli. L'AI non decide nulla di misurabile: riscrive carte, scene
+// e dilemmi nel mondo della persona (così ogni test è diverso) e scrive il
+// report a partire da numeri e prove calcolati qui.
 //
 // Tutto il file è fatto di funzioni pure (niente DOM, niente rete): gira nel
 // browser per il test e sul server per la rigenerazione con il CV, ed è
@@ -12,27 +13,29 @@
 
 import {
   AXES, AXIS_INFO, CARDS, SCENES, DILEMMAS, DILEMMI_MIN, DILEMMI_MAX,
-  MOMENTI, MOMENTI_LAVORO, CARD_QUESTION,
+  MOMENTI, MOMENTI_LAVORO, CARD_QUESTION, CARTE_PER_ASSE, GIORNATA,
+  NOMI_CAST, RUOLI_CAST, SPUNTI, MONDO_NON_SO,
 } from './v2-items.js';
 import { ROLES } from './v2-roles.js';
 
 export { AXES };
-export const ENGINE_VERSION = '2.0';
+export const ENGINE_VERSION = '2.1';
 
 // Peso di ogni tipo di risposta. Le carte valgono di più (giudizio diretto
-// su un'attività); le scene personalizzate dall'AI un po' meno, perché il
-// legame opzione → dimensione lo scrive l'AI, non noi.
+// su un'attività).
 const WEIGHTS = {
   card: 1,
   rank: 0.8,
   pick: 0.8,
-  pickAi: 0.6,
   twostep: 0.8,
   budget: 0.9,
   energia: 0.9,
   drain: 0.9,
   dilemma: 0.9,
 };
+// I testi riscritti dall'AI pesano un po' meno di quelli scritti da noi: la
+// dimensione di ogni opzione è fissa, ma le parole che la esprimono no.
+const AI_FACTOR = 0.85;
 
 const CARD_BY_ID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const SCENE_BY_ID = Object.fromEntries(SCENES.map((s) => [s.id, s]));
@@ -45,27 +48,41 @@ const sum = (arr, f = (x) => x) => arr.reduce((s, x) => s + f(x), 0);
 // ─── STATO E PERCORSO ──────────────────────────────────────────
 
 // Stato iniziale di un test. `rand` è iniettabile per i test automatici.
+// Ogni test pesca un mazzo, dei colleghi e uno spunto diversi.
 export function createState({ nomeNoto = null, rand = Math.random } = {}) {
   return {
     v: 2,
     motore: ENGINE_VERSION,
     startedAt: new Date().toISOString(),
     nomeNoto: nomeNoto || null,
+    seed: Math.floor(rand() * 2147483647),
+    cast: pickCast(rand),
+    spunto: SPUNTI[Math.floor(rand() * SPUNTI.length)],
     ordineCarte: shuffleCards(rand),
     answers: {},     // chiave del passo → risposta
     trail: [],       // chiavi risposte, in ordine (per "Indietro")
     dilemmi: [],     // id dei dilemmi già risolti, in ordine
     dilCorrente: null,
-    scenes: {},      // scene personalizzate dall'AI, per id
+    carteAi: {},     // carte riscritte dall'AI, per id ({ standard: true } = mostrata com'era)
+    scenes: {},      // scene riscritte dall'AI, per id (idem)
+    dilemmiAi: {},   // dilemmi riscritti dall'AI, per id (idem)
   };
 }
 
-// Mescola le carte a "giri": in ogni giro compare una carta per dimensione,
-// in ordine casuale e mai due carte della stessa dimensione di fila. Così le
+// I colleghi della giornata: tre nomi diversi a ogni test, più uno di
+// riserva se la persona si chiama come uno di loro.
+export function pickCast(rand = Math.random) {
+  const nomi = shuffle(NOMI_CAST, rand);
+  return { collega: nomi[0], capo: nomi[1], cliente: nomi[2], riserva: nomi[3] };
+}
+
+// Pesca CARTE_PER_ASSE carte per dimensione (il mazzo cambia a ogni test) e
+// le mescola a "giri": in ogni giro compare una carta per dimensione, in
+// ordine casuale e mai due carte della stessa dimensione di fila. Così le
 // dimensioni si distribuiscono lungo tutto il mazzo.
 export function shuffleCards(rand = Math.random) {
   const perAxis = {};
-  AXES.forEach((k) => { perAxis[k] = shuffle(CARDS.filter((c) => c.asse === k).map((c) => c.id), rand); });
+  AXES.forEach((k) => { perAxis[k] = shuffle(CARDS.filter((c) => c.asse === k).map((c) => c.id), rand).slice(0, CARTE_PER_ASSE); });
   const rounds = Math.max(...AXES.map((k) => perAxis[k].length));
   const out = [];
   let last = null;
@@ -155,11 +172,16 @@ export function progress(state) {
   return clamp(fatti / totale, 0, 1);
 }
 
+function nomeDi(state) {
+  const raw = String(state.nomeNoto || state.answers?.nome?.v || '').replace(/[{}<>]/g, '').trim();
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : null;
+}
+
 export function contextOf(state) {
   const a = state.answers;
   const momentoId = a.momento?.v || null;
   return {
-    nome: (state.nomeNoto || a.nome?.v || '').trim() || null,
+    nome: nomeDi(state),
     nomeNuovo: !state.nomeNoto && !!(a.nome?.v || '').trim(),
     momento: momentoId,
     momentoTesto: MOMENTI.find((m) => m.id === momentoId)?.testo || null,
@@ -171,40 +193,360 @@ export function contextOf(state) {
   };
 }
 
-// ─── SCENE PERSONALIZZATE ──────────────────────────────────────
+// ─── TESTI SU MISURA ───────────────────────────────────────────
 
-// Una scena dell'AI è accettata solo se ha esattamente la forma attesa e le
-// stesse 4 dimensioni della scena di riserva: la misura non cambia mai, se
-// l'AI sbaglia formato si usa la scena standard.
-export function validAiScene(ai, scene) {
-  if (!ai || typeof ai !== 'object') return false;
-  const okText = (t, max) => typeof t === 'string' && t.trim().length > 0 && t.length <= max;
-  if (!okText(ai.titolo, 80) || !okText(ai.testo, 400) || !okText(ai.domanda, 160)) return false;
-  if (!Array.isArray(ai.opzioni) || ai.opzioni.length !== 4) return false;
-  if (!ai.opzioni.every((o) => o && okText(o.testo, 140) && scene.assi.includes(o.asse))) return false;
-  return new Set(ai.opzioni.map((o) => o.asse)).size === 4;
+// I colleghi di questo test. Se la persona si chiama come uno di loro, quel
+// collega prende il nome di riserva.
+export function castOf(state) {
+  const c = state.cast || { collega: 'Luca', capo: 'Sara', cliente: 'Marco', riserva: 'Elena' };
+  const nome = (nomeDi(state) || '').toLowerCase();
+  const out = {};
+  for (const k of RUOLI_CAST) out[k] = nome && String(c[k]).toLowerCase() === nome ? c.riserva : c[k];
+  return out;
 }
 
-// Contenuto effettivo di una scena: quella fissa, oppure la versione
-// personalizzata (se valida) o di riserva, con id delle opzioni a/b/c/d.
+function personaCtx(state) {
+  return { nome: nomeDi(state), cast: castOf(state) };
+}
+
+// Sostituisce i segnaposto: {nome} con il nome della persona, {collega},
+// {capo} e {cliente} con i colleghi di questo test. Se il nome non c'è, la
+// frase si adatta ("{nome}, hai un minuto?" → "Hai un minuto?").
+export function personalizza(text, { nome = null, cast = {} } = {}) {
+  if (typeof text !== 'string') return '';
+  let t = text
+    .replace(/\{(collega|capo|cliente)\}/g, (_, k) => cast[k] || '')
+    .replace(/\{(?!nome\})[^{}]*\}/g, '');
+  if (nome) {
+    t = t.replace(/\{nome\}/g, nome);
+  } else {
+    const iniziava = /^\s*[«"“]?\s*\{nome\}/.test(t);
+    t = t
+      .replace(/(^|[«"“]|[.!?]\s+)\{nome\}\s*,\s*([a-zàèéìòù])?/g, (m, pre, ch) => pre + (ch ? ch.toUpperCase() : ''))
+      .replace(/\s*,\s*\{nome\}/g, '')
+      .replace(/\s*\{nome\}\s*/g, ' ');
+    t = t.trim();
+    if (iniziava) t = t.replace(/^([«"“]?\s*)([a-zàèéìòù])/, (m, pre, ch) => pre + ch.toUpperCase());
+  }
+  return t
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.!?»;:])/g, '$1')
+    .trim();
+}
+
+// Ordine casuale ma stabile per questo test: le opzioni non stanno sempre
+// nella stessa posizione (chi sceglie la prima non sposta la misura), e
+// ricaricando la pagina restano dove erano.
+function hashStr(str) {
+  let x = 2166136261;
+  for (let i = 0; i < str.length; i++) { x ^= str.charCodeAt(i); x = Math.imul(x, 16777619); }
+  return x >>> 0;
+}
+function seededRand(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+export function orderFor(state, key, list) {
+  return shuffle(list, seededRand(hashStr(`${state?.seed ?? 0}:${key}`)));
+}
+
+const okText = (t, max, min = 1) => typeof t === 'string' && t.trim().length >= min && t.length <= max;
+
+// ─── CARTE ─────────────────────────────────────────────────────
+
+export function validAiCard(ai) {
+  return !!ai && typeof ai === 'object' && !ai.standard && okText(ai.testo, 140, 8);
+}
+
+// La carta come la vede la persona: riscritta dall'AI nel suo mondo, se
+// arrivata in tempo, altrimenti quella standard. Attività e dimensione non
+// cambiano.
+export function cardContent(state, id) {
+  const c = CARD_BY_ID[id];
+  if (!c) return null;
+  const ai = state?.carteAi?.[id];
+  const useAi = validAiCard(ai);
+  const testo = useAi ? personalizza(ai.testo, personaCtx(state)).replace(/[.\s]+$/, '') : c.testo;
+  return { ...c, testo, fonte: useAi ? 'ai' : 'standard' };
+}
+
+// ─── SCENE ─────────────────────────────────────────────────────
+
+// Una scena dell'AI è accettata solo se ha esattamente le opzioni della
+// scena standard, con le stesse dimensioni: la misura non cambia mai. Se
+// l'AI sbaglia formato si usa la scena standard.
+export function validAiScene(ai, scene) {
+  if (!ai || typeof ai !== 'object' || ai.standard || !scene) return false;
+  if (!okText(ai.titolo, 80) || !okText(ai.testo, 450) || !okText(ai.domanda, 160)) return false;
+  if (ai.domanda2 != null && ai.domanda2 !== '' && !okText(ai.domanda2, 160)) return false;
+  const lista = (aiList, std, { mittente = false } = {}) => {
+    if (!Array.isArray(aiList) || aiList.length !== std.length) return false;
+    const assi = new Set(std.map((o) => o.asse));
+    const ok = aiList.every((o) => o && typeof o === 'object'
+      && okText(o.testo, 150)
+      && assi.has(o.asse)
+      && (!mittente || okText(o.mittente, 60))
+      && (o.eco == null || o.eco === '' || okText(o.eco, 220)));
+    return ok && new Set(aiList.map((o) => o.asse)).size === std.length;
+  };
+  if (!lista(ai.opzioni, scene.opzioni, { mittente: scene.tipo === 'rank' })) return false;
+  if (scene.opzioni2 && !lista(ai.opzioni2, scene.opzioni2)) return false;
+  return true;
+}
+
+// Contenuto effettivo di una scena: la versione dell'AI (se valida) o quella
+// standard, con nomi e colleghi al loro posto e le opzioni in un ordine
+// mescolato per questo test. Gli id delle opzioni sono sempre quelli
+// standard: un id corrisponde sempre alla stessa dimensione.
 export function sceneContent(state, id) {
   const s = SCENE_BY_ID[id];
   if (!s) return null;
-  if (!s.personalizzata) return s;
   const ai = state?.scenes?.[id];
   const useAi = validAiScene(ai, s);
-  const src = useAi ? ai : s.fallback;
+  const ctx = personaCtx(state);
+  const p = (t) => personalizza(t, ctx);
+  const build = (std, aiList, key) => orderFor(state, `${id}:${key}`, std.map((o) => {
+    const src = useAi ? aiList.find((x) => x.asse === o.asse) : o;
+    const out = { id: o.id, asse: o.asse, testo: p(src.testo) };
+    if (o.mittente != null) out.mittente = p(src.mittente);
+    const eco = p(src.eco || '');
+    if (eco) out.eco = eco;
+    return out;
+  }));
+  const domanda2 = useAi && okText(ai.domanda2, 160) ? ai.domanda2 : s.domanda2;
   return {
     ...s,
-    titolo: src.titolo.trim(),
-    testo: src.testo.trim(),
-    domanda: src.domanda.trim(),
-    opzioni: src.opzioni.map((o, i) => ({ id: OPTION_IDS[i], testo: o.testo.trim(), asse: o.asse })),
+    titolo: p(useAi ? ai.titolo : s.titolo),
+    testo: p(useAi ? ai.testo : s.testo),
+    domanda: p(useAi ? ai.domanda : s.domanda),
+    domanda2: s.domanda2 ? p(domanda2) : undefined,
+    opzioni: build(s.opzioni, ai?.opzioni, 'o'),
+    opzioni2: s.opzioni2 ? build(s.opzioni2, ai?.opzioni2, 'o2') : undefined,
     fonte: useAi ? 'ai' : 'standard',
   };
 }
 
-export const PERSONALIZED_SCENES = SCENES.filter((s) => s.personalizzata).map((s) => ({ id: s.id, ora: s.ora, assi: s.assi }));
+// L'opzione che "porta avanti la storia" in una scena già giocata.
+function sceltaGuida(scena, ans, sc) {
+  if (!ans) return null;
+  if (scena.tipo === 'rank') return ans.order?.[0] || null;
+  if (scena.tipo === 'pick') return ans.pick || null;
+  if (scena.tipo === 'twostep') return ans.first || null;
+  if (scena.tipo === 'budget') {
+    let best = null;
+    let max = 0;
+    for (const o of sc.opzioni) {
+      const t = Number(ans.tokens?.[o.id]) || 0;
+      if (t > max) { max = t; best = o.id; }
+    }
+    return best;
+  }
+  return null;
+}
+
+// La frase che apre una scena raccontando le conseguenze della scelta fatta
+// nella scena prima: la giornata risponde a quello che la persona decide.
+// Se la scena nuova chiama già la persona per nome, l'eco non lo ripete.
+export function sceneOpening(state, id) {
+  const i = SCENES.findIndex((s) => s.id === id);
+  if (i <= 0) return null;
+  const prev = SCENES[i - 1];
+  const ans = state.answers?.['scene:' + prev.id];
+  if (!ans) return null;
+  const sc = sceneContent(state, prev.id);
+  const optId = sceltaGuida(prev, ans, sc);
+  const std = prev.opzioni.find((o) => o.id === optId);
+  if (!std) return null;
+  const ai = state.scenes?.[prev.id];
+  const raw = sc.fonte === 'ai' ? ai.opzioni.find((o) => o.asse === std.asse)?.eco : std.eco;
+  if (!raw) return null;
+  const ctx = personaCtx(state);
+  const giaNominata = ctx.nome && sceneContent(state, id).testo.includes(ctx.nome);
+  return personalizza(raw, giaNominata ? { ...ctx, nome: null } : ctx) || null;
+}
+
+// ─── DILEMMI ───────────────────────────────────────────────────
+
+export function validAiDilemma(ai) {
+  return !!ai && typeof ai === 'object' && !ai.standard
+    && okText(ai.a, 140, 3) && okText(ai.b, 140, 3)
+    && (ai.intro == null || ai.intro === '' || okText(ai.intro, 220));
+}
+
+export function dilemmaContent(state, id) {
+  const d = DIL_BY_ID[id];
+  if (!d) return null;
+  const ai = state?.dilemmiAi?.[id];
+  const useAi = validAiDilemma(ai);
+  const ctx = personaCtx(state);
+  const p = (t) => personalizza(t, ctx);
+  return {
+    id,
+    intro: useAi && ai.intro ? p(ai.intro) : null,
+    a: { asse: d.a.asse, testo: p(useAi ? ai.a : d.a.testo) },
+    b: { asse: d.b.asse, testo: p(useAi ? ai.b : d.b.testo) },
+    fonte: useAi ? 'ai' : 'standard',
+  };
+}
+
+// ─── CONGELAMENTO ──────────────────────────────────────────────
+// Un contenuto si "congela" la prima volta che compare: se l'AI risponde
+// dopo, quello che la persona ha già visto (e magari scelto) non cambia.
+function freeze(map, id) {
+  if (map[id]) return false;
+  map[id] = { standard: true };
+  return true;
+}
+export function lockCard(state, id) { state.carteAi ||= {}; return freeze(state.carteAi, id); }
+export function lockScene(state, id) { state.scenes ||= {}; return freeze(state.scenes, id); }
+export function lockDilemma(state, id) { state.dilemmiAi ||= {}; return freeze(state.dilemmiAi, id); }
+
+// ─── RICHIESTE ALL'AI E RISPOSTE ───────────────────────────────
+// L'AI riceve solo mondi, momento professionale, i colleghi inventati e i
+// testi standard da riscrivere: mai il nome della persona (scrive {nome} e
+// lo inseriamo noi) né le sue risposte libere.
+
+function mondiScelti(state) {
+  return contextOf(state).mondi.filter((m) => m !== MONDO_NON_SO);
+}
+
+// Le prime carte partono subito con il testo standard; l'AI riscrive le
+// successive mentre la persona gioca.
+const CARTE_SUBITO = 3;
+
+export function richiestaCarte(state) {
+  if (!state.answers?.mondi) return null;
+  const carte = state.ordineCarte
+    .slice(CARTE_SUBITO)
+    .filter((id) => !state.carteAi?.[id] && !state.answers['card:' + id])
+    .map((id) => ({ id, testo: CARD_BY_ID[id].testo, asse: CARD_BY_ID[id].asse }));
+  if (!carte.length) return null;
+  return { mondi: mondiScelti(state), momento: contextOf(state).momentoTesto, carte };
+}
+
+export function accettaCarte(state, data) {
+  state.carteAi ||= {};
+  const list = Array.isArray(data?.carte) ? data.carte : [];
+  let n = 0;
+  for (const x of list) {
+    const id = x?.id;
+    if (typeof id !== 'string' || !CARD_BY_ID[id] || !state.ordineCarte.includes(id) || state.carteAi[id]) continue;
+    const v = { testo: typeof x.testo === 'string' ? x.testo.trim() : '' };
+    if (!validAiCard(v)) continue;
+    state.carteAi[id] = v;
+    n++;
+  }
+  return n;
+}
+
+// La scena standard, con i colleghi già al loro posto e {nome} lasciato
+// come segnaposto: è il modello che l'AI riambienta.
+function sceneTemplate(state, id) {
+  const s = SCENE_BY_ID[id];
+  const p = (t) => personalizza(t, { nome: '{nome}', cast: castOf(state) });
+  const opt = (o) => ({ asse: o.asse, ...(o.mittente ? { mittente: p(o.mittente) } : {}), testo: p(o.testo) });
+  return {
+    id: s.id,
+    ora: s.ora,
+    tipo: s.tipo,
+    ...(s.scegli ? { scegli: s.scegli } : {}),
+    titolo: s.titolo,
+    testo: p(s.testo),
+    domanda: s.domanda,
+    ...(s.domanda2 ? { domanda2: s.domanda2 } : {}),
+    opzioni: s.opzioni.map(opt),
+    ...(s.opzioni2 ? { opzioni2: s.opzioni2.map(opt) } : {}),
+  };
+}
+
+export function richiestaGiornata(state, parte) {
+  if (!state.answers?.mondi) return null;
+  const ids = (GIORNATA[parte] || []).filter((id) => !state.scenes?.[id]);
+  if (!ids.length) return null;
+  return {
+    parte,
+    mondi: mondiScelti(state),
+    momento: contextOf(state).momentoTesto,
+    spunto: state.spunto || null,
+    colleghi: castOf(state),
+    scene: ids.map((id) => sceneTemplate(state, id)),
+  };
+}
+
+// Il nome della dimensione come lo scriviamo noi, anche se l'AI ha perso un
+// accento o cambiato le maiuscole ("creativita" → "Creatività").
+const senzaAccenti = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+const ASSE_CANONICO = Object.fromEntries(AXES.map((k) => [senzaAccenti(k), k]));
+function canonAsse(x) {
+  return ASSE_CANONICO[senzaAccenti(x)] || x;
+}
+
+function pulisciOpzione(o) {
+  return {
+    asse: o.asse,
+    testo: String(o.testo).trim(),
+    ...(typeof o.mittente === 'string' ? { mittente: o.mittente.trim() } : {}),
+    ...(typeof o.eco === 'string' && o.eco.trim() ? { eco: o.eco.trim() } : {}),
+  };
+}
+
+export function accettaGiornata(state, data, parte) {
+  state.scenes ||= {};
+  const list = Array.isArray(data?.scene) ? data.scene : [];
+  let n = 0;
+  for (const id of GIORNATA[parte] || []) {
+    if (state.scenes[id]) continue;
+    const trovata = list.find((x) => x && x.id === id);
+    if (!trovata) continue;
+    const conAssi = (l) => (Array.isArray(l) ? l.map((o) => (o && typeof o === 'object' ? { ...o, asse: canonAsse(o.asse) } : o)) : l);
+    const ai = { ...trovata, opzioni: conAssi(trovata.opzioni), opzioni2: conAssi(trovata.opzioni2) };
+    if (!validAiScene(ai, SCENE_BY_ID[id])) continue;
+    state.scenes[id] = {
+      titolo: ai.titolo.trim(),
+      testo: ai.testo.trim(),
+      domanda: ai.domanda.trim(),
+      ...(okText(ai.domanda2, 160) ? { domanda2: ai.domanda2.trim() } : {}),
+      opzioni: ai.opzioni.map(pulisciOpzione),
+      ...(Array.isArray(ai.opzioni2) ? { opzioni2: ai.opzioni2.map(pulisciOpzione) } : {}),
+    };
+    n++;
+  }
+  return n;
+}
+
+export function richiestaDilemmi(state) {
+  if (!state.answers?.mondi) return null;
+  const todo = DILEMMAS.filter((d) => !state.dilemmiAi?.[d.id]);
+  if (!todo.length) return null;
+  return {
+    mondi: mondiScelti(state),
+    momento: contextOf(state).momentoTesto,
+    colleghi: castOf(state),
+    dilemmi: todo.map((d) => ({ id: d.id, a: { testo: d.a.testo, asse: d.a.asse }, b: { testo: d.b.testo, asse: d.b.asse } })),
+  };
+}
+
+export function accettaDilemmi(state, data) {
+  state.dilemmiAi ||= {};
+  const list = Array.isArray(data?.dilemmi) ? data.dilemmi : [];
+  const testo = (v) => (typeof v === 'string' ? v : typeof v?.testo === 'string' ? v.testo : '').trim();
+  let n = 0;
+  for (const x of list) {
+    const id = x?.id;
+    if (typeof id !== 'string' || !DIL_BY_ID[id] || state.dilemmiAi[id]) continue;
+    const v = { intro: testo(x.intro), a: testo(x.a), b: testo(x.b) };
+    if (!validAiDilemma(v)) continue;
+    state.dilemmiAi[id] = v;
+    n++;
+  }
+  return n;
+}
 
 // ─── PROVE: da ogni risposta, segnali sulle dimensioni ─────────
 
@@ -221,8 +563,9 @@ export function collectEvidence(state) {
   const meanBase = cardAns.length >= 8 ? sum(cardAns, (x) => base(x.v)) / cardAns.length : 0;
   for (const { c, v } of cardAns) {
     const e = clamp(base(v) - 0.5 * meanBase, -1, 1);
-    ev.push({ asse: c.asse, e, w: WEIGHTS.card, src: { tipo: 'card', id: c.id, v } });
-    if (c.sec) ev.push({ asse: c.sec.asse, e, w: WEIGHTS.card * c.sec.peso, src: { tipo: 'card', id: c.id, v, secondaria: true } });
+    const w = WEIGHTS.card * (cardContent(state, c.id).fonte === 'ai' ? AI_FACTOR : 1);
+    ev.push({ asse: c.asse, e, w, src: { tipo: 'card', id: c.id, v } });
+    if (c.sec) ev.push({ asse: c.sec.asse, e, w: w * c.sec.peso, src: { tipo: 'card', id: c.id, v, secondaria: true } });
   }
 
   for (const s of SCENES) {
@@ -230,6 +573,7 @@ export function collectEvidence(state) {
     if (!ans) continue;
     const sc = sceneContent(state, s.id);
     const opt = (id) => sc.opzioni.find((o) => o.id === id);
+    const f = sc.fonte === 'ai' ? AI_FACTOR : 1;
 
     if (s.tipo === 'rank') {
       const valori = [1, 0.6, 0.3];
@@ -237,10 +581,10 @@ export function collectEvidence(state) {
       sc.opzioni.forEach((o) => {
         const pos = order.indexOf(o.id);
         const e = pos >= 0 ? (valori[pos] ?? 0.2) : -0.25;
-        ev.push({ asse: o.asse, e, w: WEIGHTS.rank, src: { tipo: 'rank', scena: s.id, opzione: o.id, pos } });
+        ev.push({ asse: o.asse, e, w: WEIGHTS.rank * f, src: { tipo: 'rank', scena: s.id, opzione: o.id, pos } });
       });
     } else if (s.tipo === 'pick') {
-      const w = s.personalizzata ? WEIGHTS.pickAi : WEIGHTS.pick;
+      const w = WEIGHTS.pick * f;
       sc.opzioni.forEach((o) => {
         const scelta = o.id === ans.pick;
         ev.push({ asse: o.asse, e: scelta ? 1 : -0.33, w, src: { tipo: 'pick', scena: s.id, opzione: o.id, scelta } });
@@ -249,22 +593,22 @@ export function collectEvidence(state) {
       sc.opzioni.forEach((o) => {
         const e = o.id === ans.first ? 1 : o.id === ans.second ? 0.5 : -0.4;
         const pos = o.id === ans.first ? 0 : o.id === ans.second ? 1 : -1;
-        ev.push({ asse: o.asse, e, w: WEIGHTS.twostep, src: { tipo: 'twostep', scena: s.id, opzione: o.id, pos } });
+        ev.push({ asse: o.asse, e, w: WEIGHTS.twostep * f, src: { tipo: 'twostep', scena: s.id, opzione: o.id, pos } });
       });
     } else if (s.tipo === 'budget') {
       const media = s.gettoni / sc.opzioni.length;
       sc.opzioni.forEach((o) => {
         const t = Number(ans.tokens?.[o.id]) || 0;
-        ev.push({ asse: o.asse, e: clamp((t - media) / 2.5, -1, 1), w: WEIGHTS.budget, src: { tipo: 'budget', scena: s.id, opzione: o.id, t } });
+        ev.push({ asse: o.asse, e: clamp((t - media) / 2.5, -1, 1), w: WEIGHTS.budget * f, src: { tipo: 'budget', scena: s.id, opzione: o.id, t } });
       });
     } else if (s.tipo === 'energia') {
       const scelte = (ans.energia || []).filter((id) => opt(id));
       const val = scelte.length > 1 ? 0.85 : 1;
       scelte.forEach((id) => {
-        ev.push({ asse: opt(id).asse, e: val, w: WEIGHTS.energia, src: { tipo: 'energia', scena: s.id, opzione: id } });
+        ev.push({ asse: opt(id).asse, e: val, w: WEIGHTS.energia * f, src: { tipo: 'energia', scena: s.id, opzione: id } });
       });
-      const drain = s.opzioni2.find((o) => o.id === ans.drain);
-      if (drain) ev.push({ asse: drain.asse, e: -1, w: WEIGHTS.drain, src: { tipo: 'drain', scena: s.id, opzione: drain.id } });
+      const drain = sc.opzioni2.find((o) => o.id === ans.drain);
+      if (drain) ev.push({ asse: drain.asse, e: -1, w: WEIGHTS.drain * f, src: { tipo: 'drain', scena: s.id, opzione: drain.id } });
     }
   }
 
@@ -274,8 +618,9 @@ export function collectEvidence(state) {
     if (!d || !ans || (ans.pick !== 'a' && ans.pick !== 'b')) continue;
     const win = d[ans.pick];
     const lose = d[ans.pick === 'a' ? 'b' : 'a'];
-    ev.push({ asse: win.asse, e: 0.8, w: WEIGHTS.dilemma, src: { tipo: 'dilemma', id, scelta: ans.pick, vince: true } });
-    ev.push({ asse: lose.asse, e: -0.6, w: WEIGHTS.dilemma, src: { tipo: 'dilemma', id, scelta: ans.pick, vince: false } });
+    const w = WEIGHTS.dilemma * (dilemmaContent(state, id).fonte === 'ai' ? AI_FACTOR : 1);
+    ev.push({ asse: win.asse, e: 0.8, w, src: { tipo: 'dilemma', id, scelta: ans.pick, vince: true } });
+    ev.push({ asse: lose.asse, e: -0.6, w, src: { tipo: 'dilemma', id, scelta: ans.pick, vince: false } });
   }
   return ev;
 }
@@ -538,14 +883,15 @@ export function describeEvidence(state, x) {
   const s = x.src;
   if (s.tipo === 'card') {
     if (s.secondaria || s.v === 'forse') return null;
-    const c = CARD_BY_ID[s.id];
+    const c = cardContent(state, s.id);
     return `Alla carta «${c.testo}» hai risposto ${s.v === 'si' ? 'sì' : 'no'}`;
   }
   if (s.tipo === 'rank') {
     const { sc, o } = sceneOption(state, s.scena, s.opzione);
     if (s.pos < 0) return null;
     const ord = s.pos === 0 ? 'per primo' : s.pos === 1 ? 'per secondo' : 'per terzo';
-    return `Alle ${sc.ora}, tra i messaggi, hai aperto ${ord} quello su «${o.testo}»`;
+    const da = o.mittente ? ` di ${o.mittente.split(',')[0].trim()}` : '';
+    return `Alle ${sc.ora}, tra i messaggi, hai aperto ${ord} quello${da}: «${o.testo}»`;
   }
   if (s.tipo === 'pick') {
     const { sc, o } = sceneOption(state, s.scena, s.opzione);
@@ -572,7 +918,7 @@ export function describeEvidence(state, x) {
     return `A fine giornata ti ha tolto energia «${o.testo.charAt(0).toLowerCase() + o.testo.slice(1)}»`;
   }
   if (s.tipo === 'dilemma') {
-    const d = DIL_BY_ID[s.id];
+    const d = dilemmaContent(state, s.id);
     const scelta = d[s.scelta].testo;
     const altra = d[s.scelta === 'a' ? 'b' : 'a'].testo;
     return `Potendo scegliere, hai preferito «${scelta}» a «${altra}»`;
@@ -655,7 +1001,14 @@ export function computeResult(state) {
     candidati: ranked.filter((x) => !x.role.bonus).slice(0, 10).map(roleOut),
     prove: buildProve(state, profile, ev),
     tensioni: buildTensioni(ev),
-    scene_fonte: Object.fromEntries(PERSONALIZED_SCENES.map((s) => [s.id, sceneContent(state, s.id).fonte])),
+    // Quanto del test è stato scritto dall'AI per questa persona.
+    fonti: {
+      carte: state.ordineCarte.length,
+      carte_ai: state.ordineCarte.filter((id) => cardContent(state, id).fonte === 'ai').length,
+      scene_ai: SCENES.filter((s) => sceneContent(state, s.id).fonte === 'ai').map((s) => s.id),
+      dilemmi: state.dilemmi.length,
+      dilemmi_ai: state.dilemmi.filter((id) => dilemmaContent(state, id).fonte === 'ai').length,
+    },
   };
 }
 
@@ -671,8 +1024,8 @@ export function buildAnswers(state) {
   if (ctx.momentoTesto) out.push({ id: 'momento', question: 'In che momento sei della tua vita professionale?', answer: ctx.momentoTesto, indiretta: true });
   if (ctx.mondi.length) out.push({ id: 'mondi', question: 'In quali mondi ti incuriosirebbe lavorare?', answer: ctx.mondi.join(', '), indiretta: false });
 
-  const si = state.ordineCarte.filter((id) => a['card:' + id]?.v === 'si').map((id) => CARD_BY_ID[id].testo);
-  const no = state.ordineCarte.filter((id) => a['card:' + id]?.v === 'no').map((id) => CARD_BY_ID[id].testo);
+  const si = state.ordineCarte.filter((id) => a['card:' + id]?.v === 'si').map((id) => cardContent(state, id).testo);
+  const no = state.ordineCarte.filter((id) => a['card:' + id]?.v === 'no').map((id) => cardContent(state, id).testo);
   if (si.length) out.push({ id: 'carte_si', question: `${CARD_QUESTION} Sì a:`, answer: si.join('; '), indiretta: false });
   if (no.length) out.push({ id: 'carte_no', question: `${CARD_QUESTION} No a:`, answer: no.join('; '), indiretta: false });
 
@@ -691,13 +1044,13 @@ export function buildAnswers(state) {
         .sort((x, y) => (ans.tokens[y.id] || 0) - (ans.tokens[x.id] || 0))
         .map((o) => `${o.testo} (${ans.tokens[o.id]})`).join('; ');
     } else if (s.tipo === 'energia') {
-      risposta = `Energia: ${(ans.energia || []).map((id) => t(id)).join('; ')} — Fatica: ${t(ans.drain, s.opzioni2)}`;
+      risposta = `Energia: ${(ans.energia || []).map((id) => t(id)).join('; ')} — Fatica: ${t(ans.drain, sc.opzioni2)}`;
     }
     out.push({ id: 'scena_' + s.id, question: `${sc.ora} · ${sc.titolo}. ${sc.domanda}`, answer: risposta, indiretta: false });
   }
 
   state.dilemmi.forEach((id) => {
-    const d = DIL_BY_ID[id];
+    const d = dilemmaContent(state, id);
     const ans = a['dil:' + id];
     if (!d || !ans) return;
     out.push({ id: 'dilemma_' + id, question: `Scelta difficile: «${d.a.testo}» oppure «${d.b.testo}»?`, answer: d[ans.pick]?.testo || '', indiretta: false });
@@ -722,7 +1075,12 @@ export function buildPayload(state) {
     risposte: state.answers,
     ordineCarte: state.ordineCarte,
     dilemmi: state.dilemmi,
+    seed: state.seed ?? null,
+    cast: castOf(state),
+    spunto: state.spunto || null,
+    carteAi: state.carteAi || {},
     scenes: state.scenes,
+    dilemmiAi: state.dilemmiAi || {},
   };
 }
 

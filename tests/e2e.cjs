@@ -81,15 +81,27 @@ const MOCK_REPORT = {
   assi_confidenza: { Analisi: 'alta', Relazione: 'alta', 'Creatività': 'media', 'Curiosità': 'media', Leadership: 'bassa', Metodo: 'alta' },
 };
 
-// Scene personalizzate e report del test a capitoli, come li scriverebbe l'AI.
-const AI_SCENE = { scene: [
-  { id: 'ai1', titolo: 'La app in ritardo', testo: 'La nuova app per i clienti va in prova domani e mancano dei pezzi.', domanda: 'Cosa fai?', opzioni: [
-    { testo: 'Sento chi la userà per capire cosa conta', asse: 'Relazione' }, { testo: 'Rifaccio la lista delle cose da chiudere', asse: 'Metodo' },
-    { testo: 'Guardo come l\'hanno risolto altri team', asse: 'Curiosità' }, { testo: 'Provo subito la app sul telefono', asse: 'Concretezza' }] },
-  { id: 'ai2', titolo: 'La campagna nuova', testo: 'In agenzia si apre una campagna per un cliente di moda.', domanda: 'Da dove parti?', opzioni: [
-    { testo: 'Butto giù tre idee di concept', asse: 'Creatività' }, { testo: 'Propongo io come dividerci il lavoro', asse: 'Leadership' },
-    { testo: 'Studio il pubblico che non conosco', asse: 'Curiosità' }, { testo: 'Preparo un calendario delle consegne', asse: 'Metodo' }] },
-] };
+// Testi del test a capitoli come li scriverebbe l'AI, costruiti dalla
+// richiesta del browser: stesse dimensioni, parole riambientate "in reparto".
+function aiV2(fase, body) {
+  const req = JSON.parse(body.messages[0].content);
+  const low = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+  if (fase === 'carte') return { carte: req.carte.map((c) => ({ id: c.id, testo: `In reparto: ${low(c.testo)}` })) };
+  if (fase === 'giornata') {
+    return { scene: req.scene.map((sc) => {
+      const opt = (o) => ({ asse: o.asse, testo: `In reparto scelgo ${low(o.asse)}`, ...(o.mittente ? { mittente: `Reparto ${o.asse}` } : {}), eco: `Hai scelto ${low(o.asse)}, {nome}: il reparto se ne accorge.` });
+      const domanda = sc.tipo === 'rank' ? 'Quali apri per primi? Toccane tre, in ordine.' : sc.tipo === 'energia' ? 'Cosa ti ha dato energia in reparto?' : 'Cosa fai in reparto?';
+      return {
+        id: sc.id, titolo: `In reparto · ${sc.id}`, testo: `Una situazione in reparto (${sc.id}), con ${req.colleghi.collega}.`, domanda,
+        ...(sc.domanda2 ? { domanda2: 'E poi, in reparto?' } : {}),
+        opzioni: sc.opzioni.map(opt),
+        ...(sc.opzioni2 ? { opzioni2: sc.opzioni2.map(opt) } : {}),
+      };
+    }) };
+  }
+  if (fase === 'dilemmi') return { dilemmi: req.dilemmi.map((d) => ({ id: d.id, intro: `Il giorno dopo, {nome}, in reparto (${d.id}).`, a: `In reparto: ${low(d.a.testo)}`, b: `In reparto: ${low(d.b.testo)}` })) };
+  return {};
+}
 const AI_REPORT_V2 = { report: {
   chi_sei: { come_funzioni: 'Paragrafo come funzioni.', cosa_ti_alimenta: 'Paragrafo cosa ti alimenta.', di_cosa_hai_bisogno: 'Paragrafo bisogni.' },
   riepilogo_aziende: 'Questa persona lavora bene con gli altri.',
@@ -108,7 +120,7 @@ function claudeReply(fase, body, counters) {
   }
   if (fase === 'report') return text({ report: MOCK_REPORT });
   if (fase === 'report_v2') return text(AI_REPORT_V2);
-  if (fase === 'scene') return text(AI_SCENE);
+  if (fase === 'carte' || fase === 'giornata' || fase === 'dilemmi') return text(aiV2(fase, body));
   if (fase === 'compatibilita') return text({ match: 64, titolo: 'Compatibile in parte', descrizione: 'Ti somiglia per metà: serve più metodo.' });
   if (fase === 'dizionario') return text({ ruolo: { nome: 'Data Analyst', titoli_alternativi: ['Analista dati'], descrizione: 'Trasforma dati in decisioni.', giornata_tipo: 'SQL e riunioni.', con_chi_lavora: ['Product'], come_si_entra: 'Stage.', stipendio_junior: '28k', stipendio_senior: '50k', trend: 'in crescita', trend_descrizione: 'Richiesto.', cosa_non_sai: 'Parla molto.', titoli_adiacenti: ['BI Analyst'] } });
   if (fase === 'azienda_test') {
@@ -120,7 +132,7 @@ function claudeReply(fase, body, counters) {
   return text({});
 }
 
-async function newPage(browser, { session = false, cv = false, reports = false, mobile = true, sb = {}, sceneFail = false } = {}) {
+async function newPage(browser, { session = false, cv = false, reports = false, mobile = true, sb = {}, aiFail = false } = {}) {
   const ctx = await browser.newContext(mobile
     ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
     : { viewport: { width: 1280, height: 860 } });
@@ -140,7 +152,7 @@ async function newPage(browser, { session = false, cv = false, reports = false, 
     apiLog.push({ url, body, headers: r.request().headers() });
     if (url.endsWith('/api/claude')) {
       if (counters.fail429) { counters.fail429--; return r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Troppe richieste' }) }); }
-      if (body.fase === 'scene' && sceneFail) return r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"x"}' });
+      if (['carte', 'giornata', 'dilemmi'].includes(body.fase) && aiFail) return r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"x"}' });
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(claudeReply(body.fase, body, counters)) });
     }
     if (url.endsWith('/api/azienda')) {
@@ -245,7 +257,7 @@ async function actV2(page, { drag = false } = {}) {
   }
   if (await visible(page, '.v2-dil-opt')) { await page.locator('.v2-dil-opt').nth(cardTurn++ % 2).click(); return 'dilemma'; }
   if (await visible(page, 'input[aria-label="Il tuo nome"]')) { await page.fill('input[aria-label="Il tuo nome"]', 'Giulia'); await page.click('text=Continua'); return 'nome'; }
-  if (title === 'In che momento sei?') { await page.locator('.v2-opt').nth(2).click(); return 'momento'; }
+  if (/in che momento sei\?$/i.test(title)) { await page.locator('.v2-opt').nth(2).click(); return 'momento'; }
   if (await visible(page, '.v2-chip')) {
     await page.locator('.v2-chip', { hasText: 'Tecnologia e digitale' }).click();
     await page.locator('.v2-chip', { hasText: 'Media, comunicazione e marketing' }).click();
@@ -255,7 +267,7 @@ async function actV2(page, { drag = false } = {}) {
   if (await visible(page, '.v2-budget')) {
     const plus = page.locator('.v2-budget-row [data-op="+"]');
     for (const [row, n] of [[1, 4], [5, 3], [6, 2], [0, 1]]) for (let i = 0; i < n; i++) await plus.nth(row).click();
-    await page.click('text=Avanti');
+    await page.locator('#v2-stage .v2-main-btn').click();
     return 'budget';
   }
   if (await visible(page, '.v2-scene-head')) {
@@ -263,13 +275,13 @@ async function actV2(page, { drag = false } = {}) {
     if (/Toccane tre/.test(q)) {
       const opts = page.locator('.v2-opt');
       await opts.nth(1).click(); await opts.nth(4).click(); await opts.nth(0).click();
-      await page.click('text=Avanti');
+      await page.locator('#v2-stage .v2-main-btn').click();
       return 'posta';
     }
-    if (/energia/.test(q) && await visible(page, 'text=Avanti')) {
+    if (/energia/.test(q) && await visible(page, '#v2-stage .v2-main-btn')) {
       const opts = page.locator('.v2-opt');
       await opts.nth(1).click(); await opts.nth(3).click();
-      await page.click('text=Avanti');
+      await page.locator('#v2-stage .v2-main-btn').click();
       return 'energia';
     }
     await page.locator('.v2-opt').first().click();
@@ -432,16 +444,22 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         await noOverflow(vp, 'intro');
         await vp.screenshot({ path: SHOTS + '/v2-01-intro.png' });
       });
-      await t('prologo: nome, momento, mondi; parte la richiesta delle scene personalizzate', async () => {
+      await t('prologo: nome usato subito; ai mondi partono le richieste all\'AI (carte, giornata, dilemmi) senza il nome', async () => {
+        await runV2Until(vp, async () => /in che momento sei/i.test(await vp.locator('#v2-stage .v2-title').textContent().catch(() => '')));
+        assert((await vp.locator('#v2-stage .v2-title').textContent()) === 'Giulia, in che momento sei?', 'nome non usato nel prologo');
         await runV2Until(vp, async () => (await stepTitle(vp)) === 'Capitolo 1 di 3');
-        const sc = V.apiLog.filter(a => a.body.fase === 'scene');
-        assert(sc.length === 1, 'richieste scene: ' + sc.length);
-        const msg = JSON.parse(sc[0].body.messages[0].content);
-        assert(msg.mondi.includes('Tecnologia e digitale') && msg.scene.length === 2, JSON.stringify(msg));
-        assert(!sc[0].body.messages[0].content.includes('Giulia'), 'il nome non deve andare all\'AI delle scene');
+        const ai = V.apiLog.filter(a => ['carte', 'giornata', 'dilemmi'].includes(a.body.fase));
+        const conta = (f) => ai.filter(a => a.body.fase === f).length;
+        assert(conta('carte') === 1 && conta('giornata') === 2 && conta('dilemmi') === 1, 'richieste: ' + ai.map(a => a.body.fase).join(','));
+        ai.forEach(a => assert(!a.body.messages[0].content.includes('Giulia'), 'il nome non deve andare all\'AI (' + a.body.fase + ')'));
+        const parti = ai.filter(a => a.body.fase === 'giornata').map(a => JSON.parse(a.body.messages[0].content));
+        assert(parti.map(p => p.parte).sort().join() === 'mattina,pomeriggio', 'metà della giornata');
+        assert(parti.every(p => p.mondi.includes('Tecnologia e digitale') && p.colleghi.collega && p.spunto), JSON.stringify(parti[0]).slice(0, 200));
         await vp.screenshot({ path: SHOTS + '/v2-02-capitolo1.png' });
       });
       await t('carte: si rispondono con i bottoni e trascinando; la costellazione e l\'orologio avanzano', async () => {
+        await runV2Until(vp, async () => (await stepTitle(vp)) === 'Carta 1 di 28');
+        assert(!(await vp.locator('.v2-card-text').textContent()).startsWith('In reparto'), 'le prime carte partono con il testo standard');
         await runV2Until(vp, async () => (await stepTitle(vp)) === 'Carta 3 di 28', { drag: true });
         await vp.screenshot({ path: SHOTS + '/v2-03-carta.png' });
         const ora = await vp.locator('#v2-ora').textContent();
@@ -454,6 +472,10 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         assert((await stepTitle(vp)) === 'Carta 2 di 28', await stepTitle(vp));
         await actV2(vp); await vp.waitForTimeout(400);
         assert((await stepTitle(vp)) === 'Carta 3 di 28');
+      });
+      await t('dalla quarta carta in poi le attività sono riscritte nel mondo scelto', async () => {
+        await runV2Until(vp, async () => (await stepTitle(vp)) === 'Carta 5 di 28');
+        assert((await vp.locator('.v2-card-text').textContent()).startsWith('In reparto: '), 'carta non riscritta dall\'AI: ' + await vp.locator('.v2-card-text').textContent());
       });
       await t('ricaricare a metà mazzo riprende dalla stessa carta, con un avviso', async () => {
         await runV2Until(vp, async () => (await stepTitle(vp)) === 'Carta 10 di 28');
@@ -470,17 +492,24 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         assert((await p2.getAttribute('#hero-test-cta', 'href')) === 'test-v2.html');
         await p2.close();
       });
-      await t('la giornata: posta, scena personalizzata dall\'AI, cielo che cambia, imprevisto in due mosse', async () => {
+      await t('la giornata è scritta dall\'AI, risponde alle scelte (eco) e usa il nome; cielo che cambia, imprevisto in due mosse', async () => {
         await runV2Until(vp, async () => (await visible(vp, '.v2-scene-head')) && /Toccane tre/.test(await vp.locator('.v2-question').textContent()));
         assert((await vp.locator('#v2-ora').textContent()) === '09:00');
         assert(await vp.locator('.v2-layer.on[data-fase="mattino"]').count() === 1, 'cielo del mattino non attivo');
+        assert((await vp.locator('.v2-scene-titolo').textContent()) === 'In reparto · posta', 'posta non scritta dall\'AI');
+        assert(!(await visible(vp, '.v2-eco')), 'la prima scena non ha una scelta precedente');
         await vp.screenshot({ path: SHOTS + '/v2-04-posta.png' });
-        await actV2(vp); await vp.waitForTimeout(400);
+        const primo = await vp.locator('.v2-opt').nth(1).locator('.v2-opt-from').textContent();
+        await actV2(vp); await vp.waitForTimeout(500); // posta: la prima scelta è la seconda opzione mostrata
+        const eco = await vp.locator('.v2-eco').textContent();
+        const asse = primo.replace('Reparto ', '');
+        assert(eco === `Hai scelto ${asse.charAt(0).toLowerCase() + asse.slice(1)}, Giulia: il reparto se ne accorge.`, 'eco: ' + eco + ' / ' + primo);
         await actV2(vp); await vp.waitForTimeout(500); // riunione
-        assert((await vp.locator('.v2-scene-titolo').textContent()) === 'La app in ritardo', 'scena AI non usata: ' + await vp.locator('.v2-scene-titolo').textContent());
+        assert((await vp.locator('.v2-scene-titolo').textContent()) === 'In reparto · avvio', 'scena AI non usata: ' + await vp.locator('.v2-scene-titolo').textContent());
+        assert(await visible(vp, '.v2-eco'), 'manca l\'eco della riunione');
         await vp.screenshot({ path: SHOTS + '/v2-05-scena-ai.png' });
         await actV2(vp); await vp.waitForTimeout(500);
-        assert((await vp.locator('.v2-scene-titolo').textContent()) === 'L\'imprevisto');
+        assert((await vp.locator('.v2-scene-titolo').textContent()) === 'In reparto · imprevisto');
         await vp.locator('.v2-opt').nth(1).click(); await vp.waitForTimeout(450);
         assert(await visible(vp, '.v2-pill'), 'manca la prima mossa');
         assert(await vp.locator('.v2-opt').count() === 3, 'la seconda mossa deve avere 3 opzioni');
@@ -502,7 +531,10 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
       await t('fine giornata e dilemmi adattivi (da 4 a 6), poi epilogo e risultato', async () => {
         await runV2Until(vp, async () => (await stepTitle(vp)) === 'Capitolo 3 di 3');
         assert(await vp.locator('.v2-layer.on[data-fase="notte"]').count() === 1, 'cielo della notte non attivo');
+        assert((await vp.locator('#v2-stage .v2-text').textContent()).startsWith('Giulia, la giornata è finita'), 'nome non usato nel capitolo 3');
         await runV2Until(vp, () => visible(vp, '.v2-dil-opt'));
+        assert(/^Il giorno dopo, Giulia, in reparto/.test(await vp.locator('.v2-dil-intro').textContent()), 'dilemma non riscritto dall\'AI');
+        assert((await vp.locator('.v2-dil-opt').first().textContent()).startsWith('In reparto: '));
         await vp.screenshot({ path: SHOTS + '/v2-07-dilemma.png' });
         await runV2Until(vp, () => visible(vp, '.v2-role-card'));
         const st = await vp.evaluate(() => JSON.parse(localStorage.getItem('rf_v2_state')));
@@ -526,7 +558,10 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         assert(h.hist.length === 2 && h.hist[0].role === 'user', 'storia sintetica');
         assert(h.ans.some(a => a.id === 'nome' && a.answer === 'Giulia'), 'nome mancante nelle risposte');
         assert(h.asp === 'Product Manager', 'aspirazione');
-        assert(r.scene_fonte.ai1 === 'ai' && r.scene_fonte.ai2 === 'ai', 'scene AI non registrate: ' + JSON.stringify(r.scene_fonte));
+        assert(r.fonti.scene_ai.length === 7, 'scene AI non registrate: ' + JSON.stringify(r.fonti));
+        assert(r.fonti.carte_ai >= 20 && r.fonti.carte === 28, 'carte AI: ' + JSON.stringify(r.fonti));
+        assert(r.fonti.dilemmi_ai === r.fonti.dilemmi, 'dilemmi AI: ' + JSON.stringify(r.fonti));
+        assert(r.prove.some(p => p.testo.includes('reparto')), 'le prove non citano i testi visti');
         await noOverflow(vp, 'risultato');
       });
       await t('report completo: senza login c\'è il cancello email e la bozza porta con sé tutto il test', async () => {
@@ -543,9 +578,9 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
       await V.ctx.close();
       await t('nessun errore JavaScript durante il test a capitoli', async () => { assert(vErr.length === 0, vErr.join(' | ')); });
 
-      await t('se l\'AI delle scene non risponde si usano le scene standard e il test si completa', async () => {
+      await t('se l\'AI non risponde si usano carte, scene e dilemmi standard e il test si completa', async () => {
         cardTurn = 0;
-        const F = await newPage(browser, { sceneFail: true, mobile: false });
+        const F = await newPage(browser, { aiFail: true, mobile: false });
         await F.page.goto(BASE + '/test-v2.html');
         await runV2Until(F.page, async () => (await visible(F.page, '.v2-scene-titolo')) && (await F.page.locator('.v2-scene-titolo').textContent()) === 'Il progetto mai fatto', {}, 140);
         await runV2Until(F.page, () => visible(F.page, '.v2-role-card'), {}, 80);
@@ -554,7 +589,7 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         // il disegno della costellazione deve avere le stesse proporzioni del riquadro (niente stelle deformate)
         const prop = await F.page.evaluate(() => { const c = document.getElementById('v2-stars'); const b = c.getBoundingClientRect(); return { bw: c.width / b.width, bh: c.height / b.height }; });
         assert(Math.abs(prop.bw - prop.bh) < 0.02, 'costellazione deformata: ' + JSON.stringify(prop));
-        assert(r.scene_fonte.ai1 === 'standard' && r.scene_fonte.ai2 === 'standard', JSON.stringify(r.scene_fonte));
+        assert(r.fonti.scene_ai.length === 0 && r.fonti.carte_ai === 0 && r.fonti.dilemmi_ai === 0, JSON.stringify(r.fonti));
         await F.page.screenshot({ path: SHOTS + '/v2-09-risultato-desktop.png' });
         assert(F.errors.length === 0, F.errors.join(' | '));
         await F.ctx.close();
@@ -594,6 +629,23 @@ const stepTitle = (page) => page.evaluate(() => document.querySelector('#v2-stag
         await R.ctx.close();
       });
 
+      await t('tornando indietro e cambiando mondi, l\'AI riscrive tutto per i mondi nuovi', async () => {
+        cardTurn = 0;
+        const M = await newPage(browser);
+        await M.page.goto(BASE + '/test-v2.html');
+        await runV2Until(M.page, async () => (await stepTitle(M.page)) === 'Capitolo 1 di 3');
+        await M.page.waitForTimeout(500);
+        await M.page.click('#v2-back'); await M.page.waitForTimeout(300);
+        await M.page.locator('.v2-chip', { hasText: 'Sanità e farmaceutico' }).click();
+        await M.page.locator('#v2-stage .v2-main-btn').click();
+        await M.page.waitForTimeout(900);
+        const mondi = (f) => M.apiLog.filter(a => a.body.fase === f).map(a => JSON.parse(a.body.messages[0].content).mondi.join('+'));
+        assert(mondi('carte').join('|') === 'Tecnologia e digitale+Media, comunicazione e marketing|Sanità e farmaceutico', 'carte: ' + mondi('carte').join('|'));
+        assert(mondi('giornata').filter(m => m === 'Sanità e farmaceutico').length === 2, 'giornata: ' + mondi('giornata').join('|'));
+        assert(mondi('dilemmi').pop() === 'Sanità e farmaceutico', 'dilemmi: ' + mondi('dilemmi').join('|'));
+        assert(M.errors.length === 0, M.errors.join(' | '));
+        await M.ctx.close();
+      });
       await t('home: ?test=2 manda al test a capitoli; di base resta il test classico', async () => {
         const H = await newPage(browser);
         await H.page.goto(BASE + '/index.html');
