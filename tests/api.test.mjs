@@ -16,6 +16,7 @@ const claude = claudeMod.default;
 const azienda = (await import('../api/azienda.js')).default;
 const account = (await import('../api/account.js')).default;
 const cv = (await import('../api/cv.js')).default;
+const keepalive = (await import('../api/keepalive.js')).default;
 
 let pass = 0;
 let fail = 0;
@@ -34,6 +35,8 @@ function res() {
   const r = { statusCode: 200, body: null };
   r.status = (c) => { r.statusCode = c; return r; };
   r.json = (b) => { r.body = b; return r; };
+  r.headers = {};
+  r.setHeader = (k, v) => { r.headers[k] = v; };
   return r;
 }
 let fetchLog = [];
@@ -326,6 +329,47 @@ await t('report del test a capitoli: risposta dell\'AI illeggibile → 500, nien
   await cv(req({}, { auth: 'Bearer good' }), r);
   assert.equal(r.statusCode, 500);
   assert.equal(inserted, null);
+});
+
+console.log('\napi/keepalive.js — il controllo che tiene sveglio il database');
+const getReq = (headers = {}) => ({ method: 'GET', headers: { host: 'rolefit.test', ...headers } });
+let dbStatus = 200;
+stubFetch(async (url, opts) => {
+  if (url === 'https://sb.test/rest/v1/profiles?select=id&limit=1' && opts.headers.apikey === 'service') return { status: dbStatus, body: [{ id: U1 }] };
+  return { status: 500, body: {} };
+});
+await t('con CRON_SECRET risponde solo al cron; fa una lettura minima e non restituisce dati', async () => {
+  process.env.CRON_SECRET = 'segreto';
+  let r = res(); await keepalive(getReq(), r); assert.equal(r.statusCode, 401);
+  r = res(); await keepalive(getReq({ authorization: 'Bearer altro' }), r); assert.equal(r.statusCode, 401);
+  assert.equal(fetchLog.length, 0, 'senza segreto giusto non tocca il database');
+  r = res(); await keepalive(getReq({ authorization: 'Bearer segreto' }), r);
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.body.ok, true);
+  assert.ok(!JSON.stringify(r.body).includes(U1), 'restituisce dati del database');
+  assert.equal(r.headers['Cache-Control'], 'no-store');
+  r = res(); await keepalive({ method: 'POST', headers: { authorization: 'Bearer segreto' } }, r); assert.equal(r.statusCode, 405);
+});
+await t('se il database non risponde lo segnala con 502', async () => {
+  dbStatus = 503;
+  const r = res(); await keepalive(getReq({ authorization: 'Bearer segreto' }), r);
+  dbStatus = 200;
+  assert.equal(r.statusCode, 502);
+  assert.equal(r.body.ok, false);
+});
+await t('senza CRON_SECRET funziona lo stesso, ma con un tetto di chiamate', async () => {
+  delete process.env.CRON_SECRET;
+  let last;
+  for (let i = 0; i < 6; i++) { last = res(); await keepalive(getReq(), last); assert.equal(last.statusCode, 200, `chiamata ${i + 1}`); }
+  last = res(); await keepalive(getReq(), last);
+  assert.equal(last.statusCode, 429);
+});
+await t('vercel.json: il controllo parte una volta al giorno', () => {
+  const conf = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const job = conf.crons.find((c) => c.path === '/api/keepalive');
+  assert.ok(job, 'cron mancante');
+  const [min, ora, ...resto] = job.schedule.split(' ');
+  assert.ok(/^\d+$/.test(min) && /^\d+$/.test(ora) && resto.join(' ') === '* * *', 'deve essere giornaliero: ' + job.schedule);
 });
 
 console.log(`\n${pass} superati, ${fail} falliti`);
